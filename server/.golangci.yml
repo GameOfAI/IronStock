@@ -1,0 +1,68 @@
+run:
+  timeout: 5m
+  go: "1.22"
+
+linters:
+  disable-all: true
+  enable:
+    # Correctness
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - bodyclose
+    - noctx
+    - errorlint
+    - nilerr
+    - sqlclosecheck
+    - rowserrcheck
+
+    # Style & simplicity
+    - gosimple
+    - gofmt
+    - goimports
+    - misspell
+    - revive
+    - gocritic
+    - unconvert
+    - unparam
+    - whitespace
+
+    # Security
+    - gosec
+
+linters-settings:
+  revive:
+    severity: warning
+    rules:
+      - name: var-naming
+      - name: exported
+      - name: package-comments
+      - name: unused-parameter
+      - name: unused-receiver
+      - name: early-return
+  gosec:
+    excludes:
+      - G104  # Errors unhandled — errcheck already covers this
+  gocritic:
+    disabled-checks:
+      - ifElseChain
+      - singleCaseSwitch
+  misspell:
+    locale: US
+
+issues:
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - gosec
+        - errcheck
+        - unparam
+    - path: cmd/
+      linters:
+        - revive  # main.go doesn't need package comments on every func
+      text: "exported"

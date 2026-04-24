@@ -1,0 +1,70 @@
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+*~
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.iml
+
+# Go
+/server/bin/
+/server/dist/
+*.exe
+*.test
+*.out
+coverage.*
+vendor/
+
+# Rust
+/client/src-tauri/target/
+**/*.rs.bk
+Cargo.lock.bak
+
+# Node / Vite
+node_modules/
+dist/
+.vite/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.turbo/
+
+# Build / Output
+/build/
+/tmp/
+/out/
+
+# Env
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Docker volume data
+/data/
+/deploy/compose/data/
+
+# Secrets — asla commit edilmez
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+secrets/
+.secrets/
+
+# Generated code
+/shared/api/generated/
+/shared/types/generated/
+
+# Test & coverage
+coverage/
+*.coverprofile
+.nyc_output/
