@@ -1,0 +1,66 @@
+version: "2"
+# sqlc config — https://docs.sqlc.dev/en/latest/reference/config.html
+# SQL şemasını migrations/'dan okur, queries/'deki SQL'leri Go kod'a çevirir.
+#
+# Çalıştırma: `make gen-sqlc` veya `cd server && sqlc generate`
+
+sql:
+  - engine: postgresql
+    schema: "migrations"
+    queries: "queries"
+    gen:
+      go:
+        package: "sqlcgen"
+        out: "internal/db/sqlcgen"
+        sql_package: "pgx/v5"
+
+        # JSON tag'leri HTTP serialize için. snake_case default (API convention).
+        emit_json_tags: true
+        json_tags_case_style: "snake"
+
+        # Querier interface'i — mock'lama ve test kolaylığı.
+        emit_interface: true
+
+        # DB row tip isimleri "User" (tekil) olsun, "Users" değil.
+        emit_exact_table_names: false
+
+        # Nil vs boş slice — boş slice döner, client nil-check yapmaz.
+        emit_empty_slices: true
+
+        # Pointer'lar yerine sql.Null* tip aileleri.
+        emit_pointers_for_null_types: false
+
+        # Prepared statement cache'i biz açıkça yönetiyoruz, sqlc üretmesin.
+        emit_prepared_queries: false
+
+        # Overrides: Postgres tipleri ↔ Go tipleri.
+        overrides:
+          - db_type: "uuid"
+            go_type:
+              import: "github.com/google/uuid"
+              type: "UUID"
+          - db_type: "uuid"
+            nullable: true
+            go_type:
+              import: "github.com/google/uuid"
+              type: "NullUUID"
+          - db_type: "timestamptz"
+            go_type: "time.Time"
+          - db_type: "bytea"
+            go_type: "[]byte"
+          - db_type: "jsonb"
+            go_type: "[]byte"
+          - db_type: "inet"
+            go_type:
+              import: "net/netip"
+              type: "Addr"
+          - db_type: "inet"
+            nullable: true
+            go_type:
+              import: "net/netip"
+              type: "Addr"
+              pointer: true
+
+    # sqlc lint kuralları — tight type safety.
+    rules:
+      - sqlc/db-prepare

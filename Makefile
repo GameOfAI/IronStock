@@ -1,9 +1,11 @@
 .PHONY: help up down logs ps \
 	build build-server build-web build-client \
 	test test-server test-web test-client \
-	lint lint-server lint-web lint-client \
+	lint lint-server lint-web lint-client lint-openapi \
 	fmt fmt-server fmt-web fmt-client \
-	migrate-up migrate-down \
+	migrate-up migrate-down migrate-status migrate-redo \
+	gen gen-sqlc gen-oapi-go gen-oapi-ts gen-check \
+	tools-install \
 	clean
 
 .DEFAULT_GOAL := help
@@ -78,11 +80,45 @@ fmt-client:
 	cd client && npm run format && cd src-tauri && cargo fmt
 
 # ---------- DB Migration ----------
-migrate-up: ## DB migration'ları uygula (Faz 1 sonrası)
-	cd server && go run ./cmd/migrate up
+migrate-up: ## DB migration'ları uygula
+	cd server && goose -dir migrations postgres "$$ENVANTER_DB_URL" up
 
 migrate-down: ## Son migration'ı geri al
-	cd server && go run ./cmd/migrate down
+	cd server && goose -dir migrations postgres "$$ENVANTER_DB_URL" down
+
+migrate-status: ## Migration durumu
+	cd server && goose -dir migrations postgres "$$ENVANTER_DB_URL" status
+
+migrate-redo: ## Son migration'ı down + up
+	cd server && goose -dir migrations postgres "$$ENVANTER_DB_URL" redo
+
+# ---------- Code Generation ----------
+gen: gen-sqlc gen-oapi-go gen-oapi-ts ## Tüm üretilen kodu yeniden üret (sqlc + oapi-codegen + openapi-typescript)
+
+gen-sqlc: ## sqlc: SQL → Go (DB layer)
+	cd server && sqlc generate
+
+gen-oapi-go: ## oapi-codegen: OpenAPI → Go handler interface
+	cd server && oapi-codegen -config oapi-codegen.yaml ../shared/api/openapi.yaml
+
+gen-oapi-ts: ## openapi-typescript: OpenAPI → TypeScript types (web + client)
+	cd web && npx --yes openapi-typescript@latest ../shared/api/openapi.yaml -o src/api/schema.gen.ts
+	cd client && npx --yes openapi-typescript@latest ../shared/api/openapi.yaml -o src/api/schema.gen.ts
+
+gen-check: gen ## CI: üretilen kod güncel mi (diff boş olmalı)
+	git diff --exit-code -- server/internal/db/sqlcgen server/internal/httpapi/apigen \
+		web/src/api/schema.gen.ts client/src/api/schema.gen.ts \
+		|| (echo "Generated code drifted. Run 'make gen' and commit."; exit 1)
+
+lint-openapi: ## OpenAPI spec lint (Redocly)
+	npx --yes @redocly/cli@latest lint shared/api/openapi.yaml
+
+# ---------- Tool Installation ----------
+tools-install: ## Go tool'larını kur (sqlc, oapi-codegen, goose, golangci-lint)
+	go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.27.0
+	go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.3.0
+	go install github.com/pressly/goose/v3/cmd/goose@v3.22.0
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.55.2
 
 # ---------- Cleanup ----------
 clean: ## Build artifact'lerini temizle

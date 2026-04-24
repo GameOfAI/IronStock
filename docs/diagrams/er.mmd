@@ -1,0 +1,235 @@
+%% Envanter App — Tam ER Diyagramı (Faz 1 revize)
+%%
+%% Mermaid syntax. Rendering için:
+%%   - VS Code: "Markdown Preview Mermaid Support" eklentisi
+%%   - GitHub / GitLab: .md dosyasına gömülmüş halde otomatik
+%%   - CLI: npx @mermaid-js/mermaid-cli -i er.mmd -o er.png
+%%   - Online zoom: https://mermaid.live/
+%%
+%% Kardinalite notasyonu (Mermaid):
+%%   ||--||  tam bire bir
+%%   ||--o|  bire sıfır-veya-bir
+%%   ||--o{  bire çok (sıfır veya daha fazla)
+%%   ||--|{  bire çok (en az bir)
+%%
+%% Şifreleme notasyonu (ADR-0004):
+%%   [ENV]  server-side envelope (master_key → per-item DEK → AES-256-GCM)
+%%   [E2E]  client-side E2E (kullanıcı master password'undan türeyen key / X25519 wrap)
+%%   [HMAC] deterministic hash (arama için)
+%%   [HASH] one-way hash (doğrulama için, geri alınmaz)
+
+erDiagram
+    %% ---------- Auth & Identity ----------
+    USERS ||--o{ USER_ROLES : "has"
+    ROLES ||--o{ USER_ROLES : "granted_to"
+    USERS ||--o| USER_KEYPAIRS : "owns"
+    USERS ||--o| TOTP_SECRETS : "has"
+    USERS ||--o{ RECOVERY_CODES : "generated"
+    USERS ||--o{ SESSIONS : "opens"
+
+    %% ---------- Inventory Structure ----------
+    USERS ||--o{ FOLDERS : "creates"
+    USERS ||--o{ ITEMS : "creates"
+    FOLDERS ||--o{ FOLDERS : "parent_of"
+    FOLDERS ||--o{ ITEMS : "contains"
+    FOLDERS ||--o{ FOLDER_PERMISSIONS : "scoped_to"
+    USERS ||--o{ FOLDER_PERMISSIONS : "granted_to"
+    ITEM_TYPES ||--o{ ITEMS : "categorizes"
+    ITEMS ||--|{ ITEM_FIELDS : "has"
+    FIELD_DEFINITIONS ||--o{ ITEM_FIELDS : "typed_by"
+    ITEMS ||--o{ ITEM_SHARES : "shared_with"
+    USERS ||--o{ ITEM_SHARES : "granted_to"
+    ITEMS ||--o{ ITEM_RELATIONSHIPS : "source"
+    ITEMS ||--o{ ITEM_RELATIONSHIPS : "target"
+
+    %% ---------- Keys & Audit ----------
+    MASTER_KEYS ||--o{ ITEMS : "wraps_server_dek"
+    MASTER_KEYS ||--o{ FOLDERS : "wraps_name"
+    MASTER_KEYS ||--o{ TOTP_SECRETS : "wraps_secret"
+    USERS ||--o{ AUDIT_LOG : "actor"
+
+    %% ============ Tablolar ============
+
+    USERS {
+        uuid id PK
+        text username UK
+        text email UK
+        bytea password_hash "Argon2id [HASH]"
+        jsonb argon2_params "t, m, p, salt_len"
+        text status "pending_totp|active|disabled|locked"
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz last_login_at
+        int failed_login_attempts
+        timestamptz locked_until
+    }
+
+    ROLES {
+        smallint id PK
+        text name UK "admin | write | read"
+        text description
+    }
+
+    USER_ROLES {
+        uuid user_id PK_FK
+        smallint role_id PK_FK
+        timestamptz granted_at
+        uuid granted_by FK
+    }
+
+    USER_KEYPAIRS {
+        uuid user_id PK_FK
+        smallint version
+        bytea public_key "X25519 32B"
+        bytea private_key_enc "[E2E] master-password key ile"
+        bytea kek_salt "Argon2id salt"
+        jsonb kek_params
+        timestamptz created_at
+        timestamptz rotated_at
+    }
+
+    TOTP_SECRETS {
+        uuid user_id PK_FK
+        bytea secret_enc "[ENV]"
+        smallint master_key_id FK
+        bytea nonce
+        boolean verified
+        timestamptz created_at
+        timestamptz verified_at
+    }
+
+    RECOVERY_CODES {
+        uuid id PK
+        uuid user_id FK
+        bytea code_hash "Argon2id [HASH]"
+        timestamptz used_at
+        inet used_ip
+        timestamptz created_at
+    }
+
+    SESSIONS {
+        uuid id PK
+        uuid user_id FK
+        bytea refresh_token_hash "SHA-256"
+        text user_agent
+        inet ip_address
+        timestamptz created_at
+        timestamptz last_used_at
+        timestamptz expires_at
+        timestamptz revoked_at
+        text revoke_reason
+    }
+
+    MASTER_KEYS {
+        smallint id PK
+        smallint version UK
+        bytea wrapped_key "KMS (Faz 5) / k8s Secret (dev)"
+        text wrap_method "kms|k8s-secret"
+        boolean active
+        timestamptz created_at
+        timestamptz rotated_at
+    }
+
+    ITEM_TYPES {
+        smallint id PK
+        text key UK "server|url|database|ssh_key|note|generic|certificate|..."
+        text label "UI etiketi"
+        text icon "UI icon adı, opsiyonel"
+        jsonb suggested_fields "field_definitions.key array (UI default form için)"
+        jsonb default_launchers "external launcher default'ları (ssh/url/db, Faz 4'te)"
+        uuid created_by FK "null=sistem seed"
+        timestamptz created_at
+    }
+
+    FIELD_DEFINITIONS {
+        bigserial id PK
+        text key UK "hostname|ip_address|password|environment|...  (normalize lowercase_snake_case)"
+        text label "UI etiketi"
+        text field_type "text|password|url|number|boolean|multiline|ip|port|email|ssh_key|enum"
+        jsonb allowed_values "field_type=enum için array"
+        boolean is_secret "true -> E2E, false -> server envelope"
+        text hint "UI hint/help text"
+        text validation_regex "opsiyonel"
+        uuid created_by FK "null=sistem seed"
+        timestamptz created_at
+    }
+
+    FOLDERS {
+        uuid id PK
+        uuid parent_id FK "null=kök"
+        bytea name_enc "[ENV]"
+        bytea name_nonce
+        bytea name_search "[HMAC]"
+        smallint master_key_id FK
+        int position
+        uuid created_by FK
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    FOLDER_PERMISSIONS {
+        uuid folder_id PK_FK
+        uuid user_id PK_FK
+        text permission "read|write"
+        boolean inherit_to_children "alt klasörlere de geçer mi"
+        uuid granted_by FK
+        timestamptz granted_at
+        timestamptz revoked_at
+    }
+
+    ITEMS {
+        uuid id PK
+        uuid folder_id FK
+        smallint item_type_id FK "ITEM_TYPES referansı"
+        bytea name_enc "[ENV]"
+        bytea name_nonce
+        bytea name_search "[HMAC]"
+        bytea server_dek_wrapped "master_key ile wrap"
+        smallint master_key_id FK
+        jsonb external_source "null=native; {type:vault, path, key_mapping} Faz 5"
+        uuid created_by FK
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    ITEM_FIELDS {
+        uuid id PK
+        uuid item_id FK
+        bigint field_definition_id FK "FIELD_DEFINITIONS referansı"
+        bytea value_enc "null ise external_source'dan gelir"
+        bytea value_nonce
+        int position
+    }
+
+    ITEM_SHARES {
+        uuid id PK
+        uuid item_id FK
+        uuid user_id FK
+        bytea e2e_dek_wrapped "user.public_key (X25519) ile wrap"
+        bytea wrap_nonce
+        text permission "read|write"
+        uuid granted_by FK
+        timestamptz granted_at
+        timestamptz revoked_at
+    }
+
+    ITEM_RELATIONSHIPS {
+        uuid source_item_id PK_FK
+        uuid target_item_id PK_FK
+        text relationship_type PK "hosted_on|accessed_via|part_of|related_to|depends_on"
+        jsonb metadata "ek context (port, path, notes)"
+        uuid created_by FK
+        timestamptz created_at
+    }
+
+    AUDIT_LOG {
+        bigserial id PK
+        uuid actor_user_id FK
+        text action "auth.login|item.create|item.share_grant|..."
+        text resource_type "user|item|folder|session|role|folder_permission|..."
+        uuid resource_id
+        jsonb details
+        inet ip_address
+        text user_agent
+        timestamptz created_at
+    }

@@ -11,7 +11,12 @@ DevOps/SRE takımı için envanter yönetim uygulaması. KeePassXC'ye alternatif
 - Web Admin UI: React + Vite + TypeScript — kullanıcı/rol yönetimi, envanter görüntüleme
 - Client: Tauri (Rust) — Windows + macOS native, ağaç UI + offline cache
 - Auth: Username + password (Argon2id) + TOTP (RFC 6238, Google Authenticator uyumlu)
-- RBAC: read / write rolleri
+- **3-katmanlı RBAC:**
+  - Global rol: `admin` / `write` / `read`
+  - Klasör-level ACL: `folder_permissions` (inherit_to_children)
+  - Item-level share: `item_shares` (per-user wrapped DEK)
+- **Dinamik veri modeli:** `item_types` (server/url/database/ssh_key/…) + `field_definitions` (merkezi field sözlüğü, hostname/ip_address/environment vs), `item_relationships` (hosted_on, accessed_via, depends_on…).
+- **External secret backends:** HashiCorp Vault proxy (Faz 5) — native item'ların yanında Vault-backed item'lar, aynı UI. ADR-0007.
 
 ## Tech Stack
 
@@ -33,8 +38,9 @@ DevOps/SRE takımı için envanter yönetim uygulaması. KeePassXC'ye alternatif
 - **Secret field'lar** (parola, private key, token, URL credential): client-side E2E — kullanıcı master parolasından Argon2id ile türetilen key ile şifrelenir. Server plaintext'i asla görmez.
 - **Paylaşılan item'lar**: per-item DEK üretilir, yetkili kullanıcıların public key'leri (X25519) ile wrap edilir.
 - **Audit log**: server-side plaintext (uyumluluk ve okunabilirlik için).
+- **Vault-backed item'lar**: Envanter path referansı tutar, secret'ı DB'ye yazmaz. Erişim anında Vault'tan canlı çekilir (proxy). Detay ADR-0007.
 
-Detaylı tasarım: `docs/adr/0002-security-model.md` (Faz 1'de yazılacak).
+Detaylı tasarım: [docs/adr/0002-security-model.md](docs/adr/0002-security-model.md) (Faz 1'de yazıldı) + [docs/adr/0004-encryption-details.md](docs/adr/0004-encryption-details.md) (algoritma detayları).
 
 ## Dizin Yapısı
 

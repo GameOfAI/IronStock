@@ -1,0 +1,27 @@
+# oapi-codegen — https://github.com/oapi-codegen/oapi-codegen
+# OpenAPI spec'ten Go server interface + request/response modelleri üretir.
+#
+# Çalıştırma: `make gen-oapi-go` veya:
+#   cd server && oapi-codegen -config oapi-codegen.yaml ../shared/api/openapi.yaml
+
+package: apigen
+output: internal/httpapi/apigen/api.gen.go
+
+# Hangi parçalar üretilsin:
+generate:
+  chi-server: true         # chi router için handler interface
+  models: true             # request/response struct'ları
+  embedded-spec: true      # runtime'da spec'e erişim (validation, /docs servisi)
+  strict-server: true      # strict responses — return type guarantee
+
+# chi middleware fiyaskolarını önle:
+output-options:
+  skip-prune: false
+  skip-fmt: false
+  user-templates: {}
+
+# Additional imports için:
+import-mapping: {}
+
+# Response tiplerini UnmarshalJSON hızlı impl ile:
+additional-imports: []

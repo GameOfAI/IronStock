@@ -4,17 +4,17 @@ Son güncelleme: 2026-04-24
 
 ## Mevcut Durum
 
-- **Aktif Faz:** Faz 0 — Temel kurulum (kod tarafı tamam, kullanıcı smoke test'i bekleniyor)
-- **Tamamlanan Faz:** —
+- **Aktif Faz:** Faz 1 — Veri modeli + kripto tasarımı **kapandı** (tasarım + 5 ADR + migration + OpenAPI + code gen + 2 ek ADR genişletme)
+- **Tamamlanan Faz:** Faz 0 (kod iskeleti) + Faz 1 (veri modeli ve tasarım)
 - **Bloker:** Yok
-- **Bir sonraki adım:** Kullanıcının lokal dev makinesinde `docs/smoke-test.md` adımlarını çalıştırması. Yeşil olursa Faz 1'e geçilir.
+- **Bir sonraki adım:** Kullanıcı migration'ları (`make migrate-up`) + code gen (`make gen`) lokalde doğrulayıp commit'ler. Sonra **Faz 2 — Server MVP** başlar.
 
 ## Faz Durumu
 
 | Faz | Durum | Başlangıç | Bitiş | Not |
 |-----|-------|-----------|-------|-----|
-| 0 — Temel kurulum | VERIFY | 2026-04-24 | — | Kod yazıldı, user smoke test'i bekleniyor |
-| 1 — Veri modeli + kripto tasarımı | TODO | — | — | ER diyagram + ADR'ler + migration iskeleti |
+| 0 — Temel kurulum | VERIFY | 2026-04-24 | 2026-04-24 | Kod yazıldı, lokal smoke test user tarafında |
+| 1 — Veri modeli + kripto tasarımı | DONE | 2026-04-24 | 2026-04-24 | ER (17 tablo) + ADR 0004/0005/0006/0007 + auth-flow + 5 migration + OpenAPI + code gen |
 | 2 — Server MVP | TODO | — | — | Auth + RBAC + CRUD + WebSocket + audit |
 | 3 — Admin Web UI | TODO | — | — | Login + user mgmt + ağaç view |
 | 4 — Client MVP (Tauri) | TODO | — | — | Win+Mac, live sync, offline cache, E2E |
@@ -35,6 +35,19 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `VERIFY` doğrulama bek
 - [x] Tauri client iskeleti (Rust src-tauri + Vite + React + TS)
 - [x] Faz 0 smoke test kılavuzu (docs/smoke-test.md)
 - [ ] **User aksiyonu:** Smoke test'in lokalde çalıştırılması ve CI'ın ilk push'ta yeşile gelmesi
+
+## Faz 1 Task İlerlemesi
+
+- [x] ER diyagram (Mermaid) — `docs/diagrams/er.mmd` (11 tablo: auth + inventory + audit + keys)
+- [x] Şifreleme detayları ADR — `docs/adr/0004-encryption-details.md` (AES-256-GCM + Argon2id + X25519 + HMAC search)
+- [x] Migration tool ADR — `docs/adr/0005-migration-tool.md` (goose seçimi)
+- [x] Auth flow dokümantasyonu — `docs/auth-flow.md` (9 senaryo Mermaid sequence diagram)
+- [x] Tasarım review — 6 karar netleşti (UUID v7, MFA mandatory, recovery=new keypair, auto-lock 10dk, searchable enc kabul, session binding=flag)
+- [x] İlk 5 migration: `00001_init_extensions` + `00002_users` + `00003_roles` + `00004_sessions` + `00005_audit_log`
+- [x] OpenAPI v1 taslak — `shared/api/openapi.yaml` (health + 10 auth endpoint)
+- [x] Code gen pipeline: `server/sqlc.yaml` + `server/oapi-codegen.yaml` + Makefile `gen`/`gen-*` hedefleri
+- [x] sqlc query örnekleri: `server/queries/{users,sessions,roles,audit_log}.sql`
+- [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
 
@@ -61,18 +74,72 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `VERIFY` doğrulama bek
   - `docs/smoke-test.md` kullanıcı için doğrulama kılavuzu
 - **Not:** Lokal dev ortamında Go/Node/Rust/Docker kurulu değil — smoke test user'ın kendi makinesinde yapılacak.
 
-## Mimari Kararlar (Özet)
+### 2026-04-24 (2. iş günü) — Faz 1 tasarım + implementasyon
+- Repo lokal git'e alındı (`Desktop/Repos/Envanter_App`), ilk commit `c65a4be`.
+- **Faz 1 — Veri modeli + kripto tasarımı tamamlandı.** Sıralı iş:
+  1. ER diyagramı (Mermaid, 11 tablo). `users`, `user_keypairs`, `totp_secrets`, `recovery_codes`, `sessions`, `roles`, `user_roles`, `master_keys`, `folders`, `items`, `item_fields`, `item_shares`, `audit_log`.
+  2. ADR-0004 — Şifreleme detayları: AES-256-GCM (nonce 12B, tag 16B, versiyonlu blob formatı), Argon2id (t=3, m=64MiB, p=4), X25519 sealed-box key wrap, HMAC-SHA256 search. Key hierarchy: KMS/Secret → master_key → server_dek (metadata); user_password → KEK → user_priv → e2e_dek (secrets).
+  3. ADR-0005 — `goose` seçildi. SQL-first, embed, review-friendly. Atlas değerlendirildi, ekip tercihinde review-first felsefesine uymuyor.
+  4. Auth akış dokümantasyonu — 9 senaryo Mermaid sequence ile. Register + TOTP enroll + login + refresh rotation + auto-lock + logout + password change + recovery + admin reset.
+  5. **Review çıktıları (6 karar):**
+     - UUID v7 client-üretimli ✓
+     - MFA zorunlu; login'de TOTP, unlock'ta sadece master password
+     - Recovery code → yeni keypair (solo item kaybı kabul, UI'da prominent uyarı)
+     - Auto-lock default 10dk (5/10/15/30 configurable)
+     - Searchable encryption HMAC hash — frequency leak kabul
+     - Session binding = flag (block değil); token reuse detection → tüm session'lar revoke
+  6. 5 migration (`00001` init extensions + `00002` users + `00003` roles + `00004` sessions + `00005` audit_log). pgcrypto, `set_updated_at()` trigger, CHECK constraints, partial index'ler, BRIN index audit_log'da.
+  7. OpenAPI 3.1 spec — `shared/api/openapi.yaml`. Health + 10 auth endpoint (register, TOTP init/verify, login, refresh, logout, logout-all, change-password, recover/init, recover/complete).
+  8. Code gen pipeline: `sqlc.yaml` + 4 query dosyası (users/sessions/roles/audit_log), `oapi-codegen.yaml`, Makefile `gen`/`gen-sqlc`/`gen-oapi-go`/`gen-oapi-ts`/`gen-check` hedefleri. `tools-install` hedefiyle Go tool'ları pin versiyonlu.
 
-Tam ADR'ler `docs/adr/` altında (Faz 0 task'ı olarak oluşturulacak).
+### 2026-04-24 (3. iterasyon) — Faz 1 genişleme: UX + RBAC + Vault tasarımı
+
+Kullanıcı review sırasında ürün için 4 ek boyut tanımladı; hepsi için tasarım kararları alındı, belgeler güncellendi. **SQL migration'ları Faz 2'ye bırakıldı** (sadece admin rolü eklemesi 00003'te).
+
+**Karar özeti:**
+- **Objeler arası link** (`item_relationships` tablosu) — 5 edge tipi: `hosted_on`, `accessed_via`, `part_of`, `related_to`, `depends_on`. DevOps topolojisini yansıtır (DB ↔ sunucu, jump server zinciri).
+- **Item tipleri** (`item_types` ayrı tablo, enum değil) — admin yeni tip ekleyebilir. 8 seed: server / url / database / ssh_key / certificate / cloud_credential / note / generic. Her tipin `suggested_fields` ve `default_launchers` (Faz 4) metadata'sı var.
+- **Merkezi field sözlüğü** (`field_definitions` tablosu) — hostname/host_name drift'ini engeller. Type-to-search autocomplete UI'da. `field_type` içinde `enum` desteği (`allowed_values jsonb`) — `environment` (prod/stage/test/dev/lab) ve `criticality` (critical/high/medium/low) seed'li. `is_secret` artık tanımın parçası (E2E mi envelope mi otomatik).
+- **3-katmanlı RBAC** — ADR-0006 §4:
+  1. Global rol: `admin` / `write` / `read` (3 rol; admin rolü eklendi, 00003 revize)
+  2. Klasör-level ACL: `folder_permissions` tablosu, `inherit_to_children`
+  3. Item-level share: mevcut `item_shares`
+  - Effective permission hesabı auth-flow.md'de pseudocode olarak.
+- **External secret backends** (ADR-0007) — HashiCorp Vault **proxy** modeli:
+  - Envanter Vault'tan DB'ye yazmaz, passthrough eder (E2E modeli bozulmaz)
+  - `items.external_source jsonb` kolonu path referansı tutar
+  - Kubernetes auth (k8s SA → Vault AppRole) MVP; OIDC SSO parking lot
+  - Dynamic secrets (15dk kısa ömürlü DB cred) Faz 5+ bonus
+  - **Manuel linking only** (MVP) — auto-discovery parking lot
+- **Organizational convention** — proje/ortam folder düzeni + `environment` field cross-cutting sorgu için.
+
+**Güncellenen dosyalar (9):**
+- `docs/diagrams/er.mmd` — 17 tabloya çıktı (yeni: item_types, field_definitions, folder_permissions, item_relationships; modifiye: items +external_source, item_fields ↔ field_definitions)
+- `docs/adr/0006-data-model-extensions.md` — YENİ
+- `docs/adr/0007-external-secret-backends.md` — YENİ
+- `docs/adr/README.md` — 0006 + 0007 index'e
+- `docs/auth-flow.md` — RBAC 3 katman + endpoint matrix genişletildi
+- `server/migrations/00003_roles.sql` — admin rolü seed'e
+- `CLAUDE.md` — RBAC katmanları + Vault notu
+- `PROGRESS.md` — bu entry
+- `TODO.md` — Faz 2 migration listesi + Parking Lot güncellendi
+
+## Mimari Kararlar (Özet)
 
 | No | Karar | Durum |
 |----|-------|-------|
-| 0001 | Tech stack: Go + Tauri + Postgres + monorepo | Kabul edildi (2026-04-24) |
-| 0002 | Güvenlik modeli: hibrit (server-side envelope + client-side E2E) | Kabul edildi (2026-04-24) |
-| 0003 | Repo layout: monorepo (server/ + client/ + web/ + shared/ + deploy/ + docs/) | Kabul edildi (2026-04-24) |
+| 0001 | Tech stack: Go + Tauri + Postgres + monorepo | Kabul (2026-04-24) |
+| 0002 | Güvenlik modeli: hibrit (server-side envelope + client-side E2E) | Kabul (2026-04-24) |
+| 0003 | Repo layout: monorepo | Kabul (2026-04-24) |
+| 0004 | Şifreleme detayları: AES-256-GCM + Argon2id + X25519 + HMAC search | Kabul (2026-04-24) |
+| 0005 | Migration tool: goose | Kabul (2026-04-24) |
+| 0006 | Veri modeli: item_types, field_definitions, folder_permissions, item_relationships + admin rolü | Kabul (2026-04-24) |
+| 0007 | External secret backends: Vault proxy (manuel linking, Faz 5 impl) | Kabul (2026-04-24) |
 
 ## Bloker / Risk / Not
 
 - **2026-04-24:** Lokal makinede Go, Node, Rust, Docker kurulu değil — CI'a push edilene kadar gerçek build/test verifikasyonu yok. Kullanıcı `docs/smoke-test.md`'deki adımları lokal dev makinesinde çalıştırmalı.
 - Tauri iconları (Faz 4'te) eklenmeden `tauri:build` warning verebilir. `tauri:dev` sorunsuz çalışır.
 - `go.sum`, `package-lock.json`, `Cargo.lock` henüz yok — ilk `go mod tidy` / `npm install` / `cargo build` komutlarında üretilecek ve commit'lenecek.
+- **Faz 1 sonu:** Migration'lar Postgres üzerinde çalıştırılmadı (lokal ortam yok). Kullanıcı `make migrate-up` ile doğrulamalı.
+- Code gen henüz çalıştırılmadı; `server/internal/db/sqlcgen/`, `server/internal/httpapi/apigen/`, `web/src/api/schema.gen.ts`, `client/src/api/schema.gen.ts` dosyaları yok. `make gen` ilk kez çalıştırıldığında üretilecek ve commit'lenmeli (CI `make gen-check` ile drift'i yakalar).

@@ -1,0 +1,613 @@
+openapi: 3.1.0
+info:
+  title: Envanter App API
+  version: 0.1.0
+  description: |
+    DevOps/SRE envanter yönetim uygulaması REST API'si.
+
+    **Faz 1 taslağı** — sadece health + auth endpoint'leri. Envanter endpoint'leri
+    (/folders, /items) Faz 2'de eklenecek.
+
+    ## Security Model
+    - Hibrit şifreleme (bkz. ADR-0002 ve ADR-0004).
+    - Server secret field'ları plaintext görmez (client-side E2E).
+    - Audit log server-side plaintext.
+
+    ## API Sürümü
+    `/api/v1/` prefix. Breaking change → `/v2/`.
+
+    ## Tokens
+    - `access_token` — JWT, 15dk ömür, `Authorization: Bearer` header'ında.
+    - `refresh_token` — opaque 32B, 7g ömür, rotating. `Authorization: Bearer` header'ında
+      sadece `/auth/refresh` endpoint'inde.
+    - `tmp_token` — tek kullanımlık, 15dk, recovery veya TOTP enrollment için.
+
+  contact:
+    name: Envanter App Maintainers
+  license:
+    name: Proprietary
+
+servers:
+  - url: http://localhost:8080
+    description: Local dev
+  - url: https://envanter.example.internal
+    description: Production (placeholder)
+
+tags:
+  - name: health
+    description: Service health endpoints (no auth required)
+  - name: auth
+    description: Authentication & authorization (register, login, MFA, recovery)
+
+security:
+  - BearerAuth: []
+
+paths:
+  # ==================== HEALTH ====================
+
+  /healthz:
+    get:
+      tags: [health]
+      summary: Liveness probe
+      description: Uygulamanın ayakta olduğunu doğrular. Bağımlılıkları (DB) kontrol etmez.
+      security: []
+      responses:
+        "200":
+          description: Servis canlı
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /readyz:
+    get:
+      tags: [health]
+      summary: Readiness probe
+      description: Uygulamanın trafik alabilir durumda olduğunu doğrular. DB bağlantısını kontrol eder.
+      security: []
+      responses:
+        "200":
+          description: Servis hazır
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "503":
+          description: Servis hazır değil (DB bağlantı sorunu vs)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ==================== AUTH ====================
+
+  /api/v1/auth/register:
+    post:
+      tags: [auth]
+      summary: Yeni kullanıcı kaydı
+      description: |
+        İlk kullanıcı kaydı. Kayıt tamamlandığında `status='pending_totp'` — TOTP
+        enrollment tamamlanana kadar login yapılamaz.
+
+        Client master_password'dan KEK türetir, X25519 keypair üretir, private key'i
+        KEK ile şifreler ve server'a yollar (server priv plaintext'i görmez).
+
+        Bkz. docs/auth-flow.md Senaryo 1.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Kayıt tamam
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisterResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          description: Username veya email zaten kullanımda
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/v1/auth/totp/init:
+    post:
+      tags: [auth]
+      summary: TOTP enrollment başlat
+      description: |
+        Kullanıcı için TOTP secret üretir, QR kod için `otpauth://` URI döner.
+        `pending_totp` statüsündeki kullanıcılar çağırabilir (register sonrası).
+      security:
+        - TempBearerAuth: []
+      responses:
+        "200":
+          description: TOTP init bilgisi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TOTPInitResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/auth/totp/verify:
+    post:
+      tags: [auth]
+      summary: TOTP ilk doğrulama (enrollment tamamla)
+      description: |
+        Kullanıcı authenticator'dan aldığı ilk kodu doğrular. Başarılıysa
+        `status='active'` yapılır, 10 adet recovery code üretilip bir kere gösterilir.
+      security:
+        - TempBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TOTPVerifyRequest"
+      responses:
+        "200":
+          description: TOTP doğrulandı, recovery code'lar (**bir kere**)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TOTPVerifyResponse"
+        "400":
+          description: Kod geçersiz (`invalid_code`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/auth/login:
+    post:
+      tags: [auth]
+      summary: Giriş yap (password + TOTP)
+      description: |
+        Tek adımda password + TOTP doğrulaması. Başarılıysa access + refresh token
+        döner; ek olarak user_keypair bilgileri (client KEK + priv key çıkartması için).
+
+        Bkz. docs/auth-flow.md Senaryo 3.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Giriş başarılı
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: "`invalid_credentials` / `invalid_mfa` / `account_pending_totp` / `account_locked`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/v1/auth/refresh:
+    post:
+      tags: [auth]
+      summary: Access token yenile (refresh token rotation)
+      description: |
+        Refresh token kullanılarak yeni access + refresh çifti alınır. **Eski refresh
+        revoke edilir** (rotation).
+
+        Aynı refresh iki kez kullanılırsa (reuse detection) → tüm user session'ları
+        revoke edilir.
+
+        Bkz. docs/auth-flow.md Senaryo 4.
+      security:
+        - RefreshAuth: []
+      responses:
+        "200":
+          description: Yeni token çifti
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RefreshResponse"
+        "401":
+          description: "`invalid_refresh` veya `token_reuse_detected`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/auth/logout:
+    post:
+      tags: [auth]
+      summary: Mevcut session'ı sonlandır
+      description: İstek gelen session'ı revoke eder. Diğer device'lar etkilenmez.
+      responses:
+        "204":
+          description: Logout başarılı
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/auth/logout-all:
+    post:
+      tags: [auth]
+      summary: Tüm session'ları sonlandır
+      description: Kullanıcının TÜM aktif session'larını revoke eder (panic button).
+      responses:
+        "204":
+          description: Tüm session'lar revoke
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/auth/change-password:
+    post:
+      tags: [auth]
+      summary: Master password değiştir (eski password biliniyor)
+      description: |
+        Client eski password ile priv key'i açar, yeni KEK türetir, priv key'i
+        yeniden şifreler. Keypair korunur → item_shares erişimi kaybolmaz.
+
+        Bkz. docs/auth-flow.md Senaryo 7.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordRequest"
+      responses:
+        "204":
+          description: Değiştirildi
+        "401":
+          description: Eski password yanlış
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/auth/recover/init:
+    post:
+      tags: [auth]
+      summary: Master password kurtarma başlat (recovery code ile)
+      description: |
+        Recovery code ile kimlik doğrulanır. Başarılıysa 15dk ömürlü `tmp_token` döner.
+        Sonraki adım `/auth/recover/complete`.
+
+        **Kritik uyarı:** Kurtarma sonrası kullanıcı **yeni keypair** üretecek → eski
+        keypair ile wrap edilmiş item'lara (solo) erişim kaybedilir. UI'da prominent
+        gösterilmeli.
+
+        Bkz. docs/auth-flow.md Senaryo 8.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecoverInitRequest"
+      responses:
+        "200":
+          description: tmp_token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecoverInitResponse"
+        "401":
+          description: "`invalid_recovery_code`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/v1/auth/recover/complete:
+    post:
+      tags: [auth]
+      summary: Kurtarma tamamla — yeni password + yeni keypair
+      description: |
+        `tmp_token` bearer ile yeni master password + yeni public_key + yeni
+        `private_key_enc` gönderilir. Tüm session'lar revoke, kullanıcı yeniden login
+        olmalı.
+      security:
+        - TempBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecoverCompleteRequest"
+      responses:
+        "204":
+          description: Kurtarma tamam
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+components:
+  # ---------- Security ----------
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token (JWT, 15dk)
+    RefreshAuth:
+      type: http
+      scheme: bearer
+      description: Refresh token (opaque, 7g, rotating)
+    TempBearerAuth:
+      type: http
+      scheme: bearer
+      description: Geçici token (tek kullanımlık, 15dk; TOTP enrollment veya recovery için)
+
+  # ---------- Reusable responses ----------
+  responses:
+    Unauthorized:
+      description: Token geçersiz, eksik veya expired
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    BadRequest:
+      description: İstek body'si veya parametreleri geçersiz
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    RateLimited:
+      description: Rate limit aşıldı
+      headers:
+        Retry-After:
+          schema: { type: integer }
+          description: Kaç saniye beklenmeli
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  # ---------- Schemas ----------
+  schemas:
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Machine-readable hata kodu
+          examples: [invalid_credentials, rate_limited, token_reuse_detected]
+        message:
+          type: string
+          description: Kullanıcı-yüzü mesaj (Türkçe)
+        details:
+          type: object
+          description: Ek context (opsiyonel). Secret içermez.
+          additionalProperties: true
+
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        version:
+          type: string
+          description: Server sürümü (semver)
+          example: "0.1.0"
+
+    Argon2Params:
+      type: object
+      description: Argon2id parametreleri. Donanım gelişimiyle yükseltilebilir.
+      required: [t, m, p, v]
+      properties:
+        t: { type: integer, description: "time_cost", example: 3 }
+        m: { type: integer, description: "memory_cost (KiB)", example: 65536 }
+        p: { type: integer, description: "parallelism", example: 4 }
+        v: { type: integer, description: "Argon2 version", example: 19 }
+
+    EncryptedBlob:
+      type: string
+      format: byte
+      description: |
+        Base64 encoded versiyonlu şifreli blob. Format:
+        `[version:1][alg_id:1][nonce:12][ciphertext:N][auth_tag:16]`.
+        Detay için ADR-0004 §3.
+
+    PublicKey:
+      type: string
+      format: byte
+      description: X25519 public key (32B), base64 encoded.
+      example: "3cGKUvsyzd8q2i4Tlf9PvN7v0JVH5sCGi/TIXJb5dXc="
+
+    # ---------- Auth: Register ----------
+    RegisterRequest:
+      type: object
+      required: [username, email, master_password, public_key, private_key_enc, kek_salt, kek_params]
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 64
+          pattern: "^[a-zA-Z0-9._-]+$"
+        email:
+          type: string
+          format: email
+          maxLength: 255
+        master_password:
+          type: string
+          minLength: 12
+          description: TLS altında ham gönderilir; server Argon2id hash'ler ve plaintext'i siler.
+        public_key:
+          $ref: "#/components/schemas/PublicKey"
+        private_key_enc:
+          $ref: "#/components/schemas/EncryptedBlob"
+        kek_salt:
+          type: string
+          format: byte
+          description: 16B random, base64. Client KEK derivation için.
+        kek_params:
+          $ref: "#/components/schemas/Argon2Params"
+
+    RegisterResponse:
+      type: object
+      required: [user_id, tmp_token]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        tmp_token:
+          type: string
+          description: TOTP enrollment için 15dk geçici token
+
+    # ---------- Auth: TOTP ----------
+    TOTPInitResponse:
+      type: object
+      required: [otpauth_uri]
+      properties:
+        otpauth_uri:
+          type: string
+          description: "`otpauth://totp/Envanter:username?secret=BASE32&issuer=Envanter&algorithm=SHA1&digits=6&period=30`"
+        qr_png_data_url:
+          type: string
+          description: QR kod PNG'si data URL olarak (opsiyonel, UI kolaylığı için)
+
+    TOTPVerifyRequest:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          pattern: "^[0-9]{6}$"
+
+    TOTPVerifyResponse:
+      type: object
+      required: [recovery_codes]
+      properties:
+        recovery_codes:
+          type: array
+          description: 10 adet 16-haneli kod. **Bir kere gösterilir**, kullanıcı güvenli yere kaydetmeli.
+          items: { type: string }
+          minItems: 10
+          maxItems: 10
+
+    # ---------- Auth: Login ----------
+    LoginRequest:
+      type: object
+      required: [username, master_password, totp_code]
+      properties:
+        username: { type: string }
+        master_password: { type: string }
+        totp_code:
+          type: string
+          pattern: "^[0-9]{6}$"
+
+    LoginResponse:
+      type: object
+      required: [access_token, refresh_token, user, keypair]
+      properties:
+        access_token:
+          type: string
+          description: JWT (15dk)
+        refresh_token:
+          type: string
+          description: Opaque 32B hex, 7g, rotating
+        user:
+          $ref: "#/components/schemas/UserPublic"
+        keypair:
+          $ref: "#/components/schemas/KeypairForClient"
+
+    UserPublic:
+      type: object
+      required: [id, username, email, roles, status]
+      properties:
+        id: { type: string, format: uuid }
+        username: { type: string }
+        email: { type: string, format: email }
+        roles:
+          type: array
+          items:
+            type: string
+            enum: [read, write]
+        status:
+          type: string
+          enum: [pending_totp, active, disabled, locked]
+        last_login_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+
+    KeypairForClient:
+      type: object
+      description: Client master_password'dan KEK türetip priv_enc'i açacak.
+      required: [public_key, private_key_enc, kek_salt, kek_params]
+      properties:
+        public_key:
+          $ref: "#/components/schemas/PublicKey"
+        private_key_enc:
+          $ref: "#/components/schemas/EncryptedBlob"
+        kek_salt:
+          type: string
+          format: byte
+        kek_params:
+          $ref: "#/components/schemas/Argon2Params"
+
+    # ---------- Auth: Refresh ----------
+    RefreshResponse:
+      type: object
+      required: [access_token, refresh_token]
+      properties:
+        access_token: { type: string }
+        refresh_token: { type: string }
+
+    # ---------- Auth: Change Password ----------
+    ChangePasswordRequest:
+      type: object
+      required: [old_password, new_password, new_kek_salt, new_kek_params, new_private_key_enc]
+      properties:
+        old_password:
+          type: string
+          description: Mevcut master password (ham, server Argon2id ile verify)
+        new_password:
+          type: string
+          minLength: 12
+        new_kek_salt:
+          type: string
+          format: byte
+        new_kek_params:
+          $ref: "#/components/schemas/Argon2Params"
+        new_private_key_enc:
+          $ref: "#/components/schemas/EncryptedBlob"
+
+    # ---------- Auth: Recovery ----------
+    RecoverInitRequest:
+      type: object
+      required: [username, recovery_code]
+      properties:
+        username: { type: string }
+        recovery_code:
+          type: string
+          description: 16-haneli kurtarma kodu (register veya TOTP enrollment sırasında verilmişti)
+
+    RecoverInitResponse:
+      type: object
+      required: [tmp_token]
+      properties:
+        tmp_token:
+          type: string
+          description: 15dk, tek kullanımlık
+
+    RecoverCompleteRequest:
+      type: object
+      required: [new_password, new_kek_salt, new_kek_params, new_public_key, new_private_key_enc]
+      properties:
+        new_password: { type: string, minLength: 12 }
+        new_kek_salt: { type: string, format: byte }
+        new_kek_params: { $ref: "#/components/schemas/Argon2Params" }
+        new_public_key: { $ref: "#/components/schemas/PublicKey" }
+        new_private_key_enc: { $ref: "#/components/schemas/EncryptedBlob" }
