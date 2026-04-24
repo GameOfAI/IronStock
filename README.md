@@ -1,5 +1,7 @@
 # Envanter App
 
+[![CI](https://github.com/bhaslaman/Envanter_App/actions/workflows/ci.yml/badge.svg)](https://github.com/bhaslaman/Envanter_App/actions/workflows/ci.yml)
+
 DevOps/SRE takımı için merkezi envanter yönetim uygulaması. KeePassXC'ye alternatif olarak tasarlandı — canlı sync, MFA, RBAC ve offline destek içerir.
 
 ## Durum
