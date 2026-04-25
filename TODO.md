@@ -47,9 +47,16 @@ TodoWrite ile senkronize çalışır — aktif session'daki live task listesi To
 - [x] httpapi router unit testler (httptest, fakeDB) — 6 test
 - [x] CI matrix: Go 1.22 → stable (pgx min 1.25)
 
-### 🔜 PR-3: Migrations (Faz 2 ek tablolar) — `feat/server-migrations` (SIRADA)
+### ✅ PR-3: Migrations + Integration Test — `feat/server-migrations` (REVIEW BEKLIYOR)
 
-PR-2 merge sonrası: Faz 2'deki diğer tabloları + testcontainers-go ile gerçek DB integration test.
+- [x] 12 migration: master_keys, user_keypairs, totp_secrets, recovery_codes, item_types(+8 seed), field_definitions(+30 seed), folders, folder_permissions, items(external_source), item_fields, item_shares, item_relationships
+- [x] testcontainers-go integration test (up/down/up + seed validation)
+- [x] CI `server-integration` job (Go 1.23, Docker)
+- [x] Makefile `test-integration` target
+- [x] sqlc queries (minimal): field_definitions + item_types
+- [x] Lokal validation: build/test/lint clean
+
+### 🔜 PR-4: Crypto package — `feat/server-crypto` (SIRADA — PR-3 merge sonrası)
 
 - [ ] `00006_user_keypairs.sql`
 - [ ] `00007_totp_secrets.sql`

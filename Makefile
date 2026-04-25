@@ -1,6 +1,6 @@
 .PHONY: help up down logs ps \
 	build build-server build-web build-client \
-	test test-server test-web test-client \
+	test test-server test-web test-client test-integration \
 	lint lint-server lint-web lint-client lint-openapi \
 	fmt fmt-server fmt-web fmt-client \
 	migrate-up migrate-down migrate-status migrate-redo \
@@ -44,7 +44,7 @@ build-client: ## Tauri client'ı build et (Win+Mac)
 	cd client && npm run tauri build
 
 # ---------- Test ----------
-test: test-server test-web test-client ## Tüm testleri çalıştır
+test: test-server test-web test-client ## Tüm unit testleri çalıştır
 
 test-server:
 	cd server && go test ./...
@@ -54,6 +54,9 @@ test-web:
 
 test-client:
 	cd client && npm test
+
+test-integration: ## Server integration testleri (Docker + Postgres testcontainers)
+	cd server && go test -tags=integration -timeout=10m -v ./internal/db/...
 
 # ---------- Lint ----------
 lint: lint-server lint-web lint-client ## Tüm linter'ları çalıştır
