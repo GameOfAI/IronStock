@@ -80,8 +80,8 @@ jobs:
           if-no-files-found: ignore
 
   # ---------------- Docker Build & Push (GHCR) ----------------
-  # main push → amd64-only (~5dk)
-  # v* tag push → multi-arch amd64+arm64 (release distribution)
+  # Dockerfile uses --platform=$BUILDPLATFORM (native cross-compile, no QEMU).
+  # Both main push and v* tag push build linux/amd64,linux/arm64 (~8dk total).
   docker:
     name: Docker Build & Push
     runs-on: ubuntu-latest
@@ -105,11 +105,7 @@ jobs:
       - name: Determine platforms
         id: platforms
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
-            echo "list=linux/amd64,linux/arm64" >> $GITHUB_OUTPUT
-          else
-            echo "list=linux/amd64" >> $GITHUB_OUTPUT
-          fi
+          echo "list=linux/amd64,linux/arm64" >> $GITHUB_OUTPUT
 
       - name: Determine tags
         id: tags
