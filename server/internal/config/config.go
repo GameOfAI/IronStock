@@ -40,8 +40,8 @@ func Load() (*Config, error) {
 		LogLevel:              strings.ToLower(envOr("ENVANTER_LOG_LEVEL", "info")),
 		LogFormat:             strings.ToLower(envOr("ENVANTER_LOG_FORMAT", "json")),
 		DBURL:                 os.Getenv("ENVANTER_DB_URL"),
-		DBMaxConns:            int32(envIntOr("ENVANTER_DB_MAX_CONNS", 10)),
-		DBMinConns:            int32(envIntOr("ENVANTER_DB_MIN_CONNS", 2)),
+		DBMaxConns:            envInt32Or("ENVANTER_DB_MAX_CONNS", 10),
+		DBMinConns:            envInt32Or("ENVANTER_DB_MIN_CONNS", 2),
 		DBHealthCheckInterval: envDurationOr("ENVANTER_DB_HEALTH_CHECK_INTERVAL", 30*time.Second),
 	}
 	if err := cfg.Validate(); err != nil {
@@ -88,10 +88,12 @@ func envOr(key, def string) string {
 	return def
 }
 
-func envIntOr(key string, def int) int {
+// envInt32Or parses an int32 from env (bitSize=32 → no overflow risk).
+// Used for DB pool sizes (pgxpool expects int32).
+func envInt32Or(key string, def int32) int32 {
 	if v := os.Getenv(key); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			return n
+		if n, err := strconv.ParseInt(v, 10, 32); err == nil {
+			return int32(n)
 		}
 	}
 	return def

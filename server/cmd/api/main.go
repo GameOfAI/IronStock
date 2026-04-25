@@ -1,13 +1,11 @@
 // Envanter App API server entrypoint.
 //
-// Faz 2 PR-1 (foundation): config + logging wired in. HTTP layer hâlâ stdlib
-// http.ServeMux ile minimal — chi router + middleware stack PR-2'de gelecek.
-// DB pool da PR-2'de eklenecek (pgx + pgxpool dependency'siyle birlikte).
+// Faz 2 PR-2: chi router + middleware + pgx pool + DB health check.
+// Auth and inventory endpoints come in PR-3+.
 package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -18,6 +16,8 @@ import (
 	"time"
 
 	"envanter.app/server/internal/config"
+	"envanter.app/server/internal/db"
+	"envanter.app/server/internal/httpapi"
 	"envanter.app/server/internal/logging"
 )
 
@@ -43,16 +43,39 @@ func run() error {
 		slog.String("log_format", cfg.LogFormat),
 	)
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/healthz", healthz)
+	rootCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// --- DB pool ---
+	logger.Info("connecting to database",
+		slog.Int("max_conns", int(cfg.DBMaxConns)),
+		slog.Int("min_conns", int(cfg.DBMinConns)),
+	)
+	pool, err := db.New(rootCtx, db.Config{
+		URL:                 cfg.DBURL,
+		MaxConns:            cfg.DBMaxConns,
+		MinConns:            cfg.DBMinConns,
+		HealthCheckInterval: cfg.DBHealthCheckInterval,
+	})
+	if err != nil {
+		return fmt.Errorf("db: %w", err)
+	}
+	defer pool.Close()
+	logger.Info("database connected")
+
+	// --- HTTP layer ---
+	router := httpapi.NewRouter(httpapi.Deps{
+		Logger: logger,
+		DB:     pool,
+	})
 
 	srv := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           mux,
+		Handler:           router,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
-	// Server hayatı goroutine'de; ana goroutine sinyal bekler.
+	// --- Lifecycle ---
 	serverErr := make(chan error, 1)
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -71,8 +94,8 @@ func run() error {
 		return err
 	}
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
-	defer cancel()
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+	defer shutdownCancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		logger.Error("graceful shutdown failed", slog.String("error", err.Error()))
@@ -80,10 +103,4 @@ func run() error {
 	}
 	logger.Info("shutdown complete")
 	return nil
-}
-
-func healthz(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }

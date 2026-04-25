@@ -25,7 +25,13 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        go: ["1.22"]
+        # Go 1.23 — pin'lenmiş çünkü:
+        # 1. golangci-lint v1.62.2 binary'si Go 1.23 ile derlenmiş; Go 1.26 SDK'sındaki
+        #    fips140only_go1.26.go gibi dosyaları typecheck edemiyor (v2.x'e migrate
+        #    edilince stable'a dönülebilir).
+        # 2. go-version değişimi setup-go cache key'ini invalidate eder, eski stale
+        #    modül cache'i (pgx v5.9.2 vs) temizlenir.
+        go: ["1.23"]
     defaults:
       run:
         working-directory: server
@@ -60,9 +66,9 @@ jobs:
           fi
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v4
+        uses: golangci/golangci-lint-action@v6
         with:
-          version: v1.55.2
+          version: v1.62.2
           working-directory: server
           args: --timeout=5m
 
@@ -151,12 +157,12 @@ jobs:
           python-version: "3.12"
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.22"
+          go-version: "1.23"
           cache: false
       - name: Install golangci-lint
         run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/v1.55.2/install.sh \
-            | sh -s -- -b "$(go env GOPATH)/bin" v1.55.2
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/v1.62.2/install.sh \
+            | sh -s -- -b "$(go env GOPATH)/bin" v1.62.2
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
       - name: Run pre-commit
         uses: pre-commit/action@v3.0.1

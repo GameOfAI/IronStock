@@ -32,23 +32,24 @@ TodoWrite ile senkronize çalışır — aktif session'daki live task listesi To
 - [x] CI yeşil + merge → main'de canlı
 - [x] **DB migration init container** — Mac (paralel, ADR-0008)
 
-### 🔜 PR-2: DB layer + chi router — `feat/server-db-chi` (SIRADA)
+### ✅ PR-2: DB layer + chi router — `feat/server-db-chi` (REVIEW/MERGE BEKLIYOR)
 
-Faz 2 server'ın gerçek iskeletini kurar. Mac'teki cluster zaten init container ile migration'ları çalıştırıyor; PR-2 Go server tarafına gerçek pgx pool + chi router ekleyecek.
+**Durum:** Branch push edildi, lokal CI yeşil (28 test, gofmt OK, build OK). GitHub'da PR aç + CI yeşilini bekle + squash merge.
 
-**User önkoşulu:** Win'de Go 1.22+ kurulu olmalı (`go mod tidy` için): https://go.dev/dl/
+- [x] Go 1.26.2 kuruldu (Win)
+- [x] Go deps: `github.com/go-chi/chi/v5 v5.2.5`, `github.com/jackc/pgx/v5 v5.9.2`
+- [x] `go.mod` + `go.sum` (`go 1.25.0` directive — pgx v5.9.2 min)
+- [x] `go.work` go directive bumped to 1.25.0
+- [x] `internal/db` — pgxpool wrapper + Config validation + 5 unit test
+- [x] `internal/httpapi/router.go` — chi router + 6 middleware (RequestID, echoRequestIDHeader, RealIP, slogLogger, Recoverer, Timeout)
+- [x] `internal/httpapi/health.go` — /healthz (alive), /readyz (DB ping 2sn timeout)
+- [x] `cmd/api/main.go` — DB pool + chi router wire
+- [x] httpapi router unit testler (httptest, fakeDB) — 6 test
+- [x] CI matrix: Go 1.22 → stable (pgx min 1.25)
 
-- [ ] Go deps: `github.com/go-chi/chi/v5`, `github.com/jackc/pgx/v5`, `github.com/google/uuid`
-- [ ] `go.mod` + `go.sum` (Go kurulduktan sonra `go mod tidy` ile)
-- [ ] `internal/db` — pgxpool wrapper + Health check
-- [ ] `internal/httpapi/router.go` — chi router + middleware (request-id, recovery, slog logger, real-ip, timeout)
-- [ ] `internal/httpapi/health.go` — /healthz (mevcut), /readyz (DB ping)
-- [ ] `cmd/api/main.go` — DB pool + chi router wire
-- [ ] httpapi router unit testler (httptest)
+### 🔜 PR-3: Migrations (Faz 2 ek tablolar) — `feat/server-migrations` (SIRADA)
 
-### PR-3: Migrations (Faz 2 ek tablolar) — `feat/server-migrations`
-
-PR-2 sonrası: Faz 2'deki diğer tabloları (item_types, field_definitions, folders, items, vs.) ekler.
+PR-2 merge sonrası: Faz 2'deki diğer tabloları + testcontainers-go ile gerçek DB integration test.
 
 - [ ] `00006_user_keypairs.sql`
 - [ ] `00007_totp_secrets.sql`
