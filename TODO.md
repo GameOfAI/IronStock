@@ -17,7 +17,7 @@ Bu maddeler **deploy/k8s/secret.yaml** içinde plaintext secret commit edilmesin
 - [x] `secret.yaml`'ı `.gitignore`'a ekle
 - [x] `secret.yaml.example` placeholder ile yer tutucu commit
 - [x] Mac'teki cluster'da yeni secret'larla kubectl create secret applied
-- [ ] Git history'den eski secret'ları purge (BFG / git filter-repo) — ayrı PR, repo public edilmeden önce
+- [x] Git history'den eski secret'ları purge (BFG) — tamamlandı 2026-04-25
 - [ ] Sealed Secrets / External Secrets Operator adoption (Faz 5)
 
 ---

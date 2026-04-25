@@ -15,6 +15,13 @@ spec:
     spec:
       imagePullSecrets:
         - name: ghcr-pull-secret
+      initContainers:
+        - name: migrate
+          image: ghcr.io/bhaslaman/envanter-api:latest
+          command: ["/goose", "-dir", "/migrations", "postgres", "$(ENVANTER_DB_URL)", "up"]
+          envFrom:
+            - secretRef:
+                name: envanter-secret
       containers:
         - name: api
           image: ghcr.io/bhaslaman/envanter-api:latest

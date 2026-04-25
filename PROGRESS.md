@@ -61,6 +61,14 @@ PR-1 merge sonrası docker job 1+ saat sürdü (QEMU multi-arch). Çözüm:
 - Cache scope per image (`scope=api` / `scope=web`) — bir image değişince diğerinin cache'i geçerliliğini koruyor
 - `on.push.tags: ['v*']` eklendi — tag push'larda CI tetikleniyor
 
+### 2026-04-25 (Mac M4) — Git history purge (BFG)
+
+- BFG 1.15.0 ile `deploy/k8s/secret.yaml` tüm git history'den silindi
+- Bare mirror clone → BFG → `git reflog expire` + `git gc --prune=now --aggressive` → force push
+- Remote (GitHub) doğrulandı: eski commit'lerde artık `secret.yaml` içeriği yok
+- Lokal repo da temizlendi (gc sonrası `git log --all --full-history -- secret.yaml` boş döndü)
+- Win Claude session'ı `git pull` / re-clone yapmalı (hash'ler değişti)
+
 ### 2026-04-25 (Mac M4) — Secret rotation + .gitignore
 
 - `deploy/k8s/secret.yaml` git tracking'den çıkarıldı (`git rm --cached`)
