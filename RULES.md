@@ -66,6 +66,30 @@ Proje boyunca uyulacak konvensiyonlar ve kurallar. Yeni kural çıktıkça buray
   3. `PROGRESS.md`'de faz tamamlandı entry'si.
   4. Sonraki faz task'ları TodoWrite'a yüklenir.
 
+## Repo Konumu ve Tracking Dosyaları (canonical: Repos)
+
+- **Canonical dizin:** `C:\Users\burak.haslaman\Desktop\Repos\Envanter_App`. GitHub'a push edilen tek konum buradır.
+- `Claude-Chat\Envanter_App` **legacy** — Faz 0 sonu donmuş. Kaldırılması user kararına bırakıldı; çalışma kaynağı değildir.
+- Claude tüm dosya işlemlerini absolute path ile **Repos** altına yapar. Yeni session başlatılırken Claude session'ı **Repos dizininde** açılırsa working directory zaten doğru olur.
+
+### Push öncesi tracking dosyaları kontrolü (zorunlu)
+
+Bir feature/fix/chore commit'i, ilgili tracking dosyalarını **aynı commit içinde** güncel tutmalıdır:
+
+| Dosya | Ne zaman güncellenir | Asgari zorunluluk |
+|-------|---------------------|-------------------|
+| `PROGRESS.md` | Her feature/fix tamamlanması | Günlük entry'sine en az 1 satır not |
+| `TODO.md` | Tamamlanan task / çıkan yeni task | Tamamlanan `[x]` işaretlenir, yeni task eklenir |
+| `CLAUDE.md` | Kalıcı karar değişti / yeni boyut eklendi | Sadece kalıcı bağlam değiştiyse |
+| `RULES.md` | Yeni kural ortaya çıktı | Yeni kural eklenir |
+| İlgili ADR (`docs/adr/`) | Mimari karar değişti | Yeni ADR yazılır veya mevcut "Superseded by" işaretlenir |
+| `docs/diagrams/er.mmd` | Şema değişikliği | Yeni tablo/kolon yansıtılır |
+| `shared/api/openapi.yaml` | API kontratı değişti | Spec güncellenir, code gen tetiklenir |
+
+**Kural:** Tracking güncellemesi **ayrı "docs" commit'i değil**, asıl iş commit'inin içinde olur. Ayrı tutmak iki ayrı PR review yükü demektir.
+
+**İstisna:** Sadece typo / küçük doc düzeltmesi yapan commit'ler tracking güncellemesi yapmaz (örn: `docs: fix typo in README`).
+
 ## Claude Code ile Çalışma
 
 - **Dil:** Türkçe.

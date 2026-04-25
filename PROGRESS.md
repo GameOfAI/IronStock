@@ -124,6 +124,15 @@ Kullanıcı review sırasında ürün için 4 ek boyut tanımladı; hepsi için 
 - `PROGRESS.md` — bu entry
 - `TODO.md` — Faz 2 migration listesi + Parking Lot güncellendi
 
+### 2026-04-24 (4. iterasyon) — Repo konumu kuralı + tracking disiplini
+
+- Claude-Chat / Repos divergence sorgulandı; yön netleştirildi: **Repos canonical, Claude-Chat legacy/donmuş**.
+- `RULES.md`'ye yeni "Repo Konumu ve Tracking Dosyaları" bölümü eklendi:
+  - Canonical dizin: `Desktop/Repos/Envanter_App`. Tüm yazılar absolute path ile bu konuma.
+  - **Push öncesi zorunlu tracking güncelleme** matrisi (PROGRESS / TODO / CLAUDE / RULES / ADR / ER / OpenAPI). Asıl iş commit'i ile aynı commit'te.
+  - Ayrı "docs commit" ANTI-PATTERN sayılır (review yükünü ikiye katlar).
+- Bu kural pratikte zaten uygulanıyordu (Faz 1 commit'i bunu izlemişti); şimdi sözleşme yazılı.
+
 ## Mimari Kararlar (Özet)
 
 | No | Karar | Durum |
