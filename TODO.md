@@ -55,7 +55,20 @@ TodoWrite ile senkronize çalışır — aktif session'daki live task listesi To
 - [x] Makefile `test-integration` target
 - [x] sqlc queries (minimal): field_definitions + item_types
 
-### 🔜 PR-4: Crypto package — `feat/server-crypto` (SIRADA)
+### ✅ PR-4: Crypto Package — `feat/server-crypto` (REVIEW BEKLIYOR)
+
+- [x] `internal/crypto/format.go` — versioned blob + AAD helpers
+- [x] `internal/crypto/aesgcm.go` — AES-256-GCM Cipher (Seal/Open)
+- [x] `internal/crypto/envelope.go` — GenerateDEK + envelope flow doc
+- [x] `internal/crypto/argon2.go` — HashPassword / VerifyPassword / DeriveKey
+- [x] `internal/crypto/sealedbox.go` — X25519 sealed-box (ECDH + HKDF + AES-GCM)
+- [x] `internal/crypto/searchhash.go` — HMAC-SHA256 deterministic + HKDF
+- [x] `internal/crypto/doc.go` — threat model + sınırlar
+- [x] 42 unit test (KAT, AAD substitution, tamper, wrong-key, wrong-recipient)
+- [x] `golang.org/x/crypto v0.17.0` direct dependency (argon2 + hkdf)
+- [x] Lokal validation: build / test / gofmt / golangci-lint clean
+
+### 🔜 PR-5: Auth endpoints + Master Key + RBAC middleware (SIRADA)
 
 - [ ] `00006_user_keypairs.sql`
 - [ ] `00007_totp_secrets.sql`
