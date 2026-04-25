@@ -13,6 +13,8 @@ spec:
       labels:
         app: envanter-web
     spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
       containers:
         - name: web
           image: ghcr.io/bhaslaman/envanter-web:latest
