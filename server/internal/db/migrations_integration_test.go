@@ -30,10 +30,14 @@ const (
 )
 
 // startPostgres spins up a Postgres 16 container. Caller defers Terminate.
+//
+// testcontainers-go v0.30.0 API: postgres.RunContainer(ctx, opts...) — image
+// passed via testcontainers.WithImage. (postgres.Run with positional image arg
+// was introduced in v0.31+.)
 func startPostgres(ctx context.Context, t *testing.T) (*postgres.PostgresContainer, string) {
 	t.Helper()
-	c, err := postgres.Run(ctx,
-		pgImage,
+	c, err := postgres.RunContainer(ctx,
+		testcontainers.WithImage(pgImage),
 		postgres.WithDatabase(pgDB),
 		postgres.WithUsername(pgUser),
 		postgres.WithPassword(pgPass),
