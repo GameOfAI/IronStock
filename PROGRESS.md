@@ -4,12 +4,12 @@ Son güncelleme: 2026-04-25
 
 ## Mevcut Durum
 
-- **Aktif Faz:** Faz 2 — Server MVP (PR-1 ✅ merged; PR-2 hazır, review/merge bekliyor)
+- **Aktif Faz:** Faz 2 — Server MVP (PR-1, PR-2 ✅ merged; PR-3 hazır, review/merge bekliyor)
 - **Tamamlanan Faz:** Faz 0 + Faz 1
 - **Çift makine workflow:** Win = kod (PR akışı), Mac M4 = container/deploy (main direct, ADR-0008)
 - **Bloker:** Yok (secret rotation + BFG history purge tamamlandı 2026-04-25)
 - **Mac canlı k8s test:** Tüm pod'lar 1/1 Running, init container ile migration auto-apply, `/healthz` 200 OK
-- **Bir sonraki adım:** PR-2 review/merge → PR-3 (Faz 2 ek migration'lar: keypairs/totp/recovery/master_keys/items/...) → PR-4 (crypto package)
+- **Bir sonraki adım:** PR-3 review/merge → PR-4 (crypto package: envelope encrypt/decrypt + Argon2id helpers + known-answer tests) → PR-5 (auth endpoints)
 
 ## Faz Durumu
 
@@ -52,6 +52,68 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-04-25 (Win) — Faz 2 PR-3: Migration'lar + Integration Test
+
+**Branch:** `feat/server-migrations` — review/merge bekliyor.
+
+**12 yeni migration** (dependency order):
+- `00006_master_keys` — envelope encryption hierarchy root, single-active partial index
+- `00007_user_keypairs` — X25519 keypair, KEK salt + Argon2id params
+- `00008_totp_secrets` — RFC 6238, server-side envelope, verified consistency check
+- `00009_recovery_codes` — Argon2id-hashed 10/user, partial index unused
+- `00010_item_types` + 8 seed (server, url, database, ssh_key, certificate, cloud_credential, note, generic)
+- `00011_field_definitions` + 30 seed (hostname, ip_address, password, environment enum, criticality enum, ...)
+- `00012_folders` — tree (parent_id self-ref), name_search HMAC, updated_at trigger
+- `00013_folder_permissions` — 3-katmanlı RBAC katmanı, inherit_to_children, partial index
+- `00014_items` — UUID v7 client-gen, external_source jsonb (Vault hazır), partial index external_type
+- `00015_item_fields` — field_definition_id FK, value_enc nullable (external_source bypass), unique (item, def)
+- `00016_item_shares` — per-user wrapped DEK, partial indexes active
+- `00017_item_relationships` — 5 edge type, composite PK, self-loop CHECK
+
+**Integration test framework (testcontainers-go):**
+- `internal/db/migrations_integration_test.go` (build tag `integration`)
+- Postgres 16 container — fresh DB
+- Phase 1: `goose up` (tüm 17 migration)
+- Phase 2: `goose down to 0` (geri çevirme)
+- Phase 3: `goose up` tekrar (idempotency)
+- Seed validation: 3 roles, 8 item_types, ≥25 field_definitions
+- Spot-check: hostname/environment/criticality keys + enum allowed_values
+- 5 dakika global timeout, 60sn container start timeout
+
+**CI yeni job: `server-integration`**
+- `runs-on: ubuntu-latest`, Docker hazır
+- `needs: [server]` — unit testler önce yeşil olmalı
+- Go 1.23 (golangci-lint binary uyumluluğu için pin'lendi)
+- `go test -tags=integration -timeout=10m ./internal/db/...`
+
+**Makefile:**
+- `make test-integration` hedefi eklendi
+
+**sqlc queries (minimal):**
+- `field_definitions.sql` — List, GetByKey, GetByID, Create
+- `item_types.sql` — List, GetByKey, GetByID, Create
+- (item CRUD ve auth query'leri PR-4+'da)
+
+**Yeni Go deps:**
+- `github.com/testcontainers/testcontainers-go v0.30.0` (test-only)
+- `github.com/testcontainers/testcontainers-go/modules/postgres v0.30.0`
+- `github.com/pressly/goose/v3 v3.22.0`
+
+`go.mod` direktifi `go 1.22` korundu (testcontainers v0.30.0 + goose v3.22.0 uyumlu).
+
+**Lokal validation (Win, Go 1.26.2 + golangci-lint v1.62.2):**
+- `go build ./...` ✓
+- `go test ./...` ✓ (28 unit test, integration tag yok)
+- `gofmt -l .` clean
+- `golangci-lint run ./...` 0 issues
+- Integration test (Docker yokken) lokal'de çalışmaz; CI'da koşacak
+
+**Mac tarafı etkisi (merge sonrası):**
+- Docker build → GHCR yeni image (12 yeni migration embed'li)
+- ArgoCD auto-sync → api Deployment image refresh
+- Init container yeni migration'ları otomatik uygular
+- `kubectl logs envanter-api-* -c migrate` ile doğrulanır
 
 ### 2026-04-25 (Win) — Faz 2 PR-2: DB layer + chi router
 
