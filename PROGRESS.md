@@ -4,12 +4,12 @@ Son güncelleme: 2026-04-25
 
 ## Mevcut Durum
 
-- **Aktif Faz:** Faz 2 — Server MVP (PR-1, PR-2 ✅ merged; PR-3 hazır, review/merge bekliyor)
+- **Aktif Faz:** Faz 2 — Server MVP (PR-1, PR-2, PR-3 ✅ merged; PR-4 sırada)
 - **Tamamlanan Faz:** Faz 0 + Faz 1
-- **Çift makine workflow:** Win = kod (PR akışı), Mac M4 = container/deploy (main direct, ADR-0008)
-- **Bloker:** Yok (secret rotation + BFG history purge tamamlandı 2026-04-25)
-- **Mac canlı k8s test:** Tüm pod'lar 1/1 Running, init container ile migration auto-apply, `/healthz` 200 OK
-- **Bir sonraki adım:** PR-3 review/merge → PR-4 (crypto package: envelope encrypt/decrypt + Argon2id helpers + known-answer tests) → PR-5 (auth endpoints)
+- **Çift makine workflow:** ⏸ **Mac M4 paused 2026-04-26** — kullanıcı tüm geliştirmeyi şimdilik Win'den yürütüyor. Mac yeniden devreye alınırsa kullanıcı bilgi verecek; o noktada deploy/k8s işleri Mac'te devam eder (ADR-0008).
+- **Bloker:** Yok
+- **Mac canlı cluster snapshot (son durum):** Tüm pod'lar 1/1 Running, init container ile 5 migration auto-apply (Faz 1), `/healthz` 200 OK. PR-3 merge sonrası 12 yeni migration için Docker build/push tetiklendi → ArgoCD sync → init container 17 migration toplam uygular (Mac yeniden açıldığında doğrulanmalı).
+- **Bir sonraki adım:** PR-4 (crypto package: envelope encrypt/decrypt + Argon2id + X25519 sealed-box + searchable hash + known-answer tests) → PR-5 (auth endpoints)
 
 ## Faz Durumu
 
@@ -17,7 +17,7 @@ Son güncelleme: 2026-04-25
 |-----|-------|-----------|-------|-----|
 | 0 — Temel kurulum | VERIFY | 2026-04-24 | 2026-04-24 | Kod yazıldı, lokal smoke test user tarafında |
 | 1 — Veri modeli + kripto tasarımı | DONE | 2026-04-24 | 2026-04-24 | ER (17 tablo) + ADR 0004/0005/0006/0007 + auth-flow + 5 migration + OpenAPI + code gen |
-| 2 — Server MVP | ACTIVE | 2026-04-24 | — | PR-1 (config+logging) ✅ merged `cb87259`; PR-2 sırada (DB+chi). Mac'te canlı çalışıyor (init container ile migrations otomatik) |
+| 2 — Server MVP | ACTIVE | 2026-04-24 | — | PR-1 (foundation), PR-2 (DB+chi), PR-3 (12 migration + integration test) ✅ merged. PR-4 sırada (crypto package). Mac side ⏸ paused 2026-04-26. |
 | 3 — Admin Web UI | TODO | — | — | Login + user mgmt + ağaç view |
 | 4 — Client MVP (Tauri) | TODO | — | — | Win+Mac, live sync, offline cache, E2E |
 | 5 — Production hardening | PARTIAL | 2026-04-25 | — | Container + GHCR + k8s + ArgoCD + DB migration init container + native cross-compile multi-arch + secret rotation tamam. Sealed Secrets, Helm, observability, Ingress+TLS hâlâ TODO |
@@ -52,6 +52,13 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-04-26 (Win) — Mac M4 paused, PR-3 merged, tracking sync
+
+- **PR-3 merged** (commit `cf2b63c`, PR #4) — 12 migration + testcontainers integration test main'de.
+- **Mac M4 ⏸ paused** — kullanıcı şimdilik tüm geliştirmeyi Win'den yürütüyor. Mac yeniden devreye alınırsa bilgi verilecek. RULES.md'deki "Çift makine workflow" hâlâ geçerli olarak kayıtlı (Mac dönerse aynı pattern), ama mevcut "deploy direct to main" pattern'i şu an Win'de yok — geliştirme tamamen PR akışı.
+- Bu commit tracking MD'leri PR-3 merge sonrası state'e + Mac pause notu ile sync ediyor.
+- **Bir sonraki:** PR-4 — `internal/crypto` package (envelope encrypt/decrypt + Argon2id + X25519 sealed-box + searchable HMAC + known-answer tests).
 
 ### 2026-04-25 (Win) — Faz 2 PR-3: Migration'lar + Integration Test
 

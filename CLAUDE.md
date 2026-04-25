@@ -71,8 +71,11 @@ Envanter_App/
 - **Faz bazlı ilerleme:** Aynı anda bir faz aktif. Faz bitmeden sonraki başlamaz.
 - **TodoWrite eşleniği:** Aktif faz task'ları TodoWrite'ta tutulur, `TODO.md` kalıcı yansımadır.
 
-## İş Bölümü — Çift Makine Workflow
+## İş Bölümü — Çift Makine Workflow (⏸ 2026-04-26 itibariyle Win-only)
 
+**Mevcut durum:** Mac M4 paralel session paused. Tüm geliştirme Windows'tan PR akışıyla yürütülüyor. Mac yeniden devreye alınırsa kullanıcı haber verecek.
+
+**Mac aktif olduğu zamanki pattern (referans için, dönerse aynısı geçerli):**
 - **Windows iş istasyonu** (Repos/Envanter_App): kod (server, web, client, migrations, ADR, OpenAPI) — PR akışıyla.
 - **Mac M4** (paralel Claude session): containerization, k8s, ArgoCD, GHCR, deploy testleri — main'e direkt commit (ADR-0008).
 - Her iki session da `RULES.md`'deki tracking discipline kuralına uyar (PROGRESS/TODO aynı commit'te).
