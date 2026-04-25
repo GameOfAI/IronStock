@@ -44,7 +44,7 @@ PR-1 merge sonrası başlar. Bu PR Go dependency ekleyecek (chi, pgx) → kullan
 - [ ] `internal/httpapi/health.go` — /healthz, /readyz handlers
 - [ ] `cmd/api/main.go` — DB pool + chi router wire
 - [ ] httpapi router unit testler
-- [ ] **DB migration init container** (api Deployment'a) — Mac deploy ile entegre olmalı
+- [x] **DB migration init container** (api Deployment'a) — tamamlandı 2026-04-25, Mac deploy ile entegre
 
 ### PR-3: Crypto package — `feat/server-crypto`
 
