@@ -24,9 +24,13 @@ type DBPinger interface {
 }
 
 // Deps groups dependencies needed for the HTTP layer.
+//
+// Auth is optional: when nil, /api/v1/auth/* routes are not mounted (useful
+// for foundation tests that don't exercise auth flows).
 type Deps struct {
 	Logger *slog.Logger
 	DB     DBPinger
+	Auth   *AuthHandlers
 }
 
 // NewRouter builds a chi router with the standard middleware stack.
@@ -49,10 +53,20 @@ func NewRouter(d Deps) http.Handler {
 	// 6. Timeout — overall request budget; handlers should respect ctx
 	r.Use(middleware.Timeout(30 * time.Second))
 
-	// Routes
+	// Health routes (unauthenticated)
 	h := &handlers{deps: d}
 	r.Get("/healthz", h.Healthz)
 	r.Get("/readyz", h.Readyz)
+
+	// Auth routes — only mounted when auth deps are provided.
+	if d.Auth != nil {
+		r.Route("/api/v1/auth", func(ar chi.Router) {
+			ar.Post("/register", d.Auth.Register)
+			ar.Post("/totp/init", d.Auth.TOTPInit)
+			ar.Post("/totp/verify", d.Auth.TOTPVerify)
+			// PR-6: login, refresh, logout, change-password, recover/init, recover/complete
+		})
+	}
 
 	return r
 }
