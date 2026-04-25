@@ -52,6 +52,15 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 
 ## Günlük
 
+### 2026-04-25 (Mac, geç saat) — CI Docker job optimizasyonu
+
+PR-1 merge sonrası docker job 1+ saat sürdü (QEMU multi-arch). Çözüm:
+- main push → amd64-only (~5dk): QEMU emülasyon yok, hızlı feedback
+- `v*` tag push → multi-arch amd64+arm64 (release distribution için, M4 uyumlu)
+- `:main-<sha7>` tag eklendi reproducibility için (`:latest` anti-pattern kısmen çözüldü, ADR-0008 notu)
+- Cache scope per image (`scope=api` / `scope=web`) — bir image değişince diğerinin cache'i geçerliliğini koruyor
+- `on.push.tags: ['v*']` eklendi — tag push'larda CI tetikleniyor
+
 ### 2026-04-25 — Cross-machine deploy work (Mac M4, paralel Claude session) — backfill
 
 Bu entry, **Mac M4 üzerinde paralel olarak yapılan deploy çalışmasının** geriye dönük dokümantasyonu (RULES.md tracking discipline kuralı için). Çalışmayı yapan: Burak Haşlaman + Claude Sonnet 4.6 (Mac session).

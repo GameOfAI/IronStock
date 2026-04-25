@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
     branches: [main]
 
@@ -79,11 +80,15 @@ jobs:
           if-no-files-found: ignore
 
   # ---------------- Docker Build & Push (GHCR) ----------------
+  # main push → amd64-only (~5dk)
+  # v* tag push → multi-arch amd64+arm64 (release distribution)
   docker:
     name: Docker Build & Push
     runs-on: ubuntu-latest
     needs: [server]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: |
+      (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
+      startsWith(github.ref, 'refs/tags/v')
     steps:
       - uses: actions/checkout@v4
 
@@ -97,25 +102,47 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Determine platforms
+        id: platforms
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            echo "list=linux/amd64,linux/arm64" >> $GITHUB_OUTPUT
+          else
+            echo "list=linux/amd64" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Determine tags
+        id: tags
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/}"
+            echo "api=ghcr.io/${{ github.repository_owner }}/envanter-api:${VERSION},ghcr.io/${{ github.repository_owner }}/envanter-api:latest" >> $GITHUB_OUTPUT
+            echo "web=ghcr.io/${{ github.repository_owner }}/envanter-web:${VERSION},ghcr.io/${{ github.repository_owner }}/envanter-web:latest" >> $GITHUB_OUTPUT
+          else
+            SHA="${GITHUB_SHA::7}"
+            echo "api=ghcr.io/${{ github.repository_owner }}/envanter-api:main-${SHA},ghcr.io/${{ github.repository_owner }}/envanter-api:latest" >> $GITHUB_OUTPUT
+            echo "web=ghcr.io/${{ github.repository_owner }}/envanter-web:main-${SHA},ghcr.io/${{ github.repository_owner }}/envanter-web:latest" >> $GITHUB_OUTPUT
+          fi
+
       - name: Build & push API image
         uses: docker/build-push-action@v5
         with:
           context: ./server
           push: true
-          platforms: linux/amd64,linux/arm64
-          tags: ghcr.io/${{ github.repository_owner }}/envanter-api:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          platforms: ${{ steps.platforms.outputs.list }}
+          tags: ${{ steps.tags.outputs.api }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
 
       - name: Build & push Web image
         uses: docker/build-push-action@v5
         with:
           context: ./web
           push: true
-          platforms: linux/amd64,linux/arm64
-          tags: ghcr.io/${{ github.repository_owner }}/envanter-web:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          platforms: ${{ steps.platforms.outputs.list }}
+          tags: ${{ steps.tags.outputs.web }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
 
   # ---------------- Pre-commit (multi-language hygiene) ----------------
   pre-commit:
