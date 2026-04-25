@@ -4,12 +4,12 @@ Son güncelleme: 2026-04-25
 
 ## Mevcut Durum
 
-- **Aktif Faz:** Faz 2 — Server MVP (PR-1 ✅ merged `cb87259`; sırada PR-2: DB layer + chi router)
+- **Aktif Faz:** Faz 2 — Server MVP (PR-1 ✅ merged; PR-2 hazır, review/merge bekliyor)
 - **Tamamlanan Faz:** Faz 0 + Faz 1
 - **Çift makine workflow:** Win = kod (PR akışı), Mac M4 = container/deploy (main direct, ADR-0008)
 - **Bloker:** Yok (secret rotation + BFG history purge tamamlandı 2026-04-25)
 - **Mac canlı k8s test:** Tüm pod'lar 1/1 Running, init container ile migration auto-apply, `/healthz` 200 OK
-- **Bir sonraki adım:** Win'de PR-2 (DB layer + chi router) — Go installation gerekli (`go mod tidy` için)
+- **Bir sonraki adım:** PR-2 review/merge → PR-3 (Faz 2 ek migration'lar: keypairs/totp/recovery/master_keys/items/...) → PR-4 (crypto package)
 
 ## Faz Durumu
 
@@ -52,6 +52,50 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-04-25 (Win) — Faz 2 PR-2: DB layer + chi router
+
+**Branch:** `feat/server-db-chi` — review/merge bekliyor.
+
+**Önkoşul:** Win'de Go 1.26.2 kuruldu (`C:\Program Files\Go\`).
+
+**İçerik:**
+
+- **`internal/db`** (yeni) — pgx v5 `pgxpool` wrapper:
+  - `Config` struct: URL, MaxConns, MinConns, HealthCheckInterval
+  - `Validate()`: URL boş, min<0, max<min, üçü için error mesajları
+  - `New(ctx, cfg)`: parse → pool yarat → ilk Ping (5sn timeout) → fail fast davranışı
+  - 5 unit test (config validation; live DB testleri PR-3+'da testcontainers-go ile)
+
+- **`internal/httpapi`** (genişletildi) — chi router + middleware stack + handlers:
+  - `NewRouter(Deps)` chi router döner; 6 middleware sırası: RequestID → echoRequestIDHeader (yeni helper) → RealIP → slogRequestLogger → Recoverer → Timeout(30s)
+  - `slogRequestLogger`: her request için tek satır JSON log; **/healthz ve /readyz log spam'i için filtrelenir** (k8s probe'ları sürekli çağırır)
+  - `DBPinger` interface — pgxpool.Pool satisfies; testlerde fake injection
+  - `/healthz`: liveness probe, sadece process alive (200 OK)
+  - `/readyz`: readiness probe, **2sn timeout ile DB Ping**; fail → 503 + log warn
+  - 6 test: /healthz 200, /readyz DB OK 200, /readyz DB down 503, X-Request-Id header echo, 404 unknown path, 405 POST /healthz
+
+- **`cmd/api/main.go`** (refactor) — config + logging + db pool + chi router birlikte wire edildi. Graceful shutdown korundu.
+
+- **`server/go.mod` + `go.sum`** — yeni deps: `github.com/go-chi/chi/v5 v5.2.5`, `github.com/jackc/pgx/v5 v5.9.2` + indirect (puddle, pgpassfile, pgservicefile, x/sync, x/text). `go 1.25.0` directive (pgx v5.9.2 minimum).
+
+- **`go.work`** — `go 1.22` → `go 1.25.0` (workspace go directive must be ≥ module).
+
+- **`.github/workflows/ci.yml`** — Go matrix `1.22` → `stable` (setup-go'nun son stable Go'su; pgx 1.25+ gerekli).
+
+**Lokal doğrulama (Win, Go 1.26.2):**
+- `go build ./...` ✅
+- `go vet ./...` ✅
+- `go test ./...` ✅ — 28 test, 0 fail (config 9 + db 5 + httpapi 6 + logging 8)
+- `gofmt -l .` boş (CRLF→LF auto-fix sonrası)
+- Binary boyut: 13.1 MB (server/cmd/api)
+
+**Bilinçli kapsam dışı (PR-3+'a bırakıldı):**
+- testcontainers-go ile DB integration test (gerçek migration up/down)
+- Auth endpoints (Argon2id + TOTP + JWT)
+- Faz 2 ek migration'lar (00006-00017)
+- Crypto package (`internal/crypto`)
+- WebSocket hub
 
 ### 2026-04-25 (Win catch-up) — Tracking sync sonrası BFG history purge
 
