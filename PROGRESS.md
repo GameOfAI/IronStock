@@ -4,11 +4,12 @@ Son güncelleme: 2026-04-25
 
 ## Mevcut Durum
 
-- **Aktif Faz:** Faz 2 — Server MVP (PR-1 açık, review/merge bekliyor) + paralel Faz 5 deploy başlangıcı (Mac M4)
-- **Tamamlanan Faz:** Faz 0 (kod iskeleti) + Faz 1 (veri modeli ve tasarım)
-- **Çift makine workflow:** Win iş istasyonu = kod (PR akışı), Mac M4 = container/deploy (main direct, ADR-0008)
-- **Bloker:** ⚠️ `deploy/k8s/secret.yaml` plaintext secret içeriyor — rotate + .gitignore + Sealed Secrets adoption gerekli
-- **Bir sonraki adım:** PR-1 (`feat/server-foundation`) merge → PR-2 (DB layer + chi router) → Mac tarafında secret rotation + Sealed Secrets entegrasyonu
+- **Aktif Faz:** Faz 2 — Server MVP (PR-1 ✅ merged `cb87259`; sırada PR-2: DB layer + chi router)
+- **Tamamlanan Faz:** Faz 0 + Faz 1
+- **Çift makine workflow:** Win = kod (PR akışı), Mac M4 = container/deploy (main direct, ADR-0008)
+- **Bloker:** Yok (secret rotation + BFG history purge tamamlandı 2026-04-25)
+- **Mac canlı k8s test:** Tüm pod'lar 1/1 Running, init container ile migration auto-apply, `/healthz` 200 OK
+- **Bir sonraki adım:** Win'de PR-2 (DB layer + chi router) — Go installation gerekli (`go mod tidy` için)
 
 ## Faz Durumu
 
@@ -16,10 +17,10 @@ Son güncelleme: 2026-04-25
 |-----|-------|-----------|-------|-----|
 | 0 — Temel kurulum | VERIFY | 2026-04-24 | 2026-04-24 | Kod yazıldı, lokal smoke test user tarafında |
 | 1 — Veri modeli + kripto tasarımı | DONE | 2026-04-24 | 2026-04-24 | ER (17 tablo) + ADR 0004/0005/0006/0007 + auth-flow + 5 migration + OpenAPI + code gen |
-| 2 — Server MVP | ACTIVE | 2026-04-24 | — | PR-1 açık (config+logging); PR-2 sırada (DB+chi) |
+| 2 — Server MVP | ACTIVE | 2026-04-24 | — | PR-1 (config+logging) ✅ merged `cb87259`; PR-2 sırada (DB+chi). Mac'te canlı çalışıyor (init container ile migrations otomatik) |
 | 3 — Admin Web UI | TODO | — | — | Login + user mgmt + ağaç view |
 | 4 — Client MVP (Tauri) | TODO | — | — | Win+Mac, live sync, offline cache, E2E |
-| 5 — Production hardening | PARTIAL | 2026-04-25 | — | Container + GHCR + k8s + ArgoCD erken yapıldı (Mac); secrets, Helm, observability hâlâ TODO |
+| 5 — Production hardening | PARTIAL | 2026-04-25 | — | Container + GHCR + k8s + ArgoCD + DB migration init container + native cross-compile multi-arch + secret rotation tamam. Sealed Secrets, Helm, observability, Ingress+TLS hâlâ TODO |
 
 Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tamamlandı · `VERIFY` doğrulama bekliyor · `BLOCKED` bloke · `TODO` beklemede
 
@@ -51,6 +52,26 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-04-25 (Win catch-up) — Tracking sync sonrası BFG history purge
+
+Mac M4'te yapılan kapsamlı çalışmalardan sonra Win local repo'su `git reset --hard origin/main` ile remote'a hizalandı (BFG history purge'u sonrası tüm commit hash'leri yeniden yazılmıştı: `b35a46c → 21bd3df → 242cf40 → cb87259`, vs.).
+
+**Mac'in tamamladıkları (özet):**
+- PR-1 merge (`cb87259`)
+- CI optimizasyonu: 1+ saat → 5dk
+- Secret rotation + history purge (`daa48d0` + BFG)
+- DB migration init container (`9ea420b`) — `goose` binary embed + `/migrations` copy + initContainers entry
+- Server Dockerfile native cross-compile (`a89ac83` + `3bbb077` + `89be3c2`) — QEMU yok, ~8dk multi-arch
+- Tag'ler: `v0.1.0-dev`, `v0.1.1-dev`
+- Cluster doğrulama: tüm pod 1/1 Running, /healthz 200 OK
+
+**Win catch-up commit'i (bu):**
+- PROGRESS.md "Mevcut Durum" + Faz Durumu tablosu güncellendi (PR-1 merged, secret bloker resolved, Faz 5 PARTIAL detayı genişletildi)
+- TODO.md "Aktif" bölümü ve kritik secret rotation [x] işaretleri tamamlandı
+- ADR-0008 "Plaintext Secret'lar" bölümüne RESOLVED notu
+- CLAUDE.md kapsam bölümüne migration init container eklendi
+- Bloker / Risk listesi sadeleşti
 
 ### 2026-04-25 (Mac, geç saat) — CI Docker job optimizasyonu
 
@@ -224,5 +245,6 @@ Kullanıcı review sırasında ürün için 4 ek boyut tanımladı; hepsi için 
 - `go.sum`, `package-lock.json`, `Cargo.lock` henüz yok — ilk `go mod tidy` / `npm install` / `cargo build` komutlarında üretilecek ve commit'lenecek.
 - **Faz 1 sonu:** Migration'lar Postgres üzerinde çalıştırılmadı (lokal ortam yok). Kullanıcı `make migrate-up` ile doğrulamalı.
 - Code gen henüz çalıştırılmadı; `server/internal/db/sqlcgen/`, `server/internal/httpapi/apigen/`, `web/src/api/schema.gen.ts`, `client/src/api/schema.gen.ts` dosyaları yok. `make gen` ilk kez çalıştırıldığında üretilecek ve commit'lenmeli (CI `make gen-check` ile drift'i yakalar).
-- **🚨 KRİTİK 2026-04-25:** `deploy/k8s/secret.yaml` plaintext secret içeriyor. Mac tarafında acil: rotate + `.gitignore` + git history temizliği + Sealed Secrets adoption.
-- **2026-04-25:** PR-1 (`feat/server-foundation`) açıldı ama merge edilmeden main'e 4 commit eklendi (Mac deploy work). PR branch rebase edilecek (force-push), CI tekrar koşacak.
+- ~~**🚨 KRİTİK 2026-04-25:** `deploy/k8s/secret.yaml` plaintext.~~ **ÇÖZÜLDÜ 2026-04-25 (Mac):** Rotate + `.gitignore` + BFG history purge + `secret.yaml.example` placeholder. Sealed Secrets adoption Faz 5 task'ında.
+- ~~**2026-04-25:** PR-1 force-push gerekti.~~ **TAMAM:** PR-1 rebase + merge tamamlandı (`cb87259`).
+- **2026-04-25 (akşam):** BFG history purge sonrası tüm commit hash'leri değişti. Win local `git reset --hard origin/main` ile sync edildi. Gelecekte yeni history purge olursa benzer sync gerekir.

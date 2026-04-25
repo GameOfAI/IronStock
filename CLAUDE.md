@@ -29,9 +29,10 @@ DevOps/SRE takımı için envanter yönetim uygulaması. KeePassXC'ye alternatif
 | Şifreleme | AES-256-GCM (envelope) + X25519 (key wrap) |
 | Auth | Argon2id (password) + TOTP + JWT session |
 | Dev stack | Docker Compose |
-| Container images | Multi-stage Dockerfile (server: scratch, web: nginx) → GHCR |
-| Deploy | Raw k8s YAML + ArgoCD GitOps (Helm — ileride değerlendirilecek; ADR-0008) |
-| CI | GitHub Actions (server + pre-commit + docker build/push) |
+| Container images | Multi-stage Dockerfile, native cross-compile (server: alpine+goose embed, web: nginx) → GHCR |
+| Deploy | Raw k8s YAML + ArgoCD GitOps + DB migration init container (Helm Faz 5'te değerlendirilecek; ADR-0008) |
+| CI | GitHub Actions (server + pre-commit + docker multi-arch ~8dk) |
+| Secrets | `kubectl create secret` (Sealed Secrets/External Secrets Operator Faz 5'te) |
 
 ## Güvenlik Modeli (Hibrit)
 

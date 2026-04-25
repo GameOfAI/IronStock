@@ -8,45 +8,60 @@ TodoWrite ile senkronize çalışır — aktif session'daki live task listesi To
 
 ---
 
-## 🚨 KRİTİK — Mac M4 Tarafında Acil
+## ~~🚨 KRİTİK — Secret Leak~~ ✅ ÇÖZÜLDÜ (2026-04-25)
 
-Bu maddeler **deploy/k8s/secret.yaml** içinde plaintext secret commit edilmesinden kaynaklanıyor. Repo private olsa bile sektör pratiği ihlali. **ADR-0008** ayrıntılı dokümante etti.
+`deploy/k8s/secret.yaml` plaintext leak'i tamamen kapatıldı. ADR-0008'e ayrıntılı yazılı.
 
 - [x] `ENVANTER_MASTER_KEY` rotate
 - [x] `ENVANTER_JWT_SECRET` rotate
 - [x] `secret.yaml`'ı `.gitignore`'a ekle
 - [x] `secret.yaml.example` placeholder ile yer tutucu commit
-- [x] Mac'teki cluster'da yeni secret'larla kubectl create secret applied
-- [x] Git history'den eski secret'ları purge (BFG) — tamamlandı 2026-04-25
-- [ ] Sealed Secrets / External Secrets Operator adoption (Faz 5)
+- [x] Mac cluster'da `kubectl create secret` ile uygulandı
+- [x] Git history'den eski secret'ları purge (BFG, 2026-04-25)
+- [ ] **Sealed Secrets / External Secrets Operator adoption** → Faz 5'in part'ı
 
 ---
 
-## Aktif: Faz 2 — Server MVP (PR akışı başladı)
+## Aktif: Faz 2 — Server MVP
 
-### PR-1: Foundation (config + logging) — `feat/server-foundation`
-
-**Durum:** Branch açık, GitHub'da review/merge bekliyor. Mac deploy commitleri main'e geldikten sonra **rebase + force-push** gerekecek.
+### ✅ PR-1: Foundation (config + logging) — MERGED `cb87259`
 
 - [x] `internal/config` — env loader + 9 unit test
 - [x] `internal/logging` — slog + secret redaction + 8 unit test
 - [x] `cmd/api/main.go` refactor (config + logger wire)
-- [ ] **User aksiyonu:** Rebase sonrası CI yeniden yeşil olunca squash merge
+- [x] CI yeşil + merge → main'de canlı
+- [x] **DB migration init container** — Mac (paralel, ADR-0008)
 
-### PR-2: DB layer + chi router — `feat/server-db-chi` (sırada)
+### 🔜 PR-2: DB layer + chi router — `feat/server-db-chi` (SIRADA)
 
-PR-1 merge sonrası başlar. Bu PR Go dependency ekleyecek (chi, pgx) → kullanıcının lokalde Go kurup `go mod tidy` çalıştırması gerekecek.
+Faz 2 server'ın gerçek iskeletini kurar. Mac'teki cluster zaten init container ile migration'ları çalıştırıyor; PR-2 Go server tarafına gerçek pgx pool + chi router ekleyecek.
+
+**User önkoşulu:** Win'de Go 1.22+ kurulu olmalı (`go mod tidy` için): https://go.dev/dl/
 
 - [ ] Go deps: `github.com/go-chi/chi/v5`, `github.com/jackc/pgx/v5`, `github.com/google/uuid`
-- [ ] `go.mod` + `go.sum` (kullanıcı `go mod tidy` çalıştırıp commit edecek)
+- [ ] `go.mod` + `go.sum` (Go kurulduktan sonra `go mod tidy` ile)
 - [ ] `internal/db` — pgxpool wrapper + Health check
 - [ ] `internal/httpapi/router.go` — chi router + middleware (request-id, recovery, slog logger, real-ip, timeout)
-- [ ] `internal/httpapi/health.go` — /healthz, /readyz handlers
+- [ ] `internal/httpapi/health.go` — /healthz (mevcut), /readyz (DB ping)
 - [ ] `cmd/api/main.go` — DB pool + chi router wire
-- [ ] httpapi router unit testler
-- [x] **DB migration init container** (api Deployment'a) — tamamlandı 2026-04-25, Mac deploy ile entegre
+- [ ] httpapi router unit testler (httptest)
 
-### PR-3: Crypto package — `feat/server-crypto`
+### PR-3: Migrations (Faz 2 ek tablolar) — `feat/server-migrations`
+
+PR-2 sonrası: Faz 2'deki diğer tabloları (item_types, field_definitions, folders, items, vs.) ekler.
+
+- [ ] `00006_user_keypairs.sql`
+- [ ] `00007_totp_secrets.sql`
+- [ ] `00008_recovery_codes.sql`
+- [ ] `00009_master_keys.sql`
+- [ ] `00010_item_types.sql` + seed
+- [ ] `00011_field_definitions.sql` + seed
+- [ ] `00012_folders.sql` + `00013_folder_permissions.sql`
+- [ ] `00014_items.sql` + `00015_item_fields.sql` + `00016_item_shares.sql`
+- [ ] `00017_item_relationships.sql`
+- [ ] sqlc query genişletmeleri
+
+### PR-4: Crypto package — `feat/server-crypto`
 
 ## Tamamlanan: Faz 0 — Temel kurulum (VERIFY bekliyor)
 

@@ -111,27 +111,22 @@ spec:
 ### FluxCD (ArgoCD yerine)
 - **Reddedildi:** ArgoCD UI'sı + CLI'sı daha kullanıcı dostu, popülasyonu daha geniş.
 
-## ⚠️ Bilinen Kritik Eksiklikler
+## Bilinen Kritik Eksiklikler
 
-### 1. Plaintext Secret'lar Repo'da
+### 1. ✅ Plaintext Secret'lar — RESOLVED (2026-04-25)
 
-`deploy/k8s/secret.yaml` içinde **gerçek görünüşlü** secret değerler commit edildi:
-```yaml
-ENVANTER_MASTER_KEY: "+uz8/VdTGyS7uZtCRIYPom5DPEIjSDa0o4F7/1lwo/w="
-ENVANTER_JWT_SECRET: "ea1Ns+uhMy5Voz0omlTt0tvoigveTPyIQcr1XFjeY+s="
-POSTGRES_PASSWORD: "envanter_dev"
-```
+Erken implementation'da `deploy/k8s/secret.yaml` içinde plaintext secret değerler commit edilmişti. **Sonraki çalışmada tamamen düzeltildi:**
 
-**Bu sektör pratiği ihlali.** Repo private olsa bile:
-- Git history bunları kalıcı tutar
-- Read-erişimi olan herkes görür
-- Repo public olursa anında leak
+- **Rotate edildi:** `ENVANTER_MASTER_KEY`, `ENVANTER_JWT_SECRET` yeni rastgele değerlerle. (`POSTGRES_PASSWORD` korundu — PVC bu değerle init edilmiş; rotate edilseydi DB resetlenmesi gerekecekti).
+- **Repo'dan çıkarıldı:** `git rm --cached deploy/k8s/secret.yaml`; `.gitignore`'a eklendi (`deploy/k8s/secret.yaml`, `deploy/k8s/*-secret.yaml`).
+- **Placeholder commit'lendi:** `deploy/k8s/secret.yaml.example` template (gerçek değer yok, `<placeholder>` instruction'lı).
+- **Cluster'a apply:** `kubectl create secret generic envanter-secret --from-literal=...` ile yeni değerler doğrudan apply edildi.
+- **Git history purge:** BFG 1.15.0 ile bare mirror clone üzerinde `secret.yaml` history'den silindi; `git reflog expire --expire=now --all && git gc --prune=now --aggressive`; force push. Eski commit'lerde artık plaintext yok. **Tüm commit hash'leri yeniden yazıldı** (`b35a46c → 21bd3df`, `242cf40 → cb87259`, ...) — paralel session'lar `git reset --hard origin/main` ile sync etmeli.
+- **configmap.yaml temizlendi:** `ENVANTER_DB_URL` plaintext password içermiyor; `ENVANTER_DB_HOST/PORT/NAME/USER/SSLMODE` ayrı env'lere bölündü, password Secret'tan geliyor.
 
-**Acil aksiyonlar (KRİTİK TODO):**
-- [ ] `ENVANTER_MASTER_KEY` rotate (yeni rastgele 32B üret)
-- [ ] `ENVANTER_JWT_SECRET` rotate
-- [ ] `secret.yaml`'ı `.gitignore`'a ekle
-- [ ] `secret.yaml.example` placeholder ile yer tutucu commit
+**Hâlâ TODO (Faz 5):**
+- [ ] **Sealed Secrets / External Secrets Operator adoption** — şu an `kubectl create secret` manuel; long-term için GitOps-uyumlu secret yönetim katmanı şart.
+- [ ] gitleaks rule'larını sıkılaştır — k8s manifest pattern'lerinde plaintext secret yakalanması için custom rule.
 - [ ] Git history'den eski secret'ları temizle (`git filter-repo` veya BFG)
 - [ ] Sealed Secrets / External Secrets Operator / SOPS adoption (Faz 5)
 
