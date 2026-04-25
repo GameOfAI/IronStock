@@ -4,12 +4,12 @@ Son güncelleme: 2026-04-25
 
 ## Mevcut Durum
 
-- **Aktif Faz:** Faz 2 — Server MVP (PR-1, PR-2, PR-3 ✅ merged; PR-4 sırada)
+- **Aktif Faz:** Faz 2 — Server MVP (PR-1, PR-2, PR-3 ✅ merged; PR-4 hazır, review/merge bekliyor)
 - **Tamamlanan Faz:** Faz 0 + Faz 1
 - **Çift makine workflow:** ⏸ **Mac M4 paused 2026-04-26** — kullanıcı tüm geliştirmeyi şimdilik Win'den yürütüyor. Mac yeniden devreye alınırsa kullanıcı bilgi verecek; o noktada deploy/k8s işleri Mac'te devam eder (ADR-0008).
 - **Bloker:** Yok
 - **Mac canlı cluster snapshot (son durum):** Tüm pod'lar 1/1 Running, init container ile 5 migration auto-apply (Faz 1), `/healthz` 200 OK. PR-3 merge sonrası 12 yeni migration için Docker build/push tetiklendi → ArgoCD sync → init container 17 migration toplam uygular (Mac yeniden açıldığında doğrulanmalı).
-- **Bir sonraki adım:** PR-4 (crypto package: envelope encrypt/decrypt + Argon2id + X25519 sealed-box + searchable hash + known-answer tests) → PR-5 (auth endpoints)
+- **Bir sonraki adım:** PR-4 review/merge → PR-5 (auth endpoints: register/TOTP/login/refresh/recovery + master key loader + RBAC middleware iskeleti)
 
 ## Faz Durumu
 
@@ -52,6 +52,55 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-04-26 (Win) — Faz 2 PR-4: Crypto Package
+
+**Branch:** `feat/server-crypto` — review/merge bekliyor.
+
+**Yeni: `server/internal/crypto/` (~520 LOC + ~700 LOC test)**
+
+| Dosya | Sorumluluk |
+|-------|-----------|
+| `doc.go` | Threat model, koruyduklar/koruyamadıkları, paket sınırları |
+| `format.go` | Versionlu blob layout `[v][alg][nonce][ct+tag]` + AAD helpers + RandomBytes |
+| `aesgcm.go` | `Cipher` (AES-256-GCM Seal/Open) — random nonce, AAD bound, error-wrapping |
+| `envelope.go` | `GenerateDEK()` 32B + ADR-0004 §6 envelope kullanım örneği doc |
+| `argon2.go` | Argon2id `HashPassword`, `VerifyPassword` (constant-time), `DeriveKey` (KEK), `Argon2Params.Validate` |
+| `sealedbox.go` | X25519 sealed-box: ECDH + HKDF-SHA256 + AES-256-GCM (NaCl crypto_box_seal pattern, anonymous-sender) |
+| `searchhash.go` | `DeriveSearchKey` (HKDF) + `SearchHash` (HMAC-SHA256, lowercase, 16-byte truncated) |
+
+**Algoritma uyumluluğu (ADR-0004):**
+- AES-256-GCM (12B nonce, 16B tag, AEAD authenticated)
+- Argon2id (default t=3, m=64MiB, p=4, salt 16B, key 32B)
+- X25519 (`crypto/ecdh`) + HKDF-SHA256 (`golang.org/x/crypto/hkdf`)
+- HMAC-SHA256 (truncate-to-128-bit) for searchable encryption
+
+**Tehdit modeli güvenceleri (testlerle doğrulandı):**
+- ✓ Wrong-key cross access → fail
+- ✓ Wrong-AAD substitution attack → fail
+- ✓ Tampered ciphertext (1 bit flip) → fail
+- ✓ Algorithm-byte mismatch → fail
+- ✓ Sealed-box: yanlış alıcı priv ile open → fail
+- ✓ Argon2 KAT: aynı (password, salt, params) → byte-identical
+- ✓ Constant-time password compare (`subtle.ConstantTimeCompare`)
+
+**Test sayısı:** 42 unit test (crypto paketi). Tüm paketlerde toplam **68 unit test** (önceki 26 + 42 yeni).
+
+**Yeni dependency:**
+- `golang.org/x/crypto v0.17.0` (zaten indirect idi pgx üzerinden; argon2 + hkdf için direct'e geçti)
+
+**Lokal validation (Win, Go 1.26.2 + golangci-lint v1.62.2):**
+- `go build ./...` ✓
+- `go test ./...` ✓ 68 unit pass (cache hit'leri dahil)
+- `gofmt -l .` clean
+- `golangci-lint run ./...` 0 issues
+
+**Bilinçli kapsam dışı (sonraki PR'larda):**
+- Master key loader (KMS / k8s Secret okuma + master_keys tablo entegrasyonu) → PR-5'te `internal/auth` ile birlikte
+- sqlc query'leri (auth + items) → PR-5+
+- Crypto kullanan endpoint'ler (register/login) → PR-5
+
+**Sıradaki:** PR-5 — auth endpoints (register, TOTP enroll/verify, login, refresh, logout, change-password, recovery) + master key bootstrap + RBAC middleware iskeleti.
 
 ### 2026-04-26 (Win) — Mac M4 paused, PR-3 merged, tracking sync
 
