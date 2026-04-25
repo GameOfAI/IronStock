@@ -1,16 +1,51 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-04-24
+Son güncelleme: 2026-04-25
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 
-İşaretler: `[ ]` TODO · `[~]` devam ediyor · `[x]` tamamlandı · `[!]` bloke / user aksiyonu bekliyor
+İşaretler: `[ ]` TODO · `[~]` devam ediyor · `[x]` tamamlandı · `[!]` bloke / user aksiyonu bekliyor · 🚨 kritik
 
 ---
 
-## Aktif: Faz 2 — Server MVP (bekleniyor)
+## 🚨 KRİTİK — Mac M4 Tarafında Acil
 
-Faz 1 kod'u yazıldı, kullanıcı `make migrate-up` + `make gen` ile doğrulama yapacak. Faz 2 Server MVP implementasyonu başlayabilir.
+Bu maddeler **deploy/k8s/secret.yaml** içinde plaintext secret commit edilmesinden kaynaklanıyor. Repo private olsa bile sektör pratiği ihlali. **ADR-0008** ayrıntılı dokümante etti.
+
+- [!] `ENVANTER_MASTER_KEY` rotate (yeni 32B random üret, base64 encode)
+- [!] `ENVANTER_JWT_SECRET` rotate
+- [!] `secret.yaml`'ı `.gitignore`'a ekle
+- [!] `secret.yaml.example` placeholder ile yer tutucu commit
+- [!] Git history'den eski secret'ları purge (`git filter-repo --path deploy/k8s/secret.yaml --invert-paths` veya BFG)
+- [!] Mac'teki cluster'da yeni secret'larla `kubectl apply -f secret.yaml`
+
+---
+
+## Aktif: Faz 2 — Server MVP (PR akışı başladı)
+
+### PR-1: Foundation (config + logging) — `feat/server-foundation`
+
+**Durum:** Branch açık, GitHub'da review/merge bekliyor. Mac deploy commitleri main'e geldikten sonra **rebase + force-push** gerekecek.
+
+- [x] `internal/config` — env loader + 9 unit test
+- [x] `internal/logging` — slog + secret redaction + 8 unit test
+- [x] `cmd/api/main.go` refactor (config + logger wire)
+- [ ] **User aksiyonu:** Rebase sonrası CI yeniden yeşil olunca squash merge
+
+### PR-2: DB layer + chi router — `feat/server-db-chi` (sırada)
+
+PR-1 merge sonrası başlar. Bu PR Go dependency ekleyecek (chi, pgx) → kullanıcının lokalde Go kurup `go mod tidy` çalıştırması gerekecek.
+
+- [ ] Go deps: `github.com/go-chi/chi/v5`, `github.com/jackc/pgx/v5`, `github.com/google/uuid`
+- [ ] `go.mod` + `go.sum` (kullanıcı `go mod tidy` çalıştırıp commit edecek)
+- [ ] `internal/db` — pgxpool wrapper + Health check
+- [ ] `internal/httpapi/router.go` — chi router + middleware (request-id, recovery, slog logger, real-ip, timeout)
+- [ ] `internal/httpapi/health.go` — /healthz, /readyz handlers
+- [ ] `cmd/api/main.go` — DB pool + chi router wire
+- [ ] httpapi router unit testler
+- [ ] **DB migration init container** (api Deployment'a) — Mac deploy ile entegre olmalı
+
+### PR-3: Crypto package — `feat/server-crypto`
 
 ## Tamamlanan: Faz 0 — Temel kurulum (VERIFY bekliyor)
 
@@ -134,9 +169,25 @@ Faz 1 kod'u yazıldı, kullanıcı `make migrate-up` + `make gen` ile doğrulama
 ## Faz 5 — Production hardening (~1 hafta)
 
 ### k8s / Deploy
-- [ ] Helm chart (server + postgres dependency)
-- [ ] External Secrets Operator entegrasyonu (veya Sealed Secrets)
-- [ ] TLS config + ingress (cert-manager)
+
+**Mac M4 tarafında erken yapılan (ADR-0008):**
+- [x] Server + Web Dockerfile (multi-stage, scratch + nginx)
+- [x] GHCR pipeline (multi-arch amd64+arm64)
+- [x] Raw k8s manifests (namespace, configmap, secret, postgres+PVC, api, web, adminer, mailhog)
+- [x] ArgoCD Application (auto-sync, prune, self-heal)
+
+**Hâlâ yapılacak:**
+- [!] **🚨 secret.yaml plaintext fix** (yukarıda kritik bölüm)
+- [ ] Sealed Secrets veya External Secrets Operator adoption
+- [ ] Image versioning — `:latest` yerine git SHA / semver tag
+- [ ] Resource limits + HPA + PodDisruptionBudget
+- [ ] Pod Security Standards (runAsNonRoot, readOnlyRootFilesystem, drop caps)
+- [ ] NetworkPolicy (pod-to-pod traffic kısıtlama)
+- [ ] TLS config + Ingress (cert-manager + Let's Encrypt) — NodePort retire
+- [ ] Helm chart migration (opsiyonel — raw YAML yeterli olursa atlanır)
+- [ ] DB migration init container (api Deployment) — PR-2 ile koordineli
+- [ ] Managed DB değerlendirmesi (Cloud SQL / RDS / on-prem HA cluster)
+- [ ] Distroless image (server scratch yerine `gcr.io/distroless/static-debian12`)
 
 ### Observability
 - [ ] Prometheus metrics (custom + runtime)
@@ -204,7 +255,15 @@ Faz 1 kod'u yazıldı, kullanıcı `make migrate-up` + `make gen` ile doğrulama
 - [ ] Postgres HA / replication stratejisi (tek master + read replica?) → Faz 5'te karar
 - [ ] sqlc override'larda `inet` için `netip.Addr` mı `net.IP` mi? → Faz 2 implementation'da netleşir
 
-## Tamamlanan Kararlar (Faz 1)
+## Tamamlanan Kararlar
+
+### Cross-machine deploy iterasyonu (2026-04-25, Mac M4)
+- **Container images:** Multi-stage (server: scratch, web: nginx)
+- **Registry:** GHCR (multi-arch amd64+arm64)
+- **K8s deploy:** Raw YAML manifests (Helm yerine, başlangıç için)
+- **GitOps:** ArgoCD Application (auto-sync, prune, self-heal)
+- **CI:** docker build/push job, push to main only
+- ADR-0008'de detaylı
 
 ### İlk iterasyon
 - UUID v7 client-üretimli (AAD pending problemi için)

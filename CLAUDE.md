@@ -29,8 +29,9 @@ DevOps/SRE takımı için envanter yönetim uygulaması. KeePassXC'ye alternatif
 | Şifreleme | AES-256-GCM (envelope) + X25519 (key wrap) |
 | Auth | Argon2id (password) + TOTP + JWT session |
 | Dev stack | Docker Compose |
-| Deploy | Kubernetes + Helm |
-| CI | GitHub Actions |
+| Container images | Multi-stage Dockerfile (server: scratch, web: nginx) → GHCR |
+| Deploy | Raw k8s YAML + ArgoCD GitOps (Helm — ileride değerlendirilecek; ADR-0008) |
+| CI | GitHub Actions (server + pre-commit + docker build/push) |
 
 ## Güvenlik Modeli (Hibrit)
 
@@ -69,6 +70,13 @@ Envanter_App/
 - **Faz bazlı ilerleme:** Aynı anda bir faz aktif. Faz bitmeden sonraki başlamaz.
 - **TodoWrite eşleniği:** Aktif faz task'ları TodoWrite'ta tutulur, `TODO.md` kalıcı yansımadır.
 
+## İş Bölümü — Çift Makine Workflow
+
+- **Windows iş istasyonu** (Repos/Envanter_App): kod (server, web, client, migrations, ADR, OpenAPI) — PR akışıyla.
+- **Mac M4** (paralel Claude session): containerization, k8s, ArgoCD, GHCR, deploy testleri — main'e direkt commit (ADR-0008).
+- Her iki session da `RULES.md`'deki tracking discipline kuralına uyar (PROGRESS/TODO aynı commit'te).
+- Conflict olmaması için: kod tarafı PR, deploy tarafı main direct (örtüşmesizlik); örtüşme olursa main'i pull edip rebase.
+
 ## Her Session'da Yapılacaklar
 
 1. `PROGRESS.md` oku — aktif faz ve son durum.
@@ -80,8 +88,9 @@ Envanter_App/
 
 Tam liste: `RULES.md`.
 
-- Secret field (parola, token, private key) asla plaintext log'lanmaz.
+- Secret field (parola, token, private key) asla plaintext log'lanmaz **veya repo'ya commit edilmez** (`secret.yaml` gibi). `.gitignore` + Sealed Secrets / SOPS pattern'i kullanılır.
 - Test yazılmadan public API merge edilmez.
 - Her mimari karar `docs/adr/` altında ADR olarak yazılır.
-- Her task sonunda `PROGRESS.md` güncellenir.
+- Her task sonunda `PROGRESS.md` güncellenir (aynı commit içinde).
 - Conventional Commits formatı zorunlu.
+- Repos canonical, Claude-Chat legacy (RULES.md "Repo Konumu" bölümü).

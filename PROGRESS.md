@@ -1,13 +1,14 @@
 # İlerleyiş
 
-Son güncelleme: 2026-04-24
+Son güncelleme: 2026-04-25
 
 ## Mevcut Durum
 
-- **Aktif Faz:** Faz 1 — Veri modeli + kripto tasarımı **kapandı** (tasarım + 5 ADR + migration + OpenAPI + code gen + 2 ek ADR genişletme)
+- **Aktif Faz:** Faz 2 — Server MVP (PR-1 açık, review/merge bekliyor) + paralel Faz 5 deploy başlangıcı (Mac M4)
 - **Tamamlanan Faz:** Faz 0 (kod iskeleti) + Faz 1 (veri modeli ve tasarım)
-- **Bloker:** Yok
-- **Bir sonraki adım:** Kullanıcı migration'ları (`make migrate-up`) + code gen (`make gen`) lokalde doğrulayıp commit'ler. Sonra **Faz 2 — Server MVP** başlar.
+- **Çift makine workflow:** Win iş istasyonu = kod (PR akışı), Mac M4 = container/deploy (main direct, ADR-0008)
+- **Bloker:** ⚠️ `deploy/k8s/secret.yaml` plaintext secret içeriyor — rotate + .gitignore + Sealed Secrets adoption gerekli
+- **Bir sonraki adım:** PR-1 (`feat/server-foundation`) merge → PR-2 (DB layer + chi router) → Mac tarafında secret rotation + Sealed Secrets entegrasyonu
 
 ## Faz Durumu
 
@@ -15,12 +16,12 @@ Son güncelleme: 2026-04-24
 |-----|-------|-----------|-------|-----|
 | 0 — Temel kurulum | VERIFY | 2026-04-24 | 2026-04-24 | Kod yazıldı, lokal smoke test user tarafında |
 | 1 — Veri modeli + kripto tasarımı | DONE | 2026-04-24 | 2026-04-24 | ER (17 tablo) + ADR 0004/0005/0006/0007 + auth-flow + 5 migration + OpenAPI + code gen |
-| 2 — Server MVP | TODO | — | — | Auth + RBAC + CRUD + WebSocket + audit |
+| 2 — Server MVP | ACTIVE | 2026-04-24 | — | PR-1 açık (config+logging); PR-2 sırada (DB+chi) |
 | 3 — Admin Web UI | TODO | — | — | Login + user mgmt + ağaç view |
 | 4 — Client MVP (Tauri) | TODO | — | — | Win+Mac, live sync, offline cache, E2E |
-| 5 — Production hardening | TODO | — | — | Helm + secrets + metrics + packaging |
+| 5 — Production hardening | PARTIAL | 2026-04-25 | — | Container + GHCR + k8s + ArgoCD erken yapıldı (Mac); secrets, Helm, observability hâlâ TODO |
 
-Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `VERIFY` doğrulama bekliyor · `BLOCKED` bloke · `TODO` beklemede
+Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tamamlandı · `VERIFY` doğrulama bekliyor · `BLOCKED` bloke · `TODO` beklemede
 
 ## Faz 0 Task İlerlemesi
 
@@ -50,6 +51,46 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `VERIFY` doğrulama bek
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-04-25 — Cross-machine deploy work (Mac M4, paralel Claude session) — backfill
+
+Bu entry, **Mac M4 üzerinde paralel olarak yapılan deploy çalışmasının** geriye dönük dokümantasyonu (RULES.md tracking discipline kuralı için). Çalışmayı yapan: Burak Haşlaman + Claude Sonnet 4.6 (Mac session).
+
+**4 commit (sıralı):**
+
+| Commit | Açıklama |
+|--------|---------|
+| `9d8894f` | feat: add Dockerfiles, k8s manifests, and GHCR CI pipeline |
+| `48920ac` | fix: allow multi-document YAML in pre-commit + add ArgoCD Application |
+| `002a9e3` | fix: add imagePullSecrets for GHCR private registry |
+| `38c784e` | fix: build multi-platform images (amd64 + arm64) for M4 compatibility |
+
+**Eklenen / değişen:**
+
+- **`server/Dockerfile`** — Go multi-stage (golang:1.22-alpine → scratch); CGO disabled, ~20MB image
+- **`web/Dockerfile`** + **`web/nginx.conf`** — Vite build → nginx; `/api` proxy + `/ws` WebSocket + SPA fallback
+- **`deploy/k8s/`** (9 dosya) — namespace, configmap, secret, postgres (StatefulSet+PVC), api, web (NodePort 30830), adminer, mailhog, argocd-app
+- **`.github/workflows/ci.yml`** — yeni `docker` job (push to main only): GHCR login + buildx + multi-arch push (amd64 + arm64); cache=gha
+- **`.pre-commit-config.yaml`** — `check-yaml` için `--allow-multiple-documents` (k8s manifest'ler `---` içerir)
+- **ADR-0008 (bu commit'te)** — Containerization + raw k8s + GHCR + ArgoCD GitOps. ADR-0001'in Helm tercihinden farklılaşma.
+
+**Pattern:**
+- main'e push = CI → Docker images (api, web) GHCR'a push → ArgoCD detect (polling) → envanter namespace sync. Tam GitOps.
+- Multi-arch sayesinde Mac M4'te `kubectl run` veya kind/k3d ile yerel test sorunsuz.
+
+**⚠️ Kritik bulgular ve yapılacaklar:**
+
+1. **`deploy/k8s/secret.yaml` plaintext secret içeriyor** — `ENVANTER_MASTER_KEY`, `ENVANTER_JWT_SECRET`, `POSTGRES_PASSWORD` repo'da görünür. Repo private olsa bile sektör pratiği ihlali. **Acil aksiyonlar:**
+   - Master key + JWT secret rotate (yeni rastgele 32B üret)
+   - `secret.yaml`'ı `.gitignore`'a ekle
+   - `secret.yaml.example` placeholder commit
+   - Git history'den eski secret'ları purge (`git filter-repo` veya BFG)
+   - Sealed Secrets / External Secrets / SOPS adoption (Faz 5)
+2. `:latest` tag — git SHA / semver tag pin'lemesi gerekir (Faz 5)
+3. Resource limits, HPA, Ingress, TLS, NetworkPolicy, Pod Security Standards eksik — Faz 5'e taşındı
+4. DB migration init container yok — api Deployment'ına eklenmeli (Faz 2 PR-2 veya PR-3'te)
+
+**Gözlem:** Pre-commit'in `gitleaks` hook'u secret leak'i yakalayamadı (k8s YAML secret kategorize etmedi). `gitleaks` config'ine custom rule eklenmesi düşünülecek.
 
 ### 2026-04-24 — Proje başlangıcı + Faz 0 tamamlandı
 - Gereksinimler ve hedef netleşti (envanter app, DevOps/SRE takımı için, KeePassXC replacement).
@@ -144,11 +185,14 @@ Kullanıcı review sırasında ürün için 4 ek boyut tanımladı; hepsi için 
 | 0005 | Migration tool: goose | Kabul (2026-04-24) |
 | 0006 | Veri modeli: item_types, field_definitions, folder_permissions, item_relationships + admin rolü | Kabul (2026-04-24) |
 | 0007 | External secret backends: Vault proxy (manuel linking, Faz 5 impl) | Kabul (2026-04-24) |
+| 0008 | Containerization + raw k8s + GHCR + ArgoCD (Helm yerine, ADR-0001 deploy satırını değiştirir) | Kabul (2026-04-25) |
 
 ## Bloker / Risk / Not
 
-- **2026-04-24:** Lokal makinede Go, Node, Rust, Docker kurulu değil — CI'a push edilene kadar gerçek build/test verifikasyonu yok. Kullanıcı `docs/smoke-test.md`'deki adımları lokal dev makinesinde çalıştırmalı.
+- **2026-04-24:** Win lokal makinede Go, Node, Rust, Docker kurulu değil — CI'a push edilene kadar gerçek build/test verifikasyonu yok. Kullanıcı `docs/smoke-test.md`'deki adımları lokal dev makinesinde çalıştırmalı.
 - Tauri iconları (Faz 4'te) eklenmeden `tauri:build` warning verebilir. `tauri:dev` sorunsuz çalışır.
 - `go.sum`, `package-lock.json`, `Cargo.lock` henüz yok — ilk `go mod tidy` / `npm install` / `cargo build` komutlarında üretilecek ve commit'lenecek.
 - **Faz 1 sonu:** Migration'lar Postgres üzerinde çalıştırılmadı (lokal ortam yok). Kullanıcı `make migrate-up` ile doğrulamalı.
 - Code gen henüz çalıştırılmadı; `server/internal/db/sqlcgen/`, `server/internal/httpapi/apigen/`, `web/src/api/schema.gen.ts`, `client/src/api/schema.gen.ts` dosyaları yok. `make gen` ilk kez çalıştırıldığında üretilecek ve commit'lenmeli (CI `make gen-check` ile drift'i yakalar).
+- **🚨 KRİTİK 2026-04-25:** `deploy/k8s/secret.yaml` plaintext secret içeriyor. Mac tarafında acil: rotate + `.gitignore` + git history temizliği + Sealed Secrets adoption.
+- **2026-04-25:** PR-1 (`feat/server-foundation`) açıldı ama merge edilmeden main'e 4 commit eklendi (Mac deploy work). PR branch rebase edilecek (force-push), CI tekrar koşacak.

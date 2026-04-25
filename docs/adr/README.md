@@ -50,3 +50,4 @@ Küçük refactoring'ler veya kod içi kararlar için ADR yazılmaz — commit m
 | [0005](0005-migration-tool.md) | Migration tool: goose (SQL-first, embed) | 2026-04-24 | Accepted |
 | [0006](0006-data-model-extensions.md) | Veri modeli: item_types, field_definitions, folder_permissions, item_relationships + admin role | 2026-04-24 | Accepted |
 | [0007](0007-external-secret-backends.md) | Vault proxy modeli (manuel linking, Faz 5 impl) | 2026-04-24 | Accepted |
+| [0008](0008-deployment-stack.md) | Containerization + raw k8s + GHCR + ArgoCD GitOps (Helm yerine) | 2026-04-25 | Accepted |
