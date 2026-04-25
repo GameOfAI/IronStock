@@ -68,3 +68,7 @@ secrets/
 coverage/
 *.coverprofile
 .nyc_output/
+
+# Plaintext secret manifests (use Sealed Secrets / External Secrets in production)
+deploy/k8s/secret.yaml
+deploy/k8s/*-secret.yaml

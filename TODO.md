@@ -12,12 +12,13 @@ TodoWrite ile senkronize çalışır — aktif session'daki live task listesi To
 
 Bu maddeler **deploy/k8s/secret.yaml** içinde plaintext secret commit edilmesinden kaynaklanıyor. Repo private olsa bile sektör pratiği ihlali. **ADR-0008** ayrıntılı dokümante etti.
 
-- [!] `ENVANTER_MASTER_KEY` rotate (yeni 32B random üret, base64 encode)
-- [!] `ENVANTER_JWT_SECRET` rotate
-- [!] `secret.yaml`'ı `.gitignore`'a ekle
-- [!] `secret.yaml.example` placeholder ile yer tutucu commit
-- [!] Git history'den eski secret'ları purge (`git filter-repo --path deploy/k8s/secret.yaml --invert-paths` veya BFG)
-- [!] Mac'teki cluster'da yeni secret'larla `kubectl apply -f secret.yaml`
+- [x] `ENVANTER_MASTER_KEY` rotate
+- [x] `ENVANTER_JWT_SECRET` rotate
+- [x] `secret.yaml`'ı `.gitignore`'a ekle
+- [x] `secret.yaml.example` placeholder ile yer tutucu commit
+- [x] Mac'teki cluster'da yeni secret'larla kubectl create secret applied
+- [ ] Git history'den eski secret'ları purge (BFG / git filter-repo) — ayrı PR, repo public edilmeden önce
+- [ ] Sealed Secrets / External Secrets Operator adoption (Faz 5)
 
 ---
 

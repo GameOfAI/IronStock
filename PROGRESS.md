@@ -61,6 +61,19 @@ PR-1 merge sonrası docker job 1+ saat sürdü (QEMU multi-arch). Çözüm:
 - Cache scope per image (`scope=api` / `scope=web`) — bir image değişince diğerinin cache'i geçerliliğini koruyor
 - `on.push.tags: ['v*']` eklendi — tag push'larda CI tetikleniyor
 
+### 2026-04-25 (Mac M4) — Secret rotation + .gitignore
+
+- `deploy/k8s/secret.yaml` git tracking'den çıkarıldı (`git rm --cached`)
+- `.gitignore`'a `deploy/k8s/secret.yaml` ve `deploy/k8s/*-secret.yaml` eklendi
+- `deploy/k8s/secret.yaml.example` placeholder template commit'lendi
+- Yeni `ENVANTER_MASTER_KEY`, `ENVANTER_JWT_SECRET`, `POSTGRES_PASSWORD`, `ENVANTER_DB_URL` üretildi (32/32/24 byte random base64)
+- Cluster'da `kubectl create secret generic envanter-secret` ile apply edildi
+- Postgres PVC sıfırlandı (test ortamı, fresh start) → StatefulSet + API pod'ları restart
+- `configmap.yaml`'dan plaintext `ENVANTER_DB_URL` kaldırıldı; parça parça env'lere bölündü (`ENVANTER_DB_HOST/PORT/NAME/USER/SSLMODE`)
+- `ENVANTER_DB_URL` artık Secret'tan geliyor (`kubectl create secret` ile)
+- *Hâlâ TODO:* Git history'den eski secret'ları purge (BFG / git filter-repo) — ayrı task
+- *Hâlâ TODO:* Sealed Secrets / External Secrets Operator adoption (Faz 5)
+
 ### 2026-04-25 — Cross-machine deploy work (Mac M4, paralel Claude session) — backfill
 
 Bu entry, **Mac M4 üzerinde paralel olarak yapılan deploy çalışmasının** geriye dönük dokümantasyonu (RULES.md tracking discipline kuralı için). Çalışmayı yapan: Burak Haşlaman + Claude Sonnet 4.6 (Mac session).

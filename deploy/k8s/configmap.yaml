@@ -6,7 +6,11 @@ metadata:
 data:
   ENVANTER_ADDR: ":8080"
   ENVANTER_LOG_LEVEL: "info"
-  ENVANTER_DB_URL: "postgres://envanter:envanter_dev@postgres:5432/envanter?sslmode=disable"
+  ENVANTER_DB_HOST: "postgres"
+  ENVANTER_DB_PORT: "5432"
+  ENVANTER_DB_NAME: "envanter"
+  ENVANTER_DB_USER: "envanter"
+  ENVANTER_DB_SSLMODE: "disable"
   ENVANTER_SMTP_HOST: "mailhog"
   ENVANTER_SMTP_PORT: "1025"
   ENVANTER_SMTP_FROM: "noreply@envanter.local"
