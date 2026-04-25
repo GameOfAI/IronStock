@@ -25,9 +25,13 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        # PR-2'de pgx v5.9.2 Go 1.25+ gerektiriyor (go.mod 'go 1.25.0' otomatik bumped).
-        # 'stable' = setup-go'nun son stable Go'su; reproducibility için sabit minor da seçilebilir.
-        go: ["stable"]
+        # Go 1.23 — pin'lenmiş çünkü:
+        # 1. golangci-lint v1.62.2 binary'si Go 1.23 ile derlenmiş; Go 1.26 SDK'sındaki
+        #    fips140only_go1.26.go gibi dosyaları typecheck edemiyor (v2.x'e migrate
+        #    edilince stable'a dönülebilir).
+        # 2. go-version değişimi setup-go cache key'ini invalidate eder, eski stale
+        #    modül cache'i (pgx v5.9.2 vs) temizlenir.
+        go: ["1.23"]
     defaults:
       run:
         working-directory: server
@@ -153,7 +157,7 @@ jobs:
           python-version: "3.12"
       - uses: actions/setup-go@v5
         with:
-          go-version: "stable"
+          go-version: "1.23"
           cache: false
       - name: Install golangci-lint
         run: |
