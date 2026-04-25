@@ -16,7 +16,10 @@ type handlers struct {
 // Healthz is a liveness probe: returns 200 if the process is alive.
 // Does not check downstream dependencies — k8s should restart the pod
 // only when the process itself is unresponsive.
-func (h *handlers) Healthz(w http.ResponseWriter, _ *http.Request) {
+//
+// Receiver is unused (no deps needed) but kept as a method for symmetry
+// with Readyz and to allow swapping for richer probes later.
+func (*handlers) Healthz(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
