@@ -1,7 +1,8 @@
 // Envanter App API server entrypoint.
 //
-// Faz 2 PR-2: chi router + middleware + pgx pool + DB health check.
-// Auth and inventory endpoints come in PR-3+.
+// Faz 2 PR-5: master key bootstrap + auth.Service + register/TOTP endpoints
+// alongside the existing chi router + DB pool foundation. Login, refresh,
+// item CRUD come in PR-6+.
 package main
 
 import (
@@ -15,11 +16,15 @@ import (
 	"syscall"
 	"time"
 
+	"envanter.app/server/internal/audit"
+	"envanter.app/server/internal/auth"
 	"envanter.app/server/internal/config"
 	"envanter.app/server/internal/db"
 	"envanter.app/server/internal/httpapi"
 	"envanter.app/server/internal/logging"
 )
+
+const issuerName = "Envanter"
 
 func main() {
 	if err := run(); err != nil {
@@ -31,6 +36,9 @@ func main() {
 func run() error {
 	cfg, err := config.Load()
 	if err != nil {
+		return fmt.Errorf("config: %w", err)
+	}
+	if err := cfg.RequireSecrets(); err != nil {
 		return fmt.Errorf("config: %w", err)
 	}
 
@@ -63,10 +71,38 @@ func run() error {
 	defer pool.Close()
 	logger.Info("database connected")
 
+	// --- Master key bootstrap ---
+	mkState, err := auth.BootstrapMasterKey(rootCtx, pool, cfg.MasterKey)
+	if err != nil {
+		return fmt.Errorf("master key bootstrap: %w", err)
+	}
+	logger.Info("master key bootstrapped",
+		slog.Int("master_key_id", int(mkState.ID)),
+		slog.Int("version", int(mkState.Version)),
+	)
+
+	// --- Auth service + handlers ---
+	authSvc, err := auth.New(auth.ServiceConfig{
+		DB:         pool,
+		MasterKey:  mkState,
+		JWTSecret:  cfg.JWTSecret,
+		IssuerName: issuerName,
+	})
+	if err != nil {
+		return fmt.Errorf("auth service: %w", err)
+	}
+	auditWriter := audit.NewWriter(pool)
+	authHandlers := &httpapi.AuthHandlers{
+		Service: authSvc,
+		Audit:   auditWriter,
+		Logger:  logger,
+	}
+
 	// --- HTTP layer ---
 	router := httpapi.NewRouter(httpapi.Deps{
 		Logger: logger,
 		DB:     pool,
+		Auth:   authHandlers,
 	})
 
 	srv := &http.Server{

@@ -1,15 +1,15 @@
 # İlerleyiş
 
-Son güncelleme: 2026-04-25
+Son güncelleme: 2026-04-26
 
 ## Mevcut Durum
 
-- **Aktif Faz:** Faz 2 — Server MVP (PR-1, PR-2, PR-3 ✅ merged; PR-4 hazır, review/merge bekliyor)
+- **Aktif Faz:** Faz 2 — Server MVP (PR-1, PR-2, PR-3 ✅ merged; PR-4 + PR-5 hazır, review/merge bekliyor)
 - **Tamamlanan Faz:** Faz 0 + Faz 1
 - **Çift makine workflow:** ⏸ **Mac M4 paused 2026-04-26** — kullanıcı tüm geliştirmeyi şimdilik Win'den yürütüyor. Mac yeniden devreye alınırsa kullanıcı bilgi verecek; o noktada deploy/k8s işleri Mac'te devam eder (ADR-0008).
 - **Bloker:** Yok
 - **Mac canlı cluster snapshot (son durum):** Tüm pod'lar 1/1 Running, init container ile 5 migration auto-apply (Faz 1), `/healthz` 200 OK. PR-3 merge sonrası 12 yeni migration için Docker build/push tetiklendi → ArgoCD sync → init container 17 migration toplam uygular (Mac yeniden açıldığında doğrulanmalı).
-- **Bir sonraki adım:** PR-4 review/merge → PR-5 (auth endpoints: register/TOTP/login/refresh/recovery + master key loader + RBAC middleware iskeleti)
+- **Bir sonraki adım:** PR-4 + PR-5 review/merge → PR-6 (login + refresh rotation + logout + change-password + recovery + RBAC middleware iskeleti)
 
 ## Faz Durumu
 
@@ -17,7 +17,7 @@ Son güncelleme: 2026-04-25
 |-----|-------|-----------|-------|-----|
 | 0 — Temel kurulum | VERIFY | 2026-04-24 | 2026-04-24 | Kod yazıldı, lokal smoke test user tarafında |
 | 1 — Veri modeli + kripto tasarımı | DONE | 2026-04-24 | 2026-04-24 | ER (17 tablo) + ADR 0004/0005/0006/0007 + auth-flow + 5 migration + OpenAPI + code gen |
-| 2 — Server MVP | ACTIVE | 2026-04-24 | — | PR-1 (foundation), PR-2 (DB+chi), PR-3 (12 migration + integration test) ✅ merged. PR-4 sırada (crypto package). Mac side ⏸ paused 2026-04-26. |
+| 2 — Server MVP | ACTIVE | 2026-04-24 | — | PR-1 (foundation), PR-2 (DB+chi), PR-3 (12 migration + integration test) ✅ merged. PR-4 (crypto) ve PR-5 (master key bootstrap + auth primitives + register/TOTP) review bekliyor. PR-6 sırada (login/refresh/logout/change-pwd/recovery + RBAC middleware). Mac side ⏸ paused 2026-04-26. |
 | 3 — Admin Web UI | TODO | — | — | Login + user mgmt + ağaç view |
 | 4 — Client MVP (Tauri) | TODO | — | — | Win+Mac, live sync, offline cache, E2E |
 | 5 — Production hardening | PARTIAL | 2026-04-25 | — | Container + GHCR + k8s + ArgoCD + DB migration init container + native cross-compile multi-arch + secret rotation tamam. Sealed Secrets, Helm, observability, Ingress+TLS hâlâ TODO |
@@ -52,6 +52,90 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-04-26 (Win) — Faz 2 PR-5: Auth Primitives + Register + TOTP Enroll/Verify
+
+**Branch:** `feat/server-auth-primitives` — review/merge bekliyor.
+
+**Plan B (3 PR'a böldük):** Tek dev'li Faz 2 auth çalışmasını incremental review için 3 PR'a böldük:
+- **PR-5 (bu):** Master key bootstrap + auth primitives (Argon2 wrapper, TOTP, JWT, refresh, recovery) + audit helper + Register + TOTP enroll/verify
+- **PR-6 (sıradaki):** Login + refresh rotation + logout(-all) + change-password + recovery flow + RBAC middleware iskeleti
+- **PR-7:** Item CRUD + folder permissions enforcement (Faz 2 sonu)
+
+**Yeni: `server/internal/auth/` (~600 LOC + ~400 LOC test)**
+
+| Dosya | Sorumluluk |
+|-------|-----------|
+| `keyloader.go` | `BootstrapMasterKey(ctx, db, key)` — fingerprint match (SHA-256), ilk boot v=1 insert, sonraki boot doğrulama |
+| `password.go` | `HashPassword(plaintext)` + `VerifyPassword` — `crypto.HashPassword` üstüne ince persistance wrapper, `Argon2Params` JSON serialization |
+| `totp.go` | RFC 6238 SHA-1 6-digit 30s ±1 skew; `GenerateTOTP(issuer, account)` → otpauth_uri + base32 secret; `VerifyTOTP(secret, code)` |
+| `jwt.go` | HS256 `JWTSigner`; `IssueAccess` (15dk, purpose=access, sessionID + roles) + `IssueTmp` (15dk, purpose=totp-enroll/recovery) + `Parse(token, expectedPurpose)` |
+| `refresh.go` | Opaque token: 32B random hex + SHA-256 hash + 7d TTL — DB'ye sadece hash kaydedilir |
+| `recovery.go` | 10 kod × 8 hex byte (16 char); blob = `salt(16) ‖ argon2id_hash(32)`, constant-time verify |
+| `service.go` | DI bundle: DB pool + Master cipher + MasterKey state + JWTSigner + SearchKey + IssuerName |
+
+**Yeni: `server/internal/audit/` (~120 LOC)**
+- `Writer.Write(ctx, Entry)` — best-effort INSERT INTO audit_log
+- 12 Action konstantı: `auth.register`, `auth.totp_init`, `auth.totp_verified`, `auth.login`, `auth.login_fail`, `auth.logout`, `auth.logout_all`, `auth.refresh`, `auth.refresh_reuse_detected`, `auth.password_changed`, `auth.recover`, `auth.recover_fail`
+- 3 Resource konstantı: `user`, `session`, `item`
+- nullUUID/nullString/nullAddr helpers — empty → SQL NULL
+
+**Yeni endpoint'ler (`internal/httpapi/auth_*.go`):**
+
+`POST /api/v1/auth/register`
+- Validasyon: username regex `^[a-zA-Z0-9._-]{3,64}$`, RFC 5322 email, password ≥12 char, public_key tam 32B
+- 2-table tx: `INSERT users (status='pending_totp')` + `INSERT user_keypairs`
+- `argon2_params` jsonb persist
+- Audit `auth.register`
+- Yanıt: `{user_id, tmp_token}` (purpose=totp-enroll, 15dk)
+
+`POST /api/v1/auth/totp/init`
+- Auth: bearer tmp_token (purpose=totp-enroll)
+- Yeni 20B secret üret → master cipher Seal (AAD=`totp_secrets:{user_id}:secret_enc`)
+- UPSERT `totp_secrets` (verified=false) — idempotent (yeniden çağrı eski secret'ı yenilemiş olur)
+- Audit `auth.totp_init`
+- Yanıt: `{otpauth_uri, secret_base32}`
+
+`POST /api/v1/auth/totp/verify`
+- Auth: bearer tmp_token (purpose=totp-enroll)
+- Encrypted secret fetch → master cipher Open → `VerifyTOTP(secret, code)` (±1 window skew)
+- 3-stmt tx: `UPDATE totp_secrets SET verified=true` + `UPDATE users SET status='active'` + 10× `INSERT INTO recovery_codes`
+- Audit `auth.totp_verified`
+- Yanıt: `{recovery_codes: [...10 plain]}` — **plaintext sadece bu yanıtta görünür**, sonra DB'de hash-only
+
+**Shared: `internal/httpapi/error.go`**
+- `ErrorResponse` (Code/Message/Details) — OpenAPI `Error` schema ile uyumlu
+- 11 ErrCode konstantı (bad_request, unauthorized, invalid_credentials, invalid_mfa, invalid_code, invalid_token, account_locked, account_pending_totp, rate_limited, conflict, internal_error)
+- `writeError(w, logger, status, code, userMessage, cause)` — userMessage Türkçe, cause sadece log'a (5xx için warn)
+- `decodeJSON(w, r, logger, dst)` — 1 MiB body cap + DisallowUnknownFields
+
+**Wire: `cmd/api/main.go`**
+- Master key 32B kontrol → `auth.BootstrapMasterKey` → `auth.New(ServiceConfig{...})` → `audit.NewWriter(pool)` → `httpapi.AuthHandlers{Service, Audit, Logger}`
+- Router `Deps.Auth != nil` ise `/api/v1/auth/{register, totp/init, totp/verify}` mount eder
+
+**Config: `internal/config/config.go`**
+- `MasterKey []byte` + `JWTSecret []byte` alanları
+- `decodeMasterKey(b64)` — base64.StdEncoding 32B
+- `RequireSecrets()` — secret'lar boşsa fail-fast (production safety)
+
+**Test sayısı:** Yeni 18 unit test (`auth/{password,jwt,totp,refresh,recovery}_test.go` + `httpapi/error_test.go`). Tüm paketlerde toplam **86 unit test** (önceki 68 + 18 yeni).
+
+**Lokal validation (Win, Go 1.26.2 + golangci-lint v1.62.2):**
+- `go build ./...` ✓
+- `go test ./...` ✓
+- `gofmt -l .` clean
+- `golangci-lint run --timeout=5m ./...` 0 issues (gosec G101 false positive `nolint` ile kapatıldı — `ErrCodeInvalidCreds` error-code identifier, secret değil)
+
+**Bilinçli kapsam dışı (PR-6+):**
+- `/auth/login` (password verify + TOTP step + session create + access+refresh issue)
+- `/auth/refresh` (rotation + reuse detection)
+- `/auth/logout`, `/auth/logout-all`
+- `/auth/change-password`
+- `/auth/recover/{init,complete}` (recovery code → new keypair)
+- RBAC middleware (`requireRole`, `requirePermission`)
+- Item CRUD (PR-7)
+
+**Sıradaki:** PR-6 — login/refresh/logout/change-password/recovery + RBAC middleware iskeleti.
 
 ### 2026-04-26 (Win) — Faz 2 PR-4: Crypto Package
 

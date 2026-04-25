@@ -18,6 +18,8 @@ func resetEnv(t *testing.T) {
 		"ENVANTER_DB_MAX_CONNS",
 		"ENVANTER_DB_MIN_CONNS",
 		"ENVANTER_DB_HEALTH_CHECK_INTERVAL",
+		"ENVANTER_MASTER_KEY",
+		"ENVANTER_JWT_SECRET",
 	}
 	for _, k := range keys {
 		t.Setenv(k, "")
@@ -157,5 +159,80 @@ func TestEnvDurationOr_FallsBackOnInvalid(t *testing.T) {
 	}
 	if cfg.ShutdownTimeout != 10*time.Second {
 		t.Errorf("expected default 10s on invalid duration, got %v", cfg.ShutdownTimeout)
+	}
+}
+
+func TestLoad_MasterKey_DecodedAndValidated(t *testing.T) {
+	resetEnv(t)
+	// 32 zero bytes base64-encoded
+	t.Setenv("ENVANTER_MASTER_KEY", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+	if len(cfg.MasterKey) != 32 {
+		t.Errorf("MasterKey len = %d, want 32", len(cfg.MasterKey))
+	}
+}
+
+func TestLoad_MasterKey_RejectsBadBase64(t *testing.T) {
+	resetEnv(t)
+	t.Setenv("ENVANTER_MASTER_KEY", "!!!not-base64!!!")
+	_, err := Load()
+	if err == nil {
+		t.Fatal("expected error for invalid base64")
+	}
+}
+
+func TestLoad_MasterKey_RejectsWrongLength(t *testing.T) {
+	resetEnv(t)
+	// 16 bytes, base64-encoded → wrong length (need 32)
+	t.Setenv("ENVANTER_MASTER_KEY", "AAAAAAAAAAAAAAAAAAAAAA==")
+	_, err := Load()
+	if err == nil {
+		t.Fatal("expected error for 16-byte master key (need 32)")
+	}
+}
+
+func TestLoad_JWTSecret_RejectsTooShort(t *testing.T) {
+	resetEnv(t)
+	t.Setenv("ENVANTER_JWT_SECRET", "short")
+	_, err := Load()
+	if err == nil {
+		t.Fatal("expected error for short JWT secret")
+	}
+}
+
+func TestLoad_JWTSecret_AcceptsExactly32Bytes(t *testing.T) {
+	resetEnv(t)
+	t.Setenv("ENVANTER_JWT_SECRET", "01234567890123456789012345678901") // 32 chars
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+	if len(cfg.JWTSecret) != 32 {
+		t.Errorf("JWTSecret len = %d, want 32", len(cfg.JWTSecret))
+	}
+}
+
+func TestRequireSecrets(t *testing.T) {
+	cases := []struct {
+		name    string
+		mk, jwt []byte
+		wantErr bool
+	}{
+		{"both set", make([]byte, 32), make([]byte, 32), false},
+		{"missing mk", nil, make([]byte, 32), true},
+		{"missing jwt", make([]byte, 32), nil, true},
+		{"short jwt", make([]byte, 32), make([]byte, 16), true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := &Config{MasterKey: tc.mk, JWTSecret: tc.jwt}
+			err := cfg.RequireSecrets()
+			if (err != nil) != tc.wantErr {
+				t.Errorf("RequireSecrets err = %v, wantErr %v", err, tc.wantErr)
+			}
+		})
 	}
 }

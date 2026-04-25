@@ -4,6 +4,7 @@
 package config
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"os"
@@ -30,10 +31,27 @@ type Config struct {
 	DBMaxConns            int32         // ENVANTER_DB_MAX_CONNS (default 10)
 	DBMinConns            int32         // ENVANTER_DB_MIN_CONNS (default 2)
 	DBHealthCheckInterval time.Duration // ENVANTER_DB_HEALTH_CHECK_INTERVAL (default 30s)
+
+	// Cryptographic secrets (sensitive — never logged in plaintext, internal/logging
+	// redaction is the safety net but callers should still avoid printing).
+	// Both required once internal/auth is wired (PR-5+); optional during
+	// foundation tests (gated by NeedsAuth in Validate).
+
+	// MasterKey is the 32-byte symmetric key for envelope encryption (ADR-0004 §2).
+	// Provided via ENVANTER_MASTER_KEY as base64 (44 chars). Decoded length must be 32.
+	MasterKey []byte
+	// JWTSecret is the HMAC key for HS256 access tokens (and tmp tokens for TOTP
+	// enrollment / recovery). Provided via ENVANTER_JWT_SECRET, raw bytes; >= 32 bytes
+	// required for HS256 security (RFC 7518 §3.2).
+	JWTSecret []byte
 }
 
 // Load reads config from environment, applies defaults, and validates.
 func Load() (*Config, error) {
+	masterKey, err := decodeMasterKey(os.Getenv("ENVANTER_MASTER_KEY"))
+	if err != nil {
+		return nil, err
+	}
 	cfg := &Config{
 		Addr:                  envOr("ENVANTER_ADDR", ":8080"),
 		ShutdownTimeout:       envDurationOr("ENVANTER_SHUTDOWN_TIMEOUT", 10*time.Second),
@@ -43,11 +61,26 @@ func Load() (*Config, error) {
 		DBMaxConns:            envInt32Or("ENVANTER_DB_MAX_CONNS", 10),
 		DBMinConns:            envInt32Or("ENVANTER_DB_MIN_CONNS", 2),
 		DBHealthCheckInterval: envDurationOr("ENVANTER_DB_HEALTH_CHECK_INTERVAL", 30*time.Second),
+		MasterKey:             masterKey,
+		JWTSecret:             []byte(os.Getenv("ENVANTER_JWT_SECRET")),
 	}
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
 	return cfg, nil
+}
+
+// decodeMasterKey decodes the base64-encoded master key from env. Empty input
+// returns nil (validation will catch it where required).
+func decodeMasterKey(b64 string) ([]byte, error) {
+	if b64 == "" {
+		return nil, nil
+	}
+	key, err := base64.StdEncoding.DecodeString(b64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid ENVANTER_MASTER_KEY (must be base64): %w", err)
+	}
+	return key, nil
 }
 
 // Validate ensures the loaded config is internally consistent.
@@ -75,6 +108,27 @@ func (c *Config) Validate() error {
 	}
 	if c.ShutdownTimeout <= 0 {
 		return errors.New("ENVANTER_SHUTDOWN_TIMEOUT must be > 0")
+	}
+	// MasterKey + JWTSecret are not required at config-load time so foundation
+	// tests can run without env. internal/auth.New verifies them at startup.
+	if len(c.MasterKey) > 0 && len(c.MasterKey) != 32 {
+		return fmt.Errorf("ENVANTER_MASTER_KEY decoded length = %d, want 32", len(c.MasterKey))
+	}
+	if len(c.JWTSecret) > 0 && len(c.JWTSecret) < 32 {
+		return fmt.Errorf("ENVANTER_JWT_SECRET length = %d, want >= 32 (HS256 security)", len(c.JWTSecret))
+	}
+	return nil
+}
+
+// RequireSecrets returns an error if MasterKey or JWTSecret is unset.
+// Called by internal/auth bootstrap; not by Load (which is permissive so
+// non-auth tests can run).
+func (c *Config) RequireSecrets() error {
+	if len(c.MasterKey) != 32 {
+		return errors.New("ENVANTER_MASTER_KEY is required (32-byte base64)")
+	}
+	if len(c.JWTSecret) < 32 {
+		return errors.New("ENVANTER_JWT_SECRET is required (>= 32 bytes)")
 	}
 	return nil
 }

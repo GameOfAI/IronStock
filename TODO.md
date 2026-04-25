@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-04-25
+Son güncelleme: 2026-04-26
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 
@@ -68,20 +68,46 @@ TodoWrite ile senkronize çalışır — aktif session'daki live task listesi To
 - [x] `golang.org/x/crypto v0.17.0` direct dependency (argon2 + hkdf)
 - [x] Lokal validation: build / test / gofmt / golangci-lint clean
 
-### 🔜 PR-5: Auth endpoints + Master Key + RBAC middleware (SIRADA)
+### ✅ PR-5: Master key bootstrap + auth primitives + Register + TOTP — `feat/server-auth-primitives` (REVIEW BEKLIYOR)
 
-- [ ] `00006_user_keypairs.sql`
-- [ ] `00007_totp_secrets.sql`
-- [ ] `00008_recovery_codes.sql`
-- [ ] `00009_master_keys.sql`
-- [ ] `00010_item_types.sql` + seed
-- [ ] `00011_field_definitions.sql` + seed
-- [ ] `00012_folders.sql` + `00013_folder_permissions.sql`
-- [ ] `00014_items.sql` + `00015_item_fields.sql` + `00016_item_shares.sql`
-- [ ] `00017_item_relationships.sql`
-- [ ] sqlc query genişletmeleri
+**Plan B:** Faz 2 auth çalışmasını 3 PR'a böldük (PR-5: primitives + register/TOTP, PR-6: login/refresh/logout/change-pwd/recovery + RBAC middleware, PR-7: Item CRUD).
 
-### PR-4: Crypto package — `feat/server-crypto`
+- [x] `internal/config` — `MasterKey` + `JWTSecret` + `RequireSecrets()`
+- [x] `internal/auth/keyloader.go` — `BootstrapMasterKey` (fingerprint match)
+- [x] `internal/auth/password.go` — Argon2id wrapper + `Argon2Params` JSON
+- [x] `internal/auth/totp.go` — RFC 6238 (pquerna/otp), ±1 skew
+- [x] `internal/auth/jwt.go` — HS256 signer (access + tmp purposes)
+- [x] `internal/auth/refresh.go` — opaque 32B + SHA-256 hash + 7d TTL
+- [x] `internal/auth/recovery.go` — 10 codes × 8 hex byte, salt(16)‖hash(32) blob
+- [x] `internal/auth/service.go` — DI bundle
+- [x] `internal/audit` — Writer + 12 action constants + 3 resource constants
+- [x] `internal/httpapi/error.go` — shared ErrorResponse + 11 ErrCode + decodeJSON helper
+- [x] `internal/httpapi/auth_register.go` — POST /api/v1/auth/register (2-table tx, audit, tmp_token)
+- [x] `internal/httpapi/auth_totp.go` — POST /totp/init + /totp/verify (envelope encrypt secret, recovery codes)
+- [x] `cmd/api/main.go` — master key bootstrap → auth.Service → AuthHandlers wire
+- [x] 18 yeni unit test
+- [x] Lokal validation: build / test / gofmt / golangci-lint clean
+
+### 🔜 PR-6: Login + refresh + logout + change-pwd + recovery + RBAC middleware (SIRADA)
+
+- [ ] `/auth/login` (password verify + TOTP step + session create + access+refresh issue)
+- [ ] `/auth/refresh` (rotation + reuse detection → revoke all)
+- [ ] `/auth/logout` + `/auth/logout-all`
+- [ ] `/auth/change-password`
+- [ ] `/auth/recover/init` + `/auth/recover/complete` (recovery code → new keypair)
+- [ ] Session binding flag (UA/IP)
+- [ ] Rate limit middleware (login, TOTP verify, refresh, recover)
+- [ ] Account lockout (10 fail → 30dk)
+- [ ] RBAC middleware iskeleti — `requireRole`, `requirePermission(folder_id|item_id)`
+- [ ] sqlc query genişletmeleri (sessions, refresh_tokens, recovery_codes lookup)
+
+### 🔜 PR-7: Item CRUD + folder permissions enforcement (Faz 2 sonu)
+
+- [ ] Folder CRUD
+- [ ] Item CRUD (metadata envelope + secret client-provided)
+- [ ] Item share + folder_permissions effective resolution
+- [ ] Item relationships API
+- [ ] WebSocket hub (`/ws`)
 
 ## Tamamlanan: Faz 0 — Temel kurulum (VERIFY bekliyor)
 
