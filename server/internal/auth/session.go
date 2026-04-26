@@ -43,9 +43,15 @@ const (
 )
 
 // SessionRow holds the columns we read for refresh / logout flows.
+//
+// UserAgent + IPAddress are populated by LookupSessionByRefreshHash so the
+// caller can flag session-binding changes (UA/IP drift = audit alarm, not
+// a block per auth-flow.md "Session binding").
 type SessionRow struct {
 	ID           string
 	UserID       string
+	UserAgent    *string
+	IPAddress    *string
 	ExpiresAt    time.Time
 	RevokedAt    *time.Time // nil if active
 	RevokeReason *string    // nil if active
@@ -96,19 +102,27 @@ func CreateSession(
 // regardless of revocation state. Caller decides what to do based on
 // IsActive() + RevokedAt — used by /refresh for reuse detection.
 //
+// UserAgent + IPAddress (from session creation) are returned so the caller
+// can compare against the current request's UA/IP for binding-flag audit.
+//
+// ip_address is read as text via host(...) cast — pgx scans inet to
+// netip.Addr only with extra adapters, but text round-trips losslessly.
+//
 // Returns pgx.ErrNoRows if no session with this hash exists.
 func LookupSessionByRefreshHash(
 	ctx context.Context, q DBExec, refreshHash []byte,
 ) (SessionRow, error) {
 	const selectSQL = `
-		SELECT id::text, user_id::text, expires_at, revoked_at, revoke_reason
+		SELECT id::text, user_id::text, user_agent, host(ip_address),
+		       expires_at, revoked_at, revoke_reason
 		FROM sessions
 		WHERE refresh_token_hash = $1
 		LIMIT 1
 	`
 	var row SessionRow
 	err := q.QueryRow(ctx, selectSQL, refreshHash).Scan(
-		&row.ID, &row.UserID, &row.ExpiresAt, &row.RevokedAt, &row.RevokeReason,
+		&row.ID, &row.UserID, &row.UserAgent, &row.IPAddress,
+		&row.ExpiresAt, &row.RevokedAt, &row.RevokeReason,
 	)
 	return row, err
 }

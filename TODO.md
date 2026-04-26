@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-04-26 (PR-6 hazır)
+Son güncelleme: 2026-04-26 (PR-7 hazır)
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 
@@ -104,13 +104,20 @@ TodoWrite ile senkronize çalışır — aktif session'daki live task listesi To
 - [x] ~40 yeni test case (toplam 126 PASS)
 - [x] Lokal validation: build / test / gofmt / golangci-lint clean
 
-### 🔜 PR-7: Change-password + recovery + RBAC middleware iskeleti (SIRADA)
+### ✅ PR-7: Change-password + recovery + RBAC iskeleti + session binding flag — `feat/server-auth-recovery` (REVIEW BEKLIYOR)
 
-- [ ] `/auth/change-password` (current pwd verify + new pwd hash + new keypair re-wrap + revoke all sessions = 'admin' veya 'password_changed')
-- [ ] `/auth/recover/init` (username + recovery_code → tmp_token purpose=recovery)
-- [ ] `/auth/recover/complete` (tmp_token + new master_password + new public_key + new private_key_enc → eski user_keypairs invalidate; revoke all sessions = 'recovery'; eski wrap'lı item_shares accessibility kaybedilir, ADR-0004 §9)
-- [ ] Session binding flag (UA/IP değişimi audit, block değil)
-- [ ] RBAC middleware iskeleti — `requireRole(role...)`, `requirePermission(folder_id | item_id)` (effective permission resolver — admin bypass + item_shares + folder_permissions ancestor walk; full enforcement PR-8 ile birlikte)
+**Üç onaylanmış karar:** (1) change-password = priv re-wrap, public_key sabit (item_shares korunsun); (2) recovery counter login ile paylaşılan; (3) RBAC bu PR'da sadece RequireRole + Permission tipi (DB resolver PR-8'de).
+
+- [x] `/auth/change-password` — Bearer access, current pwd verify + tek tx (users + user_keypairs priv re-wrap + revoke all 'admin'); audit `auth.password_changed`
+- [x] `/auth/recover/init` — generic 401 (no username enumeration), Argon2id verify, tek tx (used_at + revoke all 'recovery'), tmp_token purpose=recovery; audit `auth.recover` (step=init) / `auth.recover_fail`
+- [x] `/auth/recover/complete` — tmp_token gated, FULL keypair rotate (new pub_key, item_shares accessibility kaybedilir), DELETE+INSERT recovery_codes (10 yeni), defansif revoke all; audit `auth.recover` (step=complete) + `auth.password_changed` (via=recovery)
+- [x] `RequireRole(allowed...)` middleware — admin bypass + claims.Roles intersection
+- [x] `Permission` tipi + sabitler (None/Read/Write) + `Allows(want)` semantiği
+- [x] Session binding flag — `auth.SessionRow` UA/IP fields + `bindingChanged()` + refresh handler audit `auth.session_binding_changed`
+- [x] Audit constant `ActionAuthSessionBindingChanged`
+- [x] Router wire: brute RL `/recover/init`'te
+- [x] ~24 yeni unit test case (toplam 150 PASS)
+- [x] Lokal validation: build / test / gofmt / golangci-lint clean
 
 ### 🔜 PR-8: Item CRUD + folder permissions enforcement (Faz 2 sonu)
 
