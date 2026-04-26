@@ -4,11 +4,11 @@ Son güncelleme: 2026-04-27
 
 ## Mevcut Durum
 
-- **Aktif Faz:** Faz 3 — Admin Web UI (PR-10/11 ✅, PR-12 hazır; PR-W1 sırada)
+- **Aktif Faz:** Faz 3 — Admin Web UI (PR-10/11/12 ✅; PR-W1 hazır, PR-W2 sırada)
 - **Tamamlanan Faz:** Faz 0 + Faz 1 + Faz 2 (server MVP) ✅ 2026-04-26
-- **Çift makine workflow:** ▶ Mac (Pro) ↔ Win paralel. Win = 6 PR (server + foundation + auth + realtime/polish; PR-12 Mac sorularından sonra eklendi). Mac = 3 PR (admin + inventory ekranlar).
+- **Çift makine workflow:** ▶ Mac (Pro) ↔ Win paralel. Win = 6 PR. Mac = 3 PR. ADR-0009 stack kararı yansıdı.
 - **Bloker:** Yok
-- **Bir sonraki adım:** **PR-W1** — Web foundation (Vite + Tailwind + shadcn/ui + TanStack Query + Zustand + API client + layout + routing). PR-12 merge sonrası başlıyorum.
+- **Bir sonraki adım:** **PR-W2** — Auth screens (login + TOTP setup + recover + change-password). KEK türetme + authStore session bu PR'da. PR-W1 merge sonrası başlıyorum.
 
 ## Faz Durumu
 
@@ -51,6 +51,91 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-04-27 (Win) — Faz 3 PR-W1: Web foundation (Vite + Tailwind 4 + shadcn/ui + TanStack Query + Zustand + API client SDK + routing + Vitest)
+
+**Branch:** `feat/web-foundation` — review/merge bekliyor.
+
+**Faz 3 web tarafının iskeleti.** Mac PR-W3+ (admin/inventory) için tüm temel alt yapı hazır. ADR-0009 kararları aynen uygulandı.
+
+**Toolchain (package.json):**
+- `react@18.3` + `react-router-dom@6.27`
+- `@tanstack/react-query@5.59` + devtools
+- `zustand@5` (devtools + persist middleware)
+- `tailwindcss@4` + `@tailwindcss/vite` (CSS-first, @theme + CSS vars)
+- shadcn/ui copy-paste primitives (Button/Input/Label/Card/Toast/Toaster/Dialog/Table/Select/Skeleton)
+- `@radix-ui/react-{dialog,label,select,slot,toast}` + `lucide-react`
+- `class-variance-authority` + `clsx` + `tailwind-merge` (`cn` helper)
+- `vitest` + `@testing-library/react` + `@testing-library/jest-dom` + `jsdom`
+
+**Tailwind 4 setup:**
+- `src/index.css`: `@import 'tailwindcss'` + light/dark CSS vars (HSL) + `@theme` mapping → utility class'lar (`bg-background`, `text-muted-foreground`, etc.) shadcn convention'ında
+- `vite.config.ts`: `tailwindcss()` plugin + `'@'` alias (`/src`)
+
+**API client SDK (`src/api/`):**
+
+| Dosya | Sorumluluk |
+|-------|-----------|
+| `client.ts` | `apiFetch<T>(path, options)` — Bearer ekler, 401 invalid_token'da tek seferlik `/auth/refresh` + retry, refresh fail → `clearAllTokens` + `auth:logout` event. JSON in/out, 204 → undefined, network err → `ApiError(status=0)`. `inflightRefresh` ile concurrent refresh collapse. |
+| `errors.ts` | `ApiError` (status + code + message + details), `ErrCode` constants (server `error.go` mirror), `isAccessTokenExpired` / `isUnrecoverableAuth` helpers |
+| `token-storage.ts` | accessToken **memory-only** module-level var; refreshToken localStorage `envanter.refresh_token`. KEK + privKey burada YOK — auth store'da. |
+| `query.ts` | `QueryClient` (staleTime 30s, gcTime 5dk, ApiError'da retry yok) + `queryKeys` factory (folders/items/admin/catalog) — WS event invalidation için stable keys |
+| `types.ts` | Manuel TS DTO'ları (Faz 3 polish PR'ında `schema.gen.ts`'e taşınacak). `[]byte` server alanları → `string` (base64) |
+
+**Stores (`src/store/`):**
+
+| Store | İçerik |
+|-------|--------|
+| `auth.ts` (Zustand + devtools) | `user`, `accessToken`, `kek`, `privateKey`, `hydrating` + `setSession` / `setAccessToken` (rotation) / `clear` (Uint8Array.fill(0) ile zeroize) + `selectIsAuthenticated/IsAdmin/HasRole(role)` selektörleri. **kek + privateKey memory-only**, persist YOK. |
+| `ui.ts` (Zustand + persist) | `theme: 'light'|'dark'|'system'`, `sidebarCollapsed`. localStorage `envanter-ui` key altında persist. |
+
+**Layout (`src/components/layout/`):**
+
+- `theme-provider.tsx` — `theme` 'system' ise `prefers-color-scheme` MediaQueryList ile dinamik resolve; `<html>`'a `dark` class toggle.
+- `app-shell.tsx` — TopBar (logo + username + theme toggle + logout) + Sidebar (Envanter / Kullanıcılar+Audit Log admin'e visible) + `<Outlet />`.
+
+**Routing (`src/routes/auth-gate.tsx` + `App.tsx`):**
+
+- `AuthGate` — `hydrating` ise `<Splash />` (Skeleton'lı loading), authed değilse `<Navigate to="/login" state={{from}}/>`.
+- `RoleGate` — admin gerekirse role intersection check, başarısız → `/inventory`'e fallback.
+- `App.tsx` route ağacı: `/login` (public), `<AuthGate>` altında `<AppShell>` → `/inventory/*` (any authed) + `<RoleGate role=admin>` altında `/admin/users` + `/admin/audit-log`. 404 → NotFoundPage.
+- `AuthEventBridge` component'i `auth:logout` custom event'ini dinler → `clear()` + `navigate('/login')` (refresh failure flow).
+- `HydrateBoot` — şimdilik `setHydrating(false)` only; PR-W2'de silent refresh denemesi olacak.
+
+**Pages (`src/pages/`):**
+
+| Page | Doldurulacağı PR |
+|------|-----------------|
+| `login.tsx` | PR-W2 (Win) — Argon2id KEK + keypair fetch + setSession |
+| `inventory/index.tsx` | PR-W4 (Mac) — folder tree + item list + detail panel |
+| `admin/index.tsx` (`AdminUsersPage` + `AdminAuditLogPage`) | PR-W3 (Mac) — user mgmt + audit log viewer |
+| `not-found.tsx` | foundation tamam (404) |
+
+Şimdilik placeholder Card'lar + "PR-WX'te dolacak" notu — Mac sahası açık bırakıldı (`web/src/pages/admin|inventory/**`).
+
+**Tests (`src/**/*.test.ts`):**
+
+- `lib/cn.test.ts` — clsx + tailwind-merge sanity (4 case: plain merge, falsy drop, conflict resolve, nested objects/arrays)
+- `api/token-storage.test.ts` — access memory-only roundtrip, refresh localStorage persist, clearAll wipe (4 case)
+- `api/errors.test.ts` — ApiError constructor + isAccessTokenExpired (5 case) + isUnrecoverableAuth (3 case)
+- `api/client.test.ts` — Bearer attach, unauthenticated:true skip, JSON parse, 204 undefined, ApiError code, **refresh + retry happy path**, **refresh failure → auth:logout event**, query string drop undefined, network error wrap (9 case)
+- `store/auth.test.ts` — initial state, setSession, selectIsAdmin, clear() with Uint8Array zeroize, setAccessToken rotation (5 case)
+- `test/setup.ts` — `cleanup()` + auth store reset between tests
+
+Toplam ~27 yeni test case. Vitest `jsdom` env, `globals: true`, setup auto-discover.
+
+**CI yeni job (`.github/workflows/ci.yml`):**
+- `web` job: Node 20 + `npm install` (lock dosyası ileride eklenecek) + `tsc -b --noEmit` type-check + `npm run lint` + `npm test` + `npm run build`. Server job'undan bağımsız fail.
+- `npm ci` yerine `npm install` — package-lock.json bu PR'da yok (Win'de Node kurulu değil); Mac veya CI ilk run'da generate edecek, sonraki PR'da commit'lenir.
+
+**Lokal validation atlandı:** Win'de Node.js kurulu değil. Foundation tamamen CI'a doğrulanacak (yeni `web` job). Win sadece server (Go) tarafında lint/test/build çalıştırıyor — bu kasıtlı bölüm zaten; Mac tarafında web doğrulaması yapılır. Mac PR-W3 başlamadan CI yeşilliği geldikten sonra emin oluyoruz.
+
+**Mac sahası ayrımı:**
+- `web/src/pages/admin/**` ve `web/src/pages/inventory/**` Mac'in alanı — sadece placeholder dosyalar bıraktım, içeriği dolduracak
+- `web/src/{api,store,components,lib,hooks,routes,test}/**` Win sahası — PR-W2 + PR-W6'da Win burada çalışacak
+- `web/src/App.tsx` ve `pages/login.tsx` Win sahası
+
+**Sıradaki:** PR-W2 — Auth screens (login + TOTP setup + recovery + change-password). argon2-browser entegrasyonu, KEK türetme, `setSession`. PR-W1 merge sonrası başlıyorum.
 
 ### 2026-04-27 (Win) — Faz 3 PR-12: /users/me/keypair endpoint (KEK derive için)
 

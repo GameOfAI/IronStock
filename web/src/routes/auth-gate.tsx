@@ -1,0 +1,49 @@
+/**
+ * AuthGate — wraps routes that require an authenticated session.
+ *
+ * Behaviour:
+ *  - hydrating: render <Splash /> (avoids auth flicker on first paint)
+ *  - not authed: redirect to /login (preserve intended path in state)
+ *  - authed:    render <Outlet />
+ *
+ * RoleGate is a thin extension that additionally enforces a required role.
+ */
+
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { Skeleton } from '@/components/ui/skeleton';
+import { selectIsAuthenticated, useAuthStore } from '@/store/auth';
+
+function Splash() {
+  return (
+    <div className="flex h-screen items-center justify-center bg-background">
+      <div className="flex w-64 flex-col gap-3">
+        <Skeleton className="h-6 w-32" />
+        <Skeleton className="h-3 w-full" />
+        <Skeleton className="h-3 w-3/4" />
+      </div>
+    </div>
+  );
+}
+
+export function AuthGate() {
+  const hydrating = useAuthStore((s) => s.hydrating);
+  const isAuthed = useAuthStore(selectIsAuthenticated);
+  const location = useLocation();
+
+  if (hydrating) return <Splash />;
+  if (!isAuthed) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+  return <Outlet />;
+}
+
+interface RoleGateProps {
+  role: string;
+  children?: React.ReactNode;
+}
+export function RoleGate({ role, children }: RoleGateProps) {
+  const user = useAuthStore((s) => s.user);
+  const has = user?.roles.includes(role) ?? false;
+  if (!has) return <Navigate to="/inventory" replace />;
+  return <>{children ?? <Outlet />}</>;
+}
