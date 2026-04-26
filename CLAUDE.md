@@ -71,15 +71,19 @@ Envanter_App/
 - **Faz bazlı ilerleme:** Aynı anda bir faz aktif. Faz bitmeden sonraki başlamaz.
 - **TodoWrite eşleniği:** Aktif faz task'ları TodoWrite'ta tutulur, `TODO.md` kalıcı yansımadır.
 
-## İş Bölümü — Çift Makine Workflow (⏸ 2026-04-26 itibariyle Win-only)
+## İş Bölümü — Çift Makine Workflow (▶ Faz 3'te aktif)
 
-**Mevcut durum:** Mac M4 paralel session paused. Tüm geliştirme Windows'tan PR akışıyla yürütülüyor. Mac yeniden devreye alınırsa kullanıcı haber verecek.
+**Mevcut durum (2026-04-27):** Mac M4 paralel session yeniden devrede. Faz 3 (Admin Web UI) için 8 PR planı: Win 5 PR (server + foundation + auth + realtime/polish), Mac 3 PR (admin + inventory ekranlar). PR sırası: PR-10 ✅ → PR-11 ✅ → PR-12 (Win, KEK endpoint) → PR-W1 (Win, foundation) → PR-W2 (Win, auth) → **Mac unlock**: PR-W3 → PR-W4 → PR-W5 → PR-W6 (Win, realtime + polish).
 
-**Mac aktif olduğu zamanki pattern (referans için, dönerse aynısı geçerli):**
-- **Windows iş istasyonu** (Repos/Envanter_App): kod (server, web, client, migrations, ADR, OpenAPI) — PR akışıyla.
-- **Mac M4** (paralel Claude session): containerization, k8s, ArgoCD, GHCR, deploy testleri — main'e direkt commit (ADR-0008).
-- Her iki session da `RULES.md`'deki tracking discipline kuralına uyar (PROGRESS/TODO aynı commit'te).
-- Conflict olmaması için: kod tarafı PR, deploy tarafı main direct (örtüşmesizlik); örtüşme olursa main'i pull edip rebase.
+**Çakışma koruması:**
+- **Win sahası:** `server/**`, `deploy/**`, `shared/api/openapi.yaml`, `web/src/api/client.ts`, `web/src/store/`, layout shell, auth ekranları. Mac dokunmaz.
+- **Mac sahası:** `web/src/pages/admin/**`, `web/src/pages/inventory/**`, ilgili componentler ve testleri. PR akışıyla.
+- Tracking dosyaları (`PROGRESS.md`, `TODO.md`) — günlük entry'ler tarihli + makine etiketli (örn `### 2026-04-27 (Mac)`).
+- Branch namespace: Mac → `feat/web-{admin,inventory-read,inventory-write}`. Win → `feat/{server-*,web-foundation,web-auth,web-realtime-polish}`.
+
+**Önceki iterasyon (Faz 2 sonu, ⏸ pattern):** Mac geçici olarak pause edilmişti, server PR'ları Win'den merged. Geriye bakış için PROGRESS.md "2026-04-25/26" entry'leri.
+
+**Stack kararları (Faz 3):** ADR-0009 — Zustand + TanStack Query + Tailwind 4 + shadcn/ui + argon2-browser + WS subprotocol auth.
 
 ## Her Session'da Yapılacaklar
 

@@ -52,6 +52,23 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 
 ## Günlük
 
+### 2026-04-27 (Mac) — ADR-0009 yazıldı: Web stack kararı + Mac aktif
+
+**Branch:** `feat/web-state-mgmt-adr` — küçük doc PR'ı, Win'in akışını bloklamaz.
+
+Mac yeniden devrede. Faz 3 web stack kararı Win + Mac arasında netleşti, ADR-0009 olarak kalıcılaştırıldı:
+
+- **State:** Zustand (UI) + TanStack Query (server) hibrit — RTK Query reddedildi.
+- **Styling:** Tailwind 4 + shadcn/ui (copy-paste, MIT) + lucide-react.
+- **API:** Custom typed fetch wrapper + manuel TS tipleri (Faz 3 polish PR'ında schema.gen.ts).
+- **Crypto:** argon2-browser (WASM) + WebCrypto AES-GCM + @noble/curves fallback (X25519).
+- **KEK akışı:** Win PR-12 ekleyecek `GET /users/me/keypair`; login sonrası argon2id türetip authStore memory-only sakla.
+- **WS auth:** `Sec-WebSocket-Protocol: bearer.<token>` subprotocol (PR-W6).
+
+**CLAUDE.md güncellendi** — "İş Bölümü" Win-only paused durumdan Faz 3 aktif duruma geçti, sahalar netleştirildi (Mac: `web/src/pages/admin|inventory/**`, Win: server + foundation + layout + auth + realtime).
+
+**Mac sırası:** PR-12 + PR-W1 + PR-W2 merge sonrası unlock — sırayla PR-W3 (admin), PR-W4 (inventory read), PR-W5 (inventory write).
+
 ### 2026-04-27 (Win) — Faz 3 PR-11: Audit log query + catalog read endpoints + OpenAPI minimal sync
 
 **Branch:** `feat/server-readapi` — review/merge bekliyor.
