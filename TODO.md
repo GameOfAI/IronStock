@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-04-26 (PR-7 hazır)
+Son güncelleme: 2026-04-26 (PR-8 hazır)
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 
@@ -119,7 +119,29 @@ TodoWrite ile senkronize çalışır — aktif session'daki live task listesi To
 - [x] ~24 yeni unit test case (toplam 150 PASS)
 - [x] Lokal validation: build / test / gofmt / golangci-lint clean
 
-### 🔜 PR-8: Item CRUD + folder permissions enforcement (Faz 2 sonu)
+### ✅ PR-8: Folder CRUD + folder_permissions + RBAC ancestor walk — `feat/server-folder-crud` (REVIEW BEKLIYOR)
+
+**Faz 2 son halkası 2'ye bölündü** (3 erteleme cost-of-delay 0): WebSocket → Faz 3, item_relationships + field/type admin → Faz 5.
+
+- [x] `internal/auth/folders.go` — `ResolveFolderPermission` (recursive CTE + 4 bool aggregate)
+- [x] `FolderPermission` tip + `AllowsRead/Write` semantiği
+- [x] `POST/GET/PUT/DELETE /api/v1/folders` — CRUD + name envelope encrypt + HMAC blind index
+- [x] `POST /api/v1/folders/:id/permissions` — UPSERT grant (idempotent, self-grant engeli)
+- [x] `DELETE /api/v1/folders/:id/permissions/:user_id` — soft revoke
+- [x] Audit: 5 yeni constant + `ResourceFolder`
+- [x] Router wire: `RequireAccessToken` middleware altında
+- [x] cmd/api/main.go: `FolderHandlers` wire
+- [x] ~8 yeni unit test case (toplam 158 PASS)
+- [x] Lokal validation: build / test / gofmt / golangci-lint clean
+
+### 🔜 PR-9: Item CRUD + item_shares + RBAC item resolver (Faz 2 SON PR — Faz 2 BİTECEK)
+
+- [ ] `POST/GET/PUT/DELETE /api/v1/items` — CRUD (metadata envelope + secret client-provided)
+- [ ] Item field değerleri — `item_fields` (field_definition_id FK + value_enc + AAD bound)
+- [ ] `POST/DELETE /api/v1/items/:id/shares` — paylaşım grant/revoke (per-user wrapped DEK)
+- [ ] `auth.ResolveItemPermission(ctx, db, userID, itemID)` — folder ancestor + item_shares birleşim (max permission)
+- [ ] Item search (HMAC blind index — hostname, ip_address)
+- [ ] Audit: `item.created`, `item.updated`, `item.deleted`, `item.shared`, `item.unshared`, `item.field_updated`
 
 - [ ] Folder CRUD
 - [ ] Item CRUD (metadata envelope + secret client-provided)

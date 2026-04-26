@@ -4,12 +4,12 @@ Son güncelleme: 2026-04-26
 
 ## Mevcut Durum
 
-- **Aktif Faz:** Faz 2 — Server MVP (PR-1...PR-6 ✅ merged; PR-7 hazır, review/merge bekliyor)
+- **Aktif Faz:** Faz 2 — Server MVP (PR-1...PR-7 ✅ merged; PR-8 hazır, review/merge bekliyor)
 - **Tamamlanan Faz:** Faz 0 + Faz 1
 - **Çift makine workflow:** ⏸ **Mac M4 paused 2026-04-26** — kullanıcı tüm geliştirmeyi şimdilik Win'den yürütüyor. Mac yeniden devreye alınırsa kullanıcı bilgi verecek; o noktada deploy/k8s işleri Mac'te devam eder (ADR-0008).
 - **Bloker:** Yok
 - **Mac canlı cluster snapshot (son durum):** Tüm pod'lar 1/1 Running, init container ile 5 migration auto-apply (Faz 1), `/healthz` 200 OK. PR-3 merge sonrası 12 yeni migration için Docker build/push tetiklendi → ArgoCD sync → init container 17 migration toplam uygular (Mac yeniden açıldığında doğrulanmalı).
-- **Bir sonraki adım:** PR-7 review/merge → PR-8 (Item CRUD + folder permissions + RBAC effective resolver — Faz 2 son PR'ı)
+- **Bir sonraki adım:** PR-8 review/merge → PR-9 (Item CRUD + item_shares + RBAC item resolver — Faz 2 son PR'ı, Faz 2 BİTİYOR)
 
 ## Faz Durumu
 
@@ -17,7 +17,7 @@ Son güncelleme: 2026-04-26
 |-----|-------|-----------|-------|-----|
 | 0 — Temel kurulum | VERIFY | 2026-04-24 | 2026-04-24 | Kod yazıldı, lokal smoke test user tarafında |
 | 1 — Veri modeli + kripto tasarımı | DONE | 2026-04-24 | 2026-04-24 | ER (17 tablo) + ADR 0004/0005/0006/0007 + auth-flow + 5 migration + OpenAPI + code gen |
-| 2 — Server MVP | ACTIVE | 2026-04-24 | — | PR-1...PR-6 ✅ merged (foundation, DB+chi, migrations+IT, crypto, master key + register/TOTP, login/refresh/logout). PR-7 (change-password + recovery flow + RBAC iskelet + session binding flag) review bekliyor. PR-8 sırada (Item CRUD + folder permissions effective resolver — Faz 2 son PR). Mac side ⏸ paused 2026-04-26. |
+| 2 — Server MVP | ACTIVE | 2026-04-24 | — | PR-1...PR-7 ✅ merged (foundation, DB+chi, migrations+IT, crypto, register/TOTP, login/refresh/logout, change-pwd/recovery/RBAC iskelet). PR-8 (Folder CRUD + folder_permissions + ResolveFolderPermission recursive ancestor walk) review bekliyor. PR-9 sırada (Item CRUD + item_shares + RBAC item resolver — Faz 2 BİTİYOR). WebSocket Faz 3'e, item_relationships + field/type admin Faz 5'e ertelendi. Mac side ⏸ paused 2026-04-26. |
 | 3 — Admin Web UI | TODO | — | — | Login + user mgmt + ağaç view |
 | 4 — Client MVP (Tauri) | TODO | — | — | Win+Mac, live sync, offline cache, E2E |
 | 5 — Production hardening | PARTIAL | 2026-04-25 | — | Container + GHCR + k8s + ArgoCD + DB migration init container + native cross-compile multi-arch + secret rotation tamam. Sealed Secrets, Helm, observability, Ingress+TLS hâlâ TODO |
@@ -52,6 +52,91 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-04-26 (Win) — Faz 2 PR-8: Folder CRUD + folder_permissions + RBAC ancestor walk
+
+**Branch:** `feat/server-folder-crud` — review/merge bekliyor.
+
+**Faz 2 son halkası 2'ye bölündü:** Eski tek-PR plan (Item + Folder + Relationships + WebSocket) çok büyüktü. Üç ertelemenin **mimari cost-of-delay analizi** sonucu (her biri 0 cost, schema hazır):
+
+- WebSocket `/ws` → Faz 3 (web UI ile birlikte gerçek consumer çıkacak)
+- Item relationships → Faz 5 / parking lot (00017 migration zaten kurulu, endpoint kolayca eklenir)
+- Field definitions / item types admin API → Faz 5 (30 alan + 8 tip seed'li, MVP yeterli)
+
+**Yeni bölünme:**
+- **PR-8 (bu):** Folder CRUD + folder_permissions + RBAC folder resolver
+- **PR-9 (sıradaki):** Item CRUD + item_shares + RBAC item resolver → **Faz 2 BİTECEK**
+
+**Yeni endpoint'ler (`internal/httpapi/folder_*.go`):**
+
+`POST /api/v1/folders` (Bearer access)
+- Body: `{name, parent_id?, position}`. Server-side envelope encrypt name (master cipher, AAD=`folders:*:name_enc`) + HMAC blind index `name_search`.
+- Permission gate: `parent_id IS NULL` (root folder) → admin only (ADR-0006 §3, sibling tree açma engeli). Aksi: `ResolveFolderPermission` Write check.
+- Audit `folder.created` (parent_id details).
+
+`GET /api/v1/folders[?parent_id=]` (Bearer access)
+- parent_id boş → root folder list (her satır için Read check, görünmeyenler filtrelenir).
+- parent_id set → o folder'ın altındaki çocuklar (önce parent Read check).
+- Admin tüm satırları görür.
+- Her response satırına `permission` field'i (UI hide-edit-buttons için).
+
+`GET /api/v1/folders/{id}` (Bearer access)
+- Read check; reddedilirse 404 (existence oracle yok).
+
+`PUT /api/v1/folders/{id}` (Bearer access)
+- Rename + re-parent. Re-parenting → BOTH source AND destination Write gerekir.
+- Audit `folder.updated`.
+
+`DELETE /api/v1/folders/{id}` (Bearer access)
+- Write check. Schema CASCADE: alt folder'lar + item'lar + permissions otomatik silinir.
+- Audit `folder.deleted`.
+
+`POST /api/v1/folders/{id}/permissions` (Bearer access)
+- Body: `{user_id, permission, inherit_to_children}`. UPSERT (re-grant aynı user için update + revoked_at=NULL geri set).
+- Self-grant engeli (admin değilse, kendine yetki vermek anlamsız).
+- Audit `folder.permission_granted` (target_user_id + permission + inherit).
+
+`DELETE /api/v1/folders/{id}/permissions/{user_id}` (Bearer access)
+- Soft revoke (revoked_at=now). Idempotent. Audit `folder.permission_revoked`.
+
+**Yeni `internal/auth/folders.go`:**
+
+`ResolveFolderPermission(ctx, db, userID, folderID) FolderPermission`
+- Tek SQL CTE recursive: target folder'dan parent_id zinciri ile root'a kadar yürür.
+- LEFT JOIN folder_permissions (revoked_at IS NULL).
+- 4 bool aggregate: is_owner / has_write / has_read / folder_exists.
+- Kural: `depth=0` (target folder) için inherit_to_children önemsiz; ata satırlar için sadece `inherit_to_children=true` count edilir.
+- Return: FolderPermNone (existence oracle yok — folder yoksa veya yetki yoksa aynı), FolderPermRead, FolderPermWrite.
+
+`FolderPermission` tip + `AllowsRead()` / `AllowsWrite()` semantiği (Write satisfies Read).
+
+**Audit constants:**
+- 5 yeni: `folder.created`, `folder.updated`, `folder.deleted`, `folder.permission_granted`, `folder.permission_revoked`
+- `ResourceFolder = "folder"`
+
+**Wire (`cmd/api/main.go` + `router.go`):**
+- `httpapi.Deps.Folder *FolderHandlers` (optional, nil-safe).
+- `/api/v1/folders/*` routes `RequireAccessToken(d.Auth.Service.JWT)` middleware altında.
+
+**Tests (~8 yeni case, toplam 158 PASS):**
+- `auth/folders_test.go`: FolderPermission.AllowsRead/Write matrix (6 case) + ResolveFolderPermission empty arg guard
+- `httpapi/folder_handlers_test.go`: validateFolderRequest 3 case + nullableUUID 2 case
+
+Handler-seviyesi DB integration test'leri PR-9'da Item CRUD ile birlikte testcontainers ile yazılacak (auth.DBExec mock'lamak yerine gerçek Postgres ile).
+
+**Lokal validation (Win, Go 1.26.2 + golangci-lint v1.62.2):**
+- `go build ./...` ✓
+- `go test ./...` ✓ 158 case PASS (önceki 150 + 8 yeni)
+- `gofmt -l .` clean
+- `golangci-lint run --timeout=5m ./...` 0 issues
+
+**Bilinçli kapsam dışı (PR-9 — Faz 2 son PR):**
+- Item CRUD (metadata envelope + secret client-provided)
+- Item field değerleri (envelope encrypt + AAD)
+- item_shares + ResolveItemPermission (folder ancestor + per-item share birleşim)
+- Item search (HMAC blind index, hostname/ip için)
+
+**Sıradaki:** PR-9 — **Faz 2 son PR'ı**. Item CRUD + item_shares + RBAC item resolver.
 
 ### 2026-04-26 (Win) — Faz 2 PR-7: Change-Password + Recovery Flow + RBAC İskeleti + Session Binding Flag
 
