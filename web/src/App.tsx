@@ -1,11 +1,89 @@
+import * as React from 'react';
+import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+
+import { queryClient } from '@/api/query';
+import { useAuthStore } from '@/store/auth';
+import { ThemeProvider } from '@/components/layout/theme-provider';
+import { AppShell } from '@/components/layout/app-shell';
+import { Toaster } from '@/components/ui/toaster';
+import { AuthGate, RoleGate } from '@/routes/auth-gate';
+
+import LoginPage from '@/pages/login';
+import InventoryPage from '@/pages/inventory';
+import AdminUsersPage, { AdminAuditLogPage } from '@/pages/admin';
+import NotFoundPage from '@/pages/not-found';
+
+/**
+ * Listens for the 'auth:logout' custom event the API client emits when
+ * refresh fails / reuse is detected. Clears the auth store and bounces
+ * the user to /login.
+ *
+ * Mounted once at the router root so the navigate() call has access to
+ * react-router context.
+ */
+function AuthEventBridge() {
+  const navigate = useNavigate();
+  const clear = useAuthStore((s) => s.clear);
+
+  React.useEffect(() => {
+    const handler = () => {
+      clear();
+      navigate('/login', { replace: true });
+    };
+    window.addEventListener('auth:logout', handler);
+    return () => window.removeEventListener('auth:logout', handler);
+  }, [clear, navigate]);
+
+  return null;
+}
+
+/**
+ * Boot-time hydration. Marks the auth store as "no longer hydrating"
+ * after first paint. PR-W2 will refine this: try GET /users/me/keypair
+ * with the persisted refresh token to silently restore session.
+ */
+function HydrateBoot() {
+  const setHydrating = useAuthStore((s) => s.setHydrating);
+  React.useEffect(() => {
+    // PR-W2 will replace this with a real silent-refresh attempt.
+    setHydrating(false);
+  }, [setHydrating]);
+  return null;
+}
+
 export default function App() {
   return (
-    <main style={{ fontFamily: 'system-ui, sans-serif', padding: 24, maxWidth: 800, margin: '0 auto' }}>
-      <h1>Envanter — Admin Panel</h1>
-      <p>Faz 0 iskeleti. Gerçek UI Faz 3&apos;te gelecek.</p>
-      <p>
-        API server: <code>http://localhost:8080/healthz</code>
-      </p>
-    </main>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <BrowserRouter>
+          <AuthEventBridge />
+          <HydrateBoot />
+          <Routes>
+            {/* Public */}
+            <Route path="/login" element={<LoginPage />} />
+
+            {/* Authenticated */}
+            <Route element={<AuthGate />}>
+              <Route element={<AppShell />}>
+                <Route index element={<Navigate to="/inventory" replace />} />
+                <Route path="/inventory/*" element={<InventoryPage />} />
+
+                {/* Admin */}
+                <Route element={<RoleGate role="admin" />}>
+                  <Route path="/admin/users" element={<AdminUsersPage />} />
+                  <Route path="/admin/audit-log" element={<AdminAuditLogPage />} />
+                </Route>
+              </Route>
+            </Route>
+
+            <Route path="*" element={<NotFoundPage />} />
+          </Routes>
+          <Toaster />
+        </BrowserRouter>
+      </ThemeProvider>
+      {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
+    </QueryClientProvider>
   );
 }

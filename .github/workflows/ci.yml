@@ -85,6 +85,42 @@ jobs:
           path: server/coverage.out
           if-no-files-found: ignore
 
+  # ---------------- Web (Vite + React + TS) ----------------
+  # Faz 3 PR-W1+: type-check, lint, test (Vitest + RTL), production build.
+  # Web tarafı build hatası serverdan bağımsız fail olmalı (server runs even
+  # if web breaks).
+  web:
+    name: Web (Vite)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install
+        # Using `install` (not `ci`) until package-lock.json lands —
+        # foundation PR (PR-W1) bootstraps the deps; lock will be
+        # committed by the first machine that runs npm install locally.
+        run: npm install --no-audit --no-fund
+
+      - name: Type check
+        run: npx tsc -b --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
   # ---------------- Server Integration (testcontainers + Postgres) ----------------
   # Build tag 'integration' ile yazılan testler. testcontainers-go gerçek Postgres
   # container'ı başlatır → migration up/down/up + seed validation. Docker GitHub

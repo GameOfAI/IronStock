@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-04-27 (Faz 3 PR-10/11 merged, PR-12 hazır, PR-W1 sırada)
+Son güncelleme: 2026-04-27 (Faz 3 PR-10/11/12 merged, PR-W1 hazır, PR-W2 sırada)
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 
@@ -67,17 +67,20 @@ Mac sorularından doğan ufak server PR'ı (Q4: KEK türetme için keypair fetch
 
 ### Web PR'ları (Win başlangıç + Mac ekranlar + Win son)
 
-#### 🔜 PR-W1: Foundation — `feat/web-foundation` (Win)
+#### ✅ PR-W1: Foundation — `feat/web-foundation` (REVIEW BEKLIYOR)
 
-- [ ] `web/src/api/client.ts` — typed fetch wrapper (schema.gen.ts'ten import)
-- [ ] Token storage (localStorage + memory hybrid, refresh rotation logic)
-- [ ] Refresh interceptor (access expired → refresh → retry orijinal request; reuse_detected → logout)
-- [ ] Error mapping (server `code` → kullanıcı toast / inline form errors)
-- [ ] Layout: sidebar + topbar + main content + toast container
-- [ ] React Router: auth-gate (`/login` accessible, geri kalan token zorunlu)
-- [ ] Theme provider (light/dark CSS vars)
-- [ ] Vite config: proxy `/api` + `/ws` → backend (dev mode)
-- [ ] Unit tests (Vitest): client fetch, token storage, error mapping
+- [x] `web/src/api/client.ts` — typed fetch + Bearer + refresh-on-401 interceptor + concurrent refresh collapse + auth:logout event
+- [x] Token storage: access memory-only, refresh localStorage
+- [x] Error mapping: `ApiError(status, code, message, details)` + ErrCode constants + helpers
+- [x] Layout: AppShell (TopBar + Sidebar + Outlet) + ThemeProvider (system/light/dark + prefers-color-scheme)
+- [x] React Router v6: AuthGate (hydrating splash + redirect /login) + RoleGate (role intersection)
+- [x] Tailwind 4 setup (CSS-first, @theme + CSS vars) + shadcn/ui primitives (10 component)
+- [x] TanStack Query: QueryClient + queryKeys factory + ReactQueryDevtools (dev only)
+- [x] Zustand stores: auth (memory-only kek+priv, Uint8Array zeroize on clear) + ui (theme + sidebar persist)
+- [x] Vite config: proxy /api + /ws + `'@'` alias + Vitest jsdom env
+- [x] Mac sahası placeholder pages (pages/admin/**, pages/inventory/**)
+- [x] CI yeni `web` job: type-check + lint + test + build (`npm install`; lock ileride)
+- [x] ~27 yeni Vitest test case (cn, token-storage, errors, client, auth store)
 
 #### 🔜 PR-W2: Auth screens — `feat/web-auth` (Win)
 
