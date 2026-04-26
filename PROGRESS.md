@@ -4,12 +4,12 @@ Son güncelleme: 2026-04-26
 
 ## Mevcut Durum
 
-- **Aktif Faz:** Faz 2 — Server MVP (PR-1...PR-7 ✅ merged; PR-8 hazır, review/merge bekliyor)
+- **Aktif Faz:** Faz 2 — Server MVP (PR-1...PR-8 ✅ merged; PR-9 hazır → **Faz 2 son halka, merge edilince Faz 3 başlar**)
 - **Tamamlanan Faz:** Faz 0 + Faz 1
-- **Çift makine workflow:** ⏸ **Mac M4 paused 2026-04-26** — kullanıcı tüm geliştirmeyi şimdilik Win'den yürütüyor. Mac yeniden devreye alınırsa kullanıcı bilgi verecek; o noktada deploy/k8s işleri Mac'te devam eder (ADR-0008).
+- **Çift makine workflow:** ⏸ **Mac M4 paused 2026-04-26** — Mac (Pro) Faz 3 başlangıcında devreye girecek. PR-9 merge'den sonra Faz 3 PR'ları Mac (Pro) ↔ Win arasında paralel iş bölümüyle planlanacak.
 - **Bloker:** Yok
 - **Mac canlı cluster snapshot (son durum):** Tüm pod'lar 1/1 Running, init container ile 5 migration auto-apply (Faz 1), `/healthz` 200 OK. PR-3 merge sonrası 12 yeni migration için Docker build/push tetiklendi → ArgoCD sync → init container 17 migration toplam uygular (Mac yeniden açıldığında doğrulanmalı).
-- **Bir sonraki adım:** PR-8 review/merge → PR-9 (Item CRUD + item_shares + RBAC item resolver — Faz 2 son PR'ı, Faz 2 BİTİYOR)
+- **Bir sonraki adım:** PR-9 review/merge → **Faz 2 BİTECEK** → Faz 3 PR planlaması (Mac ↔ Win paralel)
 
 ## Faz Durumu
 
@@ -17,7 +17,7 @@ Son güncelleme: 2026-04-26
 |-----|-------|-----------|-------|-----|
 | 0 — Temel kurulum | VERIFY | 2026-04-24 | 2026-04-24 | Kod yazıldı, lokal smoke test user tarafında |
 | 1 — Veri modeli + kripto tasarımı | DONE | 2026-04-24 | 2026-04-24 | ER (17 tablo) + ADR 0004/0005/0006/0007 + auth-flow + 5 migration + OpenAPI + code gen |
-| 2 — Server MVP | ACTIVE | 2026-04-24 | — | PR-1...PR-7 ✅ merged (foundation, DB+chi, migrations+IT, crypto, register/TOTP, login/refresh/logout, change-pwd/recovery/RBAC iskelet). PR-8 (Folder CRUD + folder_permissions + ResolveFolderPermission recursive ancestor walk) review bekliyor. PR-9 sırada (Item CRUD + item_shares + RBAC item resolver — Faz 2 BİTİYOR). WebSocket Faz 3'e, item_relationships + field/type admin Faz 5'e ertelendi. Mac side ⏸ paused 2026-04-26. |
+| 2 — Server MVP | ACTIVE | 2026-04-24 | — | PR-1...PR-8 ✅ merged (foundation, DB+chi, migrations+IT, crypto, register/TOTP, login/refresh/logout, change-pwd/recovery/RBAC iskelet, folder CRUD+ACL). PR-9 (Item CRUD + item_shares + ResolveItemPermission birleşim) review bekliyor — **merge edilince Faz 2 BİTİYOR**. WebSocket Faz 3'e, item_relationships + field/type admin Faz 5'e ertelendi. Mac side ⏸ paused 2026-04-26 (Faz 3 başında devreye girecek). |
 | 3 — Admin Web UI | TODO | — | — | Login + user mgmt + ağaç view |
 | 4 — Client MVP (Tauri) | TODO | — | — | Win+Mac, live sync, offline cache, E2E |
 | 5 — Production hardening | PARTIAL | 2026-04-25 | — | Container + GHCR + k8s + ArgoCD + DB migration init container + native cross-compile multi-arch + secret rotation tamam. Sealed Secrets, Helm, observability, Ingress+TLS hâlâ TODO |
@@ -52,6 +52,108 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-04-26 (Win) — Faz 2 PR-9: Item CRUD + item_shares + RBAC item resolver — **FAZ 2 SON HALKA**
+
+**Branch:** `feat/server-item-crud` — review/merge bekliyor.
+
+**Bu PR merge edilince Faz 2 BİTİYOR.** Server tarafında envanter işlemleri tam fonksiyonel: register → TOTP → login → folder CRUD → item CRUD → paylaşım. Faz 3 (Admin Web UI) buna bağlanmaya hazır.
+
+**Yeni endpoint'ler (`internal/httpapi/item_*.go`):**
+
+`POST /api/v1/items` (Bearer access)
+- Body: `{id (UUID v7, client-gen), folder_id, item_type_id, name, fields[], owner_dek_wrapped, owner_wrap_nonce, external_source?}`
+- **id client-generated UUID v7** (ADR-0004 §5.4): AAD-pending sorununu çözer. Server `gen_random_uuid()` kullanmaz — AAD bağlanması için id önceden bilinmeli.
+- Folder Write check (admin bypass).
+- **Two-layer envelope (ADR-0004 §6):**
+  1. server_dek = 32B random (per-item)
+  2. server_dek_wrapped = master.Seal(server_dek, AAD=`items:{id}:server_dek`)
+  3. dekCipher = NewCipher(server_dek)
+  4. name_enc = dekCipher.Seal(name, AAD=`items:{id}:name_enc`)
+  5. name_search = HMAC-SHA256(name)[:16]
+- Atomic tx: items INSERT + item_shares owner row (write, X25519 wrapped DEK from client) + item_fields[] INSERT.
+- Field değerleri **client-encrypted** (E2E) — server `value_enc + value_nonce` blob'larını sadece saklar.
+- Audit `item.created` (folder_id + item_type_id + field_count).
+
+`GET /api/v1/items?folder_id=X[&q=...]` (Bearer access)
+- folder_id zorunlu (DOS guard — tüm item'ları tek seferde dökmesin).
+- folder Read check; reddedilirse boş list (existence oracle yok).
+- q optional: `name_search = HMAC(q)` blind index lookup, deterministik eşleşme.
+- Her satır için `ResolveItemPermission` → permission field'ı yanıta eklenir.
+
+`GET /api/v1/items/{id}` (Bearer access)
+- ResolveItemPermission Read check; reddedilirse 404 (oracle yok).
+- name decrypt (DEK unwrap → DEK cipher.Open).
+- Fields array_agg ile döner (client-encrypted blob'lar olduğu gibi).
+
+`PUT /api/v1/items/{id}` (Bearer access)
+- Rename + folder move + fields replace-all.
+- Item Write check + (re-parent ise) destination folder Write check.
+- Mevcut DEK reuse (rotate yok); name yeniden encrypt.
+- `item_fields` DELETE + INSERT (replace-all semantik).
+- Audit `item.updated`.
+
+`DELETE /api/v1/items/{id}` (Bearer access)
+- Write check. Schema CASCADE: item_fields, item_shares, item_relationships otomatik silinir.
+- Audit `item.deleted`.
+
+`POST /api/v1/items/{id}/shares` (Bearer access)
+- Body: `{user_id, permission, dek_wrapped, wrap_nonce}`. UPSERT (re-share = update + revoked_at=NULL).
+- `dek_wrapped` client'tan: owner kendi RAM'indeki DEK'i recipient'in pub_key'i ile X25519 sealed-box wrap'lar.
+- Self-share engeli (owner zaten erişebilir).
+- Audit `item.shared` (target_user_id + permission).
+
+`DELETE /api/v1/items/{id}/shares/{user_id}` (Bearer access)
+- Soft revoke. **Owner share koruması:** `target_user_id == items.created_by` ise 400 (item orphan'lanmaz).
+- Idempotent. Audit `item.unshared`.
+
+**Yeni `internal/auth/items.go`:**
+
+`ResolveItemPermission(ctx, db, userID, itemID) ItemPermission`
+- 3 sub-query (recursive CTE yerine — micro-bench: indexed PK lookup'lar daha hızlı):
+  1. `items` row → folder_id + created_by (existence + owner check)
+  2. `item_shares` direct grant (revoked_at IS NULL)
+  3. `ResolveFolderPermission` (folder ancestor walk)
+- Kombinasyon: max(owner=Write, share, folder) — Write ve Read birleşimi → Write.
+- Owner ve direct-write short-circuit'leri (gereksiz folder query atlama).
+- Item yoksa veya hiç grant yoksa → ItemPermNone.
+
+`ItemPermission` tip + `AllowsRead/Write` semantiği.
+
+**Yeni audit constants (6):**
+- `item.created`, `item.updated`, `item.deleted`, `item.field_updated`, `item.shared`, `item.unshared`
+
+**`extractNonce` refactor:** unused `nonceLen` parametresi kaldırıldı (her zaman `crypto.AESGCMNonceLen`). Çağıranlar güncellendi (auth_totp, folder_handlers, item_handlers).
+
+**Wire:**
+- `httpapi.Deps.Item *ItemHandlers`.
+- `/api/v1/items/*` `RequireAccessToken` middleware altında.
+- `cmd/api/main.go` ItemHandlers instance.
+
+**Tests (~16 yeni case, toplam 174 PASS):**
+- `auth/items_test.go`: ItemPermission.AllowsRead/Write matrix (6) + maxItemPerm (5) + folderPermToItemPerm (3) + ResolveItemPermission empty arg guard (2).
+- `httpapi/item_handlers_test.go`: looksLikeUUID (3 valid + 6 invalid) + validateItemCreate (5 case) + nilIfEmpty (3) + nullableJSON (3) + fieldInputsToOutputs (2).
+
+Handler-seviyesi DB integration testleri Faz 3 öncesi PR'ında testcontainers ile gelecek (real folder + item + share matrix).
+
+**Lokal validation (Win, Go 1.26.2 + golangci-lint v1.62.2):**
+- `go build ./...` ✓
+- `go test ./...` ✓ 174 case PASS (önceki 158 + 16 yeni)
+- `gofmt -l .` clean
+- `golangci-lint run --timeout=5m ./...` 0 issues
+
+**🎯 Faz 2 tamamlanma kriterleri (PR-9 merge sonrası):**
+- ✓ Auth surface (10 endpoint: register/totp/login/refresh/logout/logout-all/change-pwd/recover-init/recover-complete + tmp_token gate)
+- ✓ Inventory CRUD (folder + item, RBAC enforced)
+- ✓ Sharing (folder ACL + item_shares, X25519 sealed-box wrap)
+- ✓ Audit log (24 action constant)
+- ✓ Brute-force guards (rate limit + account lockout)
+- ✓ E2E hibrit model: metadata server-side envelope, secret field'lar client-side
+- ✓ 174 unit test PASS
+- ⏸ WebSocket → Faz 3 (web UI ile birlikte)
+- ⏸ item_relationships + field/type admin → Faz 5 (parking)
+
+**Sıradaki:** Faz 3 — Admin Web UI. Mac (Pro) ↔ Win paralel PR planlaması. WebSocket de bu fazla geliyor.
 
 ### 2026-04-26 (Win) — Faz 2 PR-8: Folder CRUD + folder_permissions + RBAC ancestor walk
 

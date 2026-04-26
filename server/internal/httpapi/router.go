@@ -26,13 +26,14 @@ type DBPinger interface {
 
 // Deps groups dependencies needed for the HTTP layer.
 //
-// Auth and Folder are optional: when nil their routes are not mounted
+// Auth, Folder, Item are optional: when nil their routes are not mounted
 // (useful for foundation tests that don't exercise those flows).
 type Deps struct {
 	Logger *slog.Logger
 	DB     DBPinger
 	Auth   *AuthHandlers
 	Folder *FolderHandlers
+	Item   *ItemHandlers
 }
 
 // NewRouter builds a chi router with the standard middleware stack.
@@ -90,7 +91,7 @@ func NewRouter(d Deps) http.Handler {
 		})
 	}
 
-	// Inventory routes — folder + (PR-9) item. Bearer access required.
+	// Inventory routes — folder + item. Bearer access required.
 	if d.Folder != nil && d.Auth != nil {
 		r.Route("/api/v1/folders", func(fr chi.Router) {
 			fr.Use(RequireAccessToken(d.Auth.Service.JWT))
@@ -101,6 +102,19 @@ func NewRouter(d Deps) http.Handler {
 			fr.Delete("/{id}", d.Folder.Delete)
 			fr.Post("/{id}/permissions", d.Folder.GrantPermission)
 			fr.Delete("/{id}/permissions/{user_id}", d.Folder.RevokePermission)
+		})
+	}
+
+	if d.Item != nil && d.Auth != nil {
+		r.Route("/api/v1/items", func(ir chi.Router) {
+			ir.Use(RequireAccessToken(d.Auth.Service.JWT))
+			ir.Get("/", d.Item.List)
+			ir.Post("/", d.Item.Create)
+			ir.Get("/{id}", d.Item.Get)
+			ir.Put("/{id}", d.Item.Update)
+			ir.Delete("/{id}", d.Item.Delete)
+			ir.Post("/{id}/shares", d.Item.Share)
+			ir.Delete("/{id}/shares/{user_id}", d.Item.Unshare)
 		})
 	}
 

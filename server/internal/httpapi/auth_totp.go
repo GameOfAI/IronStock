@@ -54,7 +54,7 @@ func (s *AuthHandlers) TOTPInit(w http.ResponseWriter, r *http.Request) {
 	// (the schema stores nonce separately for index/audit purposes; the
 	// blob still contains the same nonce, but persisting it directly avoids
 	// re-parsing on read).
-	nonce := extractNonce(enc, crypto.AESGCMNonceLen)
+	nonce := extractNonce(enc)
 
 	const upsertSQL = `
 		INSERT INTO totp_secrets (user_id, secret_enc, nonce, master_key_id, verified)
@@ -242,8 +242,10 @@ func (s *AuthHandlers) fetchUsername(ctx context.Context, userID string) (string
 	return u, err
 }
 
-// extractNonce returns the nonce slice from a versioned blob.
-func extractNonce(blob []byte, nonceLen int) []byte {
+// extractNonce returns the AES-GCM nonce slice from a versioned crypto blob.
+// Layout reminder (crypto/format.go): [version:1][alg:1][nonce:N][ct+tag].
+func extractNonce(blob []byte) []byte {
+	const nonceLen = crypto.AESGCMNonceLen
 	if len(blob) < crypto.HeaderLen+nonceLen {
 		return nil
 	}

@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-04-26 (PR-8 hazır)
+Son güncelleme: 2026-04-26 (PR-9 hazır — Faz 2 son halka)
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 
@@ -134,14 +134,34 @@ TodoWrite ile senkronize çalışır — aktif session'daki live task listesi To
 - [x] ~8 yeni unit test case (toplam 158 PASS)
 - [x] Lokal validation: build / test / gofmt / golangci-lint clean
 
-### 🔜 PR-9: Item CRUD + item_shares + RBAC item resolver (Faz 2 SON PR — Faz 2 BİTECEK)
+### ✅ PR-9: Item CRUD + item_shares + ResolveItemPermission — `feat/server-item-crud` (REVIEW BEKLIYOR — Faz 2 SON HALKA)
 
-- [ ] `POST/GET/PUT/DELETE /api/v1/items` — CRUD (metadata envelope + secret client-provided)
-- [ ] Item field değerleri — `item_fields` (field_definition_id FK + value_enc + AAD bound)
-- [ ] `POST/DELETE /api/v1/items/:id/shares` — paylaşım grant/revoke (per-user wrapped DEK)
-- [ ] `auth.ResolveItemPermission(ctx, db, userID, itemID)` — folder ancestor + item_shares birleşim (max permission)
-- [ ] Item search (HMAC blind index — hostname, ip_address)
-- [ ] Audit: `item.created`, `item.updated`, `item.deleted`, `item.shared`, `item.unshared`, `item.field_updated`
+- [x] `POST/GET/PUT/DELETE /api/v1/items` — CRUD (two-layer envelope: server_dek master-wrapped, name DEK-encrypted)
+- [x] Client-generated UUID v7 (AAD-pending sorunu çözümü)
+- [x] `item_fields` — client-encrypted blob'lar (field_definition_id FK + value_enc + value_nonce)
+- [x] `POST/DELETE /api/v1/items/:id/shares` — UPSERT grant + soft revoke + owner-share koruması
+- [x] `auth.ResolveItemPermission` — owner + direct share + folder ancestor walk (max)
+- [x] Item search (HMAC blind index, name_search deterministik eşleşme)
+- [x] 6 yeni audit constant + ResourceItem
+- [x] `extractNonce` refactor (unused param removed)
+- [x] ~16 yeni unit test (toplam 174 PASS)
+- [x] Lokal validation: build / test / gofmt / golangci-lint clean
+
+---
+
+## 🎯 Faz 2 — Server MVP TAMAMLANDI (PR-9 merge sonrası)
+
+PR-9 main'e merge edildiğinde Faz 2 biter. Server tarafı tam fonksiyonel:
+- 10 auth endpoint (register/TOTP/login/refresh/logout/logout-all/change-pwd/recover-init/recover-complete + tmp_token gate)
+- Folder CRUD + ACL (3 katmanlı RBAC: admin/owner/inherit)
+- Item CRUD + sharing (E2E hibrit: metadata server-side envelope, secret client-side)
+- 24 audit action + brute-force guards (rate limit + lockout) + session binding flag
+- 174 unit test PASS, 17 migration, ~10K LOC
+
+Faz 2 ertelemeleri (mimari cost-of-delay 0):
+- WebSocket `/ws` → Faz 3 (web UI consumer ile birlikte)
+- item_relationships → Faz 5 / parking lot
+- field_definitions / item_types admin API → Faz 5
 
 - [ ] Folder CRUD
 - [ ] Item CRUD (metadata envelope + secret client-provided)

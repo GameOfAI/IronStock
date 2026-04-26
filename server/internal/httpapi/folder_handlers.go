@@ -571,7 +571,7 @@ func encryptFolderName(svc *auth.Service, name string) (enc, nonce []byte, err e
 	if err != nil {
 		return nil, nil, err
 	}
-	nonce = extractNonce(enc, crypto.AESGCMNonceLen)
+	nonce = extractNonce(enc)
 	return enc, nonce, nil
 }
 

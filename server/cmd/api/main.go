@@ -102,6 +102,11 @@ func run() error {
 		Audit:   auditWriter,
 		Logger:  logger,
 	}
+	itemHandlers := &httpapi.ItemHandlers{
+		Service: authSvc,
+		Audit:   auditWriter,
+		Logger:  logger,
+	}
 
 	// --- HTTP layer ---
 	router := httpapi.NewRouter(httpapi.Deps{
@@ -109,6 +114,7 @@ func run() error {
 		DB:     pool,
 		Auth:   authHandlers,
 		Folder: folderHandlers,
+		Item:   itemHandlers,
 	})
 
 	srv := &http.Server{
