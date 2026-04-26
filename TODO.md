@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-04-27 (Faz 3 PR-10/11 hazır, PR-W1 sırada)
+Son güncelleme: 2026-04-27 (Faz 3 PR-10/11 merged, PR-12 hazır, PR-W1 sırada)
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 
@@ -54,6 +54,16 @@ TodoWrite ile senkronize çalışır — aktif session'daki live task listesi To
 - [x] ~10 yeni unit test (toplam 191 PASS)
 - [x] Lokal validation: build / test / gofmt / golangci-lint clean
 - [ ] **Faz 3 sonu polish PR (PR-W6 ile)**: tam OpenAPI spec sync + `make gen` ile `web/src/api/schema.gen.ts`
+
+#### ✅ PR-12: /users/me/keypair endpoint — `feat/server-me-keypair` (REVIEW BEKLIYOR)
+
+Mac sorularından doğan ufak server PR'ı (Q4: KEK türetme için keypair fetch).
+
+- [x] `GET /api/v1/users/me/keypair` — caller's user_keypairs row (public_key + private_key_enc + kek_salt + kek_params + version + rotated_at)
+- [x] CatalogHandlers'a `GetMyKeypair` metodu (yeni handler struct yok)
+- [x] Routing collision kontrolü (`/users/me/keypair` vs `/users/{id}/public-key`) — test ile pin'lendi
+- [x] 5 yeni unit test (toplam 196 PASS)
+- [x] Lokal validation: build / test / gofmt / golangci-lint clean
 
 ### Web PR'ları (Win başlangıç + Mac ekranlar + Win son)
 

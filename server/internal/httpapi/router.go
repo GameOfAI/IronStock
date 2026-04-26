@@ -151,14 +151,16 @@ func NewRouter(d Deps) http.Handler {
 		})
 	}
 
-	// Catalog routes — read-only lookup tables for the form/share flows.
-	// Any authenticated user may read these (no PII, no secrets).
+	// Catalog routes — read-only lookup tables for the form/share flows
+	// + /users/me/keypair (caller's own E2E material for KEK derive).
+	// Any authenticated user may read these.
 	if d.Catalog != nil && d.Auth != nil {
 		r.Route("/api/v1", func(cr chi.Router) {
 			cr.Use(timeoutMW)
 			cr.Use(RequireAccessToken(d.Auth.Service.JWT))
 			cr.Get("/field-definitions", d.Catalog.ListFieldDefinitions)
 			cr.Get("/item-types", d.Catalog.ListItemTypes)
+			cr.Get("/users/me/keypair", d.Catalog.GetMyKeypair)
 			cr.Get("/users/{id}/public-key", d.Catalog.GetUserPublicKey)
 		})
 	}
