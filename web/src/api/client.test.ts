@@ -63,7 +63,7 @@ describe('apiFetch', () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse(403, { code: 'forbidden', message: 'Yetkiniz yok.' }),
     );
-    const err = await apiFetch('/api/v1/admin/users').catch((e) => e);
+    const err = (await apiFetch('/api/v1/admin/users').catch((e: unknown) => e)) as ApiError;
     expect(err).toBeInstanceOf(ApiError);
     expect(err.status).toBe(403);
     expect(err.code).toBe('forbidden');
@@ -138,7 +138,7 @@ describe('apiFetch', () => {
 
   it('wraps network errors with status 0', async () => {
     fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
-    const err = await apiFetch('/api/v1/folders').catch((e) => e);
+    const err = (await apiFetch('/api/v1/folders').catch((e: unknown) => e)) as ApiError;
     expect(err).toBeInstanceOf(ApiError);
     expect(err.status).toBe(0);
     expect(err.code).toBe('network_error');
