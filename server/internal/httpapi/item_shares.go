@@ -9,6 +9,7 @@ import (
 	"envanter.app/server/internal/audit"
 	"envanter.app/server/internal/auth"
 	"envanter.app/server/internal/crypto"
+	"envanter.app/server/internal/ws"
 )
 
 // shareItemRequest is the body of POST /api/v1/items/{id}/shares.
@@ -126,6 +127,7 @@ func (h *ItemHandlers) Share(w http.ResponseWriter, r *http.Request) {
 		IPAddress: parseIP(r.RemoteAddr),
 		UserAgent: r.UserAgent(),
 	})
+	h.publishEvent(ws.EventItemShared, itemID, claims.Subject)
 
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -204,6 +206,7 @@ func (h *ItemHandlers) Unshare(w http.ResponseWriter, r *http.Request) {
 		IPAddress:    parseIP(r.RemoteAddr),
 		UserAgent:    r.UserAgent(),
 	})
+	h.publishEvent(ws.EventItemUnshared, itemID, claims.Subject)
 
 	w.WriteHeader(http.StatusNoContent)
 }

@@ -22,6 +22,7 @@ import (
 	"envanter.app/server/internal/db"
 	"envanter.app/server/internal/httpapi"
 	"envanter.app/server/internal/logging"
+	"envanter.app/server/internal/ws"
 )
 
 const issuerName = "Envanter"
@@ -97,14 +98,30 @@ func run() error {
 		Audit:   auditWriter,
 		Logger:  logger,
 	}
+	// --- WebSocket hub (created early so handlers can attach Publish) ---
+	hub := ws.NewHub(logger)
+	defer hub.Close()
+
 	folderHandlers := &httpapi.FolderHandlers{
 		Service: authSvc,
 		Audit:   auditWriter,
 		Logger:  logger,
+		Hub:     hub,
 	}
 	itemHandlers := &httpapi.ItemHandlers{
 		Service: authSvc,
 		Audit:   auditWriter,
+		Logger:  logger,
+		Hub:     hub,
+	}
+	adminHandlers := &httpapi.AdminHandlers{
+		Service: authSvc,
+		Audit:   auditWriter,
+		Logger:  logger,
+	}
+	wsHandlers := &httpapi.WSHandlers{
+		Service: authSvc,
+		Hub:     hub,
 		Logger:  logger,
 	}
 
@@ -115,6 +132,8 @@ func run() error {
 		Auth:   authHandlers,
 		Folder: folderHandlers,
 		Item:   itemHandlers,
+		Admin:  adminHandlers,
+		WS:     wsHandlers,
 	})
 
 	srv := &http.Server{

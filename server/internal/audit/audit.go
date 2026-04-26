@@ -50,6 +50,12 @@ const (
 	ActionItemFieldUpdated = "item.field_updated"
 	ActionItemShared       = "item.shared"
 	ActionItemUnshared     = "item.unshared"
+
+	// Admin actions (PR-10).
+	ActionAdminUserDisabled = "admin.user_disabled"
+	ActionAdminUserEnabled  = "admin.user_enabled"
+	ActionAdminRoleGranted  = "admin.role_granted"
+	ActionAdminRoleRevoked  = "admin.role_revoked"
 )
 
 // ResourceFolder is the audit resource type for folder rows.

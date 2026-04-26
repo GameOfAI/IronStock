@@ -4,11 +4,11 @@ Son güncelleme: 2026-04-26
 
 ## Mevcut Durum
 
-- **Aktif Faz:** Faz 3 — Admin Web UI (başlıyor — 8 PR planlandı, Mac ↔ Win paralel iş bölümü)
-- **Tamamlanan Faz:** Faz 0 + Faz 1 + **Faz 2 (server MVP) ✅ 2026-04-26**
-- **Çift makine workflow:** ▶ **Mac (Pro) Faz 3 ile yeniden devrede.** Win = Server + Foundation + Auth + Realtime/Polish (5 PR). Mac = Admin + Inventory Read + Inventory Write (3 PR). Mac token ekonomisi gözetilerek **self-contained ekran PR'ları** Mac'e tahsis.
+- **Aktif Faz:** Faz 3 — Admin Web UI (PR-10 ✅ done, PR-11 sırada)
+- **Tamamlanan Faz:** Faz 0 + Faz 1 + Faz 2 (server MVP) ✅ 2026-04-26
+- **Çift makine workflow:** ▶ Mac (Pro) ↔ Win paralel. Win = 5 PR (server + foundation + auth + realtime/polish). Mac = 3 PR (admin + inventory ekranlar).
 - **Bloker:** Yok
-- **Bir sonraki adım:** **PR-10** — Server WebSocket hub + admin user mgmt endpoints (Win, başlıyor). Mac 3. günden itibaren PR-W3 ile katılır.
+- **Bir sonraki adım:** **PR-11** — Server read API (audit query + field/type/user-pubkey + OpenAPI sync). Mac şu an repo inceleme + PR-W3 planlama yapıyor.
 
 ## Faz Durumu
 
@@ -51,6 +51,78 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-04-27 (Win) — Faz 3 PR-10: WebSocket hub + admin user mgmt endpoints
+
+**Branch:** `feat/server-ws-admin` — review/merge bekliyor.
+
+**Yeni paket: `internal/ws/`**
+
+| Dosya | İçerik |
+|-------|--------|
+| `doc.go` | Architecture diagram + concurrency model + event payload felsefesi (minimal — client REST ile re-fetch eder, RBAC sızıntısız) |
+| `events.go` | 9 Event type sabit (`folder.{created,updated,deleted}`, `item.{created,updated,deleted,shared,unshared,field_updated}`) + `Event{Type,ResourceID,ActorUserID,Timestamp}` + `NewEvent()` |
+| `hub.go` | `Hub` (ctx + cancel + sync.RWMutex + connections map) + `NewHub` / `Close` (graceful) + `Register` / `Publish` (drop on overflow, no block) + `Stats` + `Accept`. `Connection` (id, userID, send chan, runReader, runWriter, ping ticker 30s, write timeout 10s) + `Closed()` channel + `closeOnce` |
+
+**Critical karar: Hub kendi ctx'i kullanıyor.** Chi'nin `Timeout` middleware'i `http.TimeoutHandler` üstüne kurulu, Hijack'ı **desteklemez** → WebSocket upgrade kırılır. Çözüm: Hub'a kendi `context.WithCancel(context.Background())` kontekstini veriyorum, runReader/runWriter goroutine'leri buna anchor olur. Request ctx upgrade'den sonra kullanılmaz. `r.Context().Done()` yerine `c.Closed()` channel'ı ile parking yapıyoruz.
+
+**Router refactor:** `Timeout(30s)` artık global değil. REST grupları (`/api/v1/auth`, `/folders`, `/items`, `/admin`) içinde `ar.Use(timeoutMW)` ile uygulanır. WebSocket route'u (`/api/v1/ws`) çıplak — uzun süreli bağlantı timeout-wrapper'sız.
+
+**Yeni endpoint'ler (admin, RoleAdmin gerekir):**
+
+`GET /api/v1/admin/users[?limit=&offset=]` (default 50, max 200)
+- Pagination (limit + offset + total count). `array_agg + ORDER BY username`. Per-row `fetchUserRoles` çağrısı (small N — page max 200).
+- Yanıt: `{users[], total, limit, offset}` her satır id/username/email/status/roles[]/last_login_at/created_at.
+
+`POST /api/v1/admin/users/:id/disable`
+- `users.status='disabled'` + tek tx içinde `RevokeAllUserSessions(reason='admin')`. Self-disable engeli.
+- Idempotent (already-disabled → 204). Audit `admin.user_disabled`.
+
+`POST /api/v1/admin/users/:id/enable`
+- `status='disabled'`'dan recovery: TOTP verified varsa 'active', yoksa 'pending_totp' (tutarlılık koruması).
+- Lockout reset etmez (ayrı concern). Idempotent. Audit `admin.user_enabled`.
+
+`POST /api/v1/admin/users/:id/roles`
+- Body: `{role: "admin"|"write"|"read"}`. ON CONFLICT DO NOTHING (idempotent re-grant).
+- Audit `admin.role_granted` (target_user_id + role).
+
+`DELETE /api/v1/admin/users/:id/roles/:role_name`
+- **Self-strip-admin engeli:** kendi admin rolünü kaldıramaz (sistemde tek kalan admin'in kendini kilitlemesini önler).
+- Idempotent. Audit `admin.role_revoked`.
+
+**Yeni: `GET /api/v1/ws` (Bearer access in Authorization header)**
+- JWT validate (purpose=access) → `websocket.Accept` (subprotocol `envanter.v1`) → Hub.Register → `<-c.Closed()` parking
+- Reader: inbound frame'leri tüketir (MVP'de business message yok, sadece disconnect detection)
+- Writer: send chan drain + 30s ping ticker (proxy/LB cull engeli)
+
+**Hub.Publish entegrasyonu:**
+- `FolderHandlers` + `ItemHandlers` artık `Hub *ws.Hub` field'ı taşıyor (nil-safe — `publishEvent` no-op ise)
+- 9 endpoint mutate ettikten sonra `h.publishEvent(ws.EventXXX, resourceID, actorUserID)` çağırıyor
+- Audit yazıldıktan sonra publish (audit tx commit'inden sonra, başarısız işlem broadcast etmez)
+
+**Audit constants (4 yeni):**
+- `admin.user_disabled`, `admin.user_enabled`, `admin.role_granted`, `admin.role_revoked`
+
+**Yeni dependency:**
+- `github.com/coder/websocket v1.8.12` (modern, context-aware, küçük API; gorilla/websocket archived)
+
+**Wire:**
+- `httpapi.Deps.Admin *AdminHandlers`, `Deps.WS *WSHandlers`
+- `cmd/api/main.go`: hub erken yaratılır (defer Close), folder/item handlers'a Hub field'ı geçer, admin/ws handlers ayrı
+
+**Tests (~7 yeni case, toplam 181 PASS):**
+- `ws/hub_test.go`: Event field stamp + NewHub stats=0 + Publish-no-conns no-op + Close idempotent + 9 event constant pin
+- `httpapi/admin_users_test.go`: validRoleName whitelist (3 valid + 5 invalid) + parseIntDefault clamping (8 case)
+
+Handler-level DB integration testleri PR-11 sonrası testcontainers ile gelecek.
+
+**Lokal validation (Win, Go 1.26.2 + golangci-lint v1.62.2):**
+- `go build ./...` ✓
+- `go test ./...` ✓ 181 case PASS (önceki 174 + 7 yeni)
+- `gofmt -l .` clean
+- `golangci-lint run --timeout=5m ./...` 0 issues
+
+**Sıradaki:** PR-11 — Server read API (audit query + field/type/user-pubkey + OpenAPI sync). Mac PR-W3 (admin UI) için backend hazır oluyor.
 
 ### 2026-04-26 (Win) — Faz 3 başlıyor: PR planlaması + Mac (Pro) ↔ Win iş bölümü
 

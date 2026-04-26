@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-04-26 (Faz 2 ✅ DONE, Faz 3 başlıyor — 8 PR planlı)
+Son güncelleme: 2026-04-27 (Faz 3 PR-10 hazır, PR-11 sırada)
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 
@@ -30,17 +30,19 @@ TodoWrite ile senkronize çalışır — aktif session'daki live task listesi To
 
 ### Server PR'ları (Win)
 
-#### 🔜 PR-10: WebSocket hub + admin user mgmt — `feat/server-ws-admin`
+#### ✅ PR-10: WebSocket hub + admin user mgmt — `feat/server-ws-admin` (REVIEW BEKLIYOR)
 
-- [ ] `internal/ws/` paketi: hub + connection registry + access token gate (RequireAccessToken middleware reuse)
-- [ ] `GET /api/v1/ws` — upgrade endpoint, JWT validation, connection lifecycle
-- [ ] Pub/sub broadcast (folder/item events: `created`, `updated`, `deleted`, `shared`)
-- [ ] `internal/httpapi/admin_users.go`: `GET /api/v1/admin/users` (list + pagination, admin role)
-- [ ] `POST /api/v1/admin/users/:id/disable` + `/enable` (status flip)
-- [ ] `POST /api/v1/admin/users/:id/roles` + `DELETE /:role_name` (role grant/revoke)
-- [ ] `RequireRole(RoleAdmin)` middleware compose
-- [ ] Audit constants: `admin.user_disabled`, `admin.user_enabled`, `admin.role_granted`, `admin.role_revoked`
-- [ ] Unit tests + handler validation tests
+- [x] `internal/ws/` paketi: hub + connection + 9 event type sabit + ping/pong + drop-on-overflow
+- [x] `GET /api/v1/ws` upgrade endpoint (JWT access, subprotocol `envanter.v1`)
+- [x] Hub kendi ctx'i kullanıyor (chi Timeout middleware Hijack uyumsuzluğu çözüldü)
+- [x] Router refactor: Timeout artık per-group, `/ws` çıplak
+- [x] `Hub.Publish` entegrasyonu: 9 mutate endpoint'i event yayınlıyor (folder + item + share/unshare)
+- [x] `internal/httpapi/admin_users.go`: `GET /admin/users` (pagination 50/200), `disable/enable` (revoke all sessions on disable), `role grant/revoke` (self-strip-admin engeli)
+- [x] `RequireRole(RoleAdmin)` middleware compose
+- [x] 4 yeni audit constant: `admin.user_disabled/enabled/role_granted/revoked`
+- [x] `github.com/coder/websocket v1.8.12` direct dep
+- [x] ~7 yeni unit test (toplam 181 PASS)
+- [x] Lokal validation: build / test / gofmt / golangci-lint clean
 
 #### 🔜 PR-11: Read API + OpenAPI sync — `feat/server-readapi`
 
