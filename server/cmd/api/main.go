@@ -119,6 +119,10 @@ func run() error {
 		Audit:   auditWriter,
 		Logger:  logger,
 	}
+	catalogHandlers := &httpapi.CatalogHandlers{
+		Service: authSvc,
+		Logger:  logger,
+	}
 	wsHandlers := &httpapi.WSHandlers{
 		Service: authSvc,
 		Hub:     hub,
@@ -127,13 +131,14 @@ func run() error {
 
 	// --- HTTP layer ---
 	router := httpapi.NewRouter(httpapi.Deps{
-		Logger: logger,
-		DB:     pool,
-		Auth:   authHandlers,
-		Folder: folderHandlers,
-		Item:   itemHandlers,
-		Admin:  adminHandlers,
-		WS:     wsHandlers,
+		Logger:  logger,
+		DB:      pool,
+		Auth:    authHandlers,
+		Folder:  folderHandlers,
+		Item:    itemHandlers,
+		Admin:   adminHandlers,
+		Catalog: catalogHandlers,
+		WS:      wsHandlers,
 	})
 
 	srv := &http.Server{

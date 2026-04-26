@@ -1,12 +1,16 @@
 openapi: 3.1.0
 info:
   title: Envanter App API
-  version: 0.1.0
+  version: 0.3.0
   description: |
     DevOps/SRE envanter yönetim uygulaması REST API'si.
 
-    **Faz 1 taslağı** — sadece health + auth endpoint'leri. Envanter endpoint'leri
-    (/folders, /items) Faz 2'de eklenecek.
+    **Faz 3 — minimal sync (PR-11):** Health + auth tam, envanter
+    (/folders, /items), admin (/admin/*), catalog (/field-definitions,
+    /item-types, /users/{id}/public-key) ve realtime (/ws) endpoint'leri
+    eklendi. Tam request/response schema detayı **Faz 3 sonu polish PR'ında**
+    yazılacak — web tarafı (Mac PR-W*) elle TypeScript tipleri ile devam ediyor.
+    Endpoint kataloğu için PROGRESS.md son entry'lerine bakın.
 
     ## Security Model
     - Hibrit şifreleme (bkz. ADR-0002 ve ADR-0004).
@@ -38,6 +42,16 @@ tags:
     description: Service health endpoints (no auth required)
   - name: auth
     description: Authentication & authorization (register, login, MFA, recovery)
+  - name: folders
+    description: Folder CRUD + ACL (PR-8). Bearer access; RBAC enforced.
+  - name: items
+    description: Item CRUD + sharing (PR-9). Bearer access; RBAC enforced.
+  - name: admin
+    description: User mgmt + audit log (PR-10/11). Admin role required.
+  - name: catalog
+    description: Read-only lookup tables — field defs, item types, user pub keys (PR-11).
+  - name: realtime
+    description: WebSocket /ws — folder/item lifecycle events (PR-10).
 
 security:
   - BearerAuth: []
