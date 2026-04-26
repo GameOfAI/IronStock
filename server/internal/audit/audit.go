@@ -35,7 +35,17 @@ const (
 	// User-Agent or IP differs from the row stored at session creation.
 	// Informational only — we do not block the refresh.
 	ActionAuthSessionBindingChanged = "auth.session_binding_changed"
+
+	// Folder lifecycle (PR-8).
+	ActionFolderCreated          = "folder.created"
+	ActionFolderUpdated          = "folder.updated"
+	ActionFolderDeleted          = "folder.deleted"
+	ActionFolderPermissionGrant  = "folder.permission_granted"
+	ActionFolderPermissionRevoke = "folder.permission_revoked"
 )
+
+// ResourceFolder is the audit resource type for folder rows.
+const ResourceFolder = "folder"
 
 // Resource type constants.
 const (

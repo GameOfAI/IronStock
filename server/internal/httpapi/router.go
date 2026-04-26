@@ -26,12 +26,13 @@ type DBPinger interface {
 
 // Deps groups dependencies needed for the HTTP layer.
 //
-// Auth is optional: when nil, /api/v1/auth/* routes are not mounted (useful
-// for foundation tests that don't exercise auth flows).
+// Auth and Folder are optional: when nil their routes are not mounted
+// (useful for foundation tests that don't exercise those flows).
 type Deps struct {
 	Logger *slog.Logger
 	DB     DBPinger
 	Auth   *AuthHandlers
+	Folder *FolderHandlers
 }
 
 // NewRouter builds a chi router with the standard middleware stack.
@@ -86,6 +87,20 @@ func NewRouter(d Deps) http.Handler {
 			// complete is tmp-token gated.
 			ar.With(authBruteRL.Middleware).Post("/recover/init", d.Auth.RecoverInit)
 			ar.Post("/recover/complete", d.Auth.RecoverComplete)
+		})
+	}
+
+	// Inventory routes — folder + (PR-9) item. Bearer access required.
+	if d.Folder != nil && d.Auth != nil {
+		r.Route("/api/v1/folders", func(fr chi.Router) {
+			fr.Use(RequireAccessToken(d.Auth.Service.JWT))
+			fr.Get("/", d.Folder.List)
+			fr.Post("/", d.Folder.Create)
+			fr.Get("/{id}", d.Folder.Get)
+			fr.Put("/{id}", d.Folder.Update)
+			fr.Delete("/{id}", d.Folder.Delete)
+			fr.Post("/{id}/permissions", d.Folder.GrantPermission)
+			fr.Delete("/{id}/permissions/{user_id}", d.Folder.RevokePermission)
 		})
 	}
 

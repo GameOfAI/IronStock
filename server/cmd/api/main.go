@@ -97,12 +97,18 @@ func run() error {
 		Audit:   auditWriter,
 		Logger:  logger,
 	}
+	folderHandlers := &httpapi.FolderHandlers{
+		Service: authSvc,
+		Audit:   auditWriter,
+		Logger:  logger,
+	}
 
 	// --- HTTP layer ---
 	router := httpapi.NewRouter(httpapi.Deps{
 		Logger: logger,
 		DB:     pool,
 		Auth:   authHandlers,
+		Folder: folderHandlers,
 	})
 
 	srv := &http.Server{
