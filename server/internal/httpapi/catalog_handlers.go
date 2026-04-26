@@ -195,3 +195,77 @@ func (h *CatalogHandlers) GetUserPublicKey(w http.ResponseWriter, r *http.Reques
 		PublicKey: pubKey,
 	})
 }
+
+// --- /users/me/keypair (caller's own E2E keypair material for KEK derive) ---
+
+// myKeypairResponse is what the caller's client needs to:
+//
+//  1. Derive KEK from master_password using kek_salt + kek_params (Argon2id)
+//  2. Decrypt private_key_enc with KEK -> X25519 priv key in memory
+//  3. Hold pub + priv in useAuth() context for item_share unwrap (PR-W5)
+//
+// Returned ONLY for the authenticated caller (claims.Subject). There is NO
+// path that exposes another user's private_key_enc — that material is
+// encrypted client-side anyway, but the endpoint contract is "self only".
+type myKeypairResponse struct {
+	PublicKey     []byte          `json:"public_key"`      // 32B X25519, base64 in JSON
+	PrivateKeyEnc []byte          `json:"private_key_enc"` // AES-GCM blob, base64
+	KEKSalt       []byte          `json:"kek_salt"`        // Argon2id salt, base64
+	KEKParams     json.RawMessage `json:"kek_params"`      // {"t":3,"m":65536,"p":4,"v":1,"salt_b64":"..."}
+	Version       int16           `json:"version"`
+	RotatedAt     *string         `json:"rotated_at,omitempty"`
+}
+
+// GetMyKeypair implements GET /api/v1/users/me/keypair.
+//
+// Auth: Bearer access token. Returns the caller's user_keypairs row so
+// the client can derive KEK and decrypt private_key_enc on login. Decoupled
+// from /auth/login response to keep the login endpoint focused on session
+// creation (TOTP + lockout + session insert + roles).
+//
+// 404 if the caller has no keypair row — this should be impossible after
+// /auth/register (the keypair INSERT is in the same tx) but we guard anyway.
+func (h *CatalogHandlers) GetMyKeypair(w http.ResponseWriter, r *http.Request) {
+	claims := ClaimsFromContext(r.Context())
+	if claims == nil {
+		writeMiddlewareUnauthorized(w, errors.New("no claims"))
+		return
+	}
+
+	const sqlText = `
+		SELECT public_key, private_key_enc, kek_salt, kek_params::text,
+		       version, rotated_at::text
+		FROM user_keypairs
+		WHERE user_id = $1::uuid
+		LIMIT 1
+	`
+	var pubKey, privEnc, kekSalt []byte
+	var kekParamsRaw, rotatedAtRaw string
+	var version int16
+	err := h.Service.DB.QueryRow(r.Context(), sqlText, claims.Subject).Scan(
+		&pubKey, &privEnc, &kekSalt, &kekParamsRaw, &version, &rotatedAtRaw,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, h.Logger, http.StatusNotFound, ErrCodeBadRequest,
+				"Keypair bulunamadı.", err)
+			return
+		}
+		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
+			"Keypair okunamadı.", err)
+		return
+	}
+
+	resp := myKeypairResponse{
+		PublicKey:     pubKey,
+		PrivateKeyEnc: privEnc,
+		KEKSalt:       kekSalt,
+		KEKParams:     json.RawMessage(kekParamsRaw),
+		Version:       version,
+	}
+	if rotatedAtRaw != "" {
+		ra := rotatedAtRaw
+		resp.RotatedAt = &ra
+	}
+	writeJSON(w, http.StatusOK, resp)
+}

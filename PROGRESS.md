@@ -1,14 +1,14 @@
 # İlerleyiş
 
-Son güncelleme: 2026-04-26
+Son güncelleme: 2026-04-27
 
 ## Mevcut Durum
 
-- **Aktif Faz:** Faz 3 — Admin Web UI (PR-10 ✅, PR-11 ✅ done; PR-W1 sırada)
+- **Aktif Faz:** Faz 3 — Admin Web UI (PR-10/11 ✅, PR-12 hazır; PR-W1 sırada)
 - **Tamamlanan Faz:** Faz 0 + Faz 1 + Faz 2 (server MVP) ✅ 2026-04-26
-- **Çift makine workflow:** ▶ Mac (Pro) ↔ Win paralel. Win = 5 PR (server + foundation + auth + realtime/polish). Mac = 3 PR (admin + inventory ekranlar).
+- **Çift makine workflow:** ▶ Mac (Pro) ↔ Win paralel. Win = 6 PR (server + foundation + auth + realtime/polish; PR-12 Mac sorularından sonra eklendi). Mac = 3 PR (admin + inventory ekranlar).
 - **Bloker:** Yok
-- **Bir sonraki adım:** **PR-W1** — Web foundation (API client + token storage + refresh rotation + layout + routing). Mac PR-W3 başlamadan önce W1 + W2 da Win'de tamamlanmalı.
+- **Bir sonraki adım:** **PR-W1** — Web foundation (Vite + Tailwind + shadcn/ui + TanStack Query + Zustand + API client + layout + routing). PR-12 merge sonrası başlıyorum.
 
 ## Faz Durumu
 
@@ -17,7 +17,7 @@ Son güncelleme: 2026-04-26
 | 0 — Temel kurulum | VERIFY | 2026-04-24 | 2026-04-24 | Kod yazıldı, lokal smoke test user tarafında |
 | 1 — Veri modeli + kripto tasarımı | DONE | 2026-04-24 | 2026-04-24 | ER (17 tablo) + ADR 0004/0005/0006/0007 + auth-flow + 5 migration + OpenAPI + code gen |
 | 2 — Server MVP | DONE | 2026-04-24 | 2026-04-26 | PR-1...PR-9 ✅ merged. 10 auth endpoint, folder/item CRUD, RBAC 3 katmanlı, E2E hibrit, 174 unit test, 17 migration. WebSocket → Faz 3, item_relationships + field/type admin → Faz 5 (parking). |
-| 3 — Admin Web UI | ACTIVE | 2026-04-26 | — | 8 PR planlı (5 Win + 3 Mac). Win: PR-10 (server WS+admin), PR-11 (server read API), PR-W1 (web foundation), PR-W2 (web auth), PR-W6 (websocket+polish). Mac (Pro): PR-W3 (admin UI), PR-W4 (inventory read), PR-W5 (inventory write). Hedef: 5 günde Faz 3 BİTECEK. |
+| 3 — Admin Web UI | ACTIVE | 2026-04-26 | — | 9 PR planlı (Win 6 + Mac 3). Win: PR-10 (server WS+admin) ✅, PR-11 (server read API) ✅, PR-12 (/users/me/keypair, Mac sorularından sonra eklendi), PR-W1 (web foundation), PR-W2 (web auth), PR-W6 (websocket+polish). Mac (Pro): PR-W3 (admin UI), PR-W4 (inventory read), PR-W5 (inventory write). ADR-0009 (Mac) merged. Hedef: 5 günde Faz 3 BİTECEK. |
 | 4 — Client MVP (Tauri) | TODO | — | — | Win+Mac, live sync, offline cache, E2E |
 | 5 — Production hardening | PARTIAL | 2026-04-25 | — | Container + GHCR + k8s + ArgoCD + DB migration init container + native cross-compile multi-arch + secret rotation tamam. Sealed Secrets, Helm, observability, Ingress+TLS hâlâ TODO |
 
@@ -51,6 +51,71 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-04-27 (Win) — Faz 3 PR-12: /users/me/keypair endpoint (KEK derive için)
+
+**Branch:** `feat/server-me-keypair` — review/merge bekliyor.
+
+**Mac sorularından doğan ufak server PR'ı.** Mac (PR-W2 auth flow) `useAuth()` context'inde `kek + privateKey` expose ederken bu blob'ları çekecek. Login response'a embed etmek yerine ayrı endpoint:
+
+**Karar gerekçesi (Q4):**
+- `/auth/login` zaten karmaşık (TOTP + lockout + session create + roles fetch). Payload şişmemeli.
+- Login → tek round-trip access+refresh, ardından `GET /users/me/keypair` ile keypair fetch — temiz separation.
+- Faz 4 Tauri'de unlock akışı benzer pattern (lock olduğunda priv RAM'den silinir, unlock'ta yeniden çekilir).
+
+**Yeni endpoint:**
+
+`GET /api/v1/users/me/keypair` (Bearer access)
+- Caller'ın `claims.Subject` ile `user_keypairs` row'unu döndürür
+- Yanıt:
+  ```json
+  {
+    "public_key": "<32B base64>",
+    "private_key_enc": "<bytes base64>",
+    "kek_salt": "<bytes base64>",
+    "kek_params": {"t":3,"m":65536,"p":4,"v":1,"salt_b64":"..."},
+    "version": 1,
+    "rotated_at": "2026-04-27T10:00:00Z"
+  }
+  ```
+- 404 if no row (register sonrası INSERT same-tx; pratikte unreachable, defensive guard)
+- `rotated_at` omitempty — yeni hesap için JSON'da görünmez
+
+**Routing collision kontrolü:**
+- `/users/me/keypair` (literal "me") → bu endpoint
+- `/users/{id}/public-key` (UUID id) → existing endpoint
+- chi routing specific-before-generic, çakışma yok (test ile pin'lendi)
+
+**Implementation:**
+- `CatalogHandlers`'a `GetMyKeypair` metodu eklendi (lookup table semantik orada toplanmıştı)
+- Yeni handler struct YOK — tek metod ekleme
+- SQL: `SELECT public_key, private_key_enc, kek_salt, kek_params::text, version, rotated_at::text FROM user_keypairs WHERE user_id = $1::uuid`
+- `kek_params::text` cast → `json.RawMessage` (client'a opaque)
+
+**Tests (5 yeni, toplam 196 PASS):**
+- `myKeypairResponse` JSON wire format pin (7 field assertion)
+- `rotated_at` nil → omitempty doğrulaması
+- chi routing specific-before-generic (`/users/me/keypair` vs `/users/{id}/public-key`)
+- `GetMyKeypair` no-claims early-return
+- `CtxKeyClaims` drift koruması + `ClaimsFromContext` roundtrip
+
+**Mac (Pro) sorularına yanıtlar (özet):**
+- **Q1 client.ts pattern:** TanStack Query + custom typed fetch wrapper (RTK Query DEĞİL). Refresh rotation interceptor `client.ts` içinde.
+- **Q2 UI lib:** Tailwind 4 + shadcn/ui copy-paste. PR-W1'de Button/Input/Card/Dialog/Toast/Table/Select pre-install.
+- **Q3 state:** Zustand (UI/auth ephemeral) + TanStack Query (server state). Hibrit.
+- **Q4 KEK türetme:** argon2-browser, `useAuth()` context'inde `kek + privateKey` memory-only. Bu PR (PR-12) backend'i hazırlıyor.
+- **Q5 audit username:** Frontend mapping (Mac'in (a) önerisi). `/admin/users` zaten cache'lenecek, deleted user için "deleted_user" fallback UI tarafında.
+- **Bonus WS auth:** `Sec-WebSocket-Protocol` subprotocol abuse (`['bearer.<token>']`). PR-W6'da Win server-side parse helper ekleyecek; Mac PR-W3/W4'te realtime'sız fallback OK.
+
+**ADR-0009 (state management):** Mac yazıyor (CLAUDE.md "Mac aktif" + ADR iskelet). Win bu PR'da tracking güncellemesi yapmıyor (alan ayrımı).
+
+**Lokal validation (Win, Go 1.26.2 + golangci-lint v1.62.2):**
+- `go build ./...` ✓
+- `go test ./...` ✓ 196 case PASS (önceki 191 + 5 yeni)
+- `gofmt -l .` clean
+- `golangci-lint run --timeout=5m ./...` 0 issues (Win local'de `diff` aracı için Git'in usr/bin'i PATH'e eklendi — CI Linux'unda zaten var)
+
+**Sıradaki:** PR-W1 — Web foundation. Vite proje setup + Tailwind + shadcn/ui pre-install + TanStack Query + Zustand store iskeleti + API client SDK + chi router + layout shell.
 
 ### 2026-04-27 (Mac) — ADR-0009 yazıldı: Web stack kararı + Mac aktif
 
