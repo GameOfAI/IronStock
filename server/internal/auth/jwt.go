@@ -11,7 +11,7 @@ import (
 // JWT lifetimes.
 const (
 	// AccessTokenLifetime is the JWT access-token validity. Short by design;
-	// rotation is via the refresh-token mechanism (PR-6).
+	// rotation is via the refresh-token mechanism.
 	AccessTokenLifetime = 15 * time.Minute
 	// TmpTokenLifetime is the validity of a single-purpose token issued at
 	// register-time (TOTP enrolment) or recovery-init (password reset).

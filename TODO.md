@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-04-26
+Son güncelleme: 2026-04-26 (PR-6 hazır)
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 
@@ -88,20 +88,31 @@ TodoWrite ile senkronize çalışır — aktif session'daki live task listesi To
 - [x] 18 yeni unit test
 - [x] Lokal validation: build / test / gofmt / golangci-lint clean
 
-### 🔜 PR-6: Login + refresh + logout + change-pwd + recovery + RBAC middleware (SIRADA)
+### ✅ PR-6: Login + refresh rotation + logout(-all) + rate limit + lockout — `feat/server-auth-session` (REVIEW BEKLIYOR)
 
-- [ ] `/auth/login` (password verify + TOTP step + session create + access+refresh issue)
-- [ ] `/auth/refresh` (rotation + reuse detection → revoke all)
-- [ ] `/auth/logout` + `/auth/logout-all`
-- [ ] `/auth/change-password`
-- [ ] `/auth/recover/init` + `/auth/recover/complete` (recovery code → new keypair)
-- [ ] Session binding flag (UA/IP)
-- [ ] Rate limit middleware (login, TOTP verify, refresh, recover)
-- [ ] Account lockout (10 fail → 30dk)
-- [ ] RBAC middleware iskeleti — `requireRole`, `requirePermission(folder_id|item_id)`
-- [ ] sqlc query genişletmeleri (sessions, refresh_tokens, recovery_codes lookup)
+**Plan B genişletmesi:** Eski PR-6 kapsamını 2'ye böldük (PR-6: session lifecycle, PR-7: change-pwd + recovery + RBAC).
 
-### 🔜 PR-7: Item CRUD + folder permissions enforcement (Faz 2 sonu)
+- [x] `internal/auth/lockout.go` — `MaxFailedLoginAttempts=10`, `LockoutDuration=30m`, `IsLocked`
+- [x] `internal/auth/session.go` — `SessionRow`, `DBExec` interface, `CreateSession/LookupSessionByRefreshHash/RevokeSession/RevokeAllUserSessions/TouchSession` + 7 RevokeReason sabit
+- [x] `internal/httpapi/auth_login.go` — tek-adım login (pwd + TOTP), atomic counter+lock CASE SQL, generic 401
+- [x] `internal/httpapi/auth_refresh.go` — rotation tx + reuse detection (revoked row hit → revoke all)
+- [x] `internal/httpapi/auth_logout.go` — `/logout` + `/logout-all` + inline `requireAccessToken`
+- [x] `internal/httpapi/middleware_authn.go` — `RequireAccessToken` chi middleware + `ClaimsFromContext`
+- [x] `internal/httpapi/middleware_ratelimit.go` — per-IP token bucket (rate.Limiter), 5 burst/sustained 1/12s, 429+Retry-After
+- [x] Router wire: `/auth/{login,refresh,totp/verify}` brute-RL altında
+- [x] `golang.org/x/time v0.3.0` indirect → direct
+- [x] ~40 yeni test case (toplam 126 PASS)
+- [x] Lokal validation: build / test / gofmt / golangci-lint clean
+
+### 🔜 PR-7: Change-password + recovery + RBAC middleware iskeleti (SIRADA)
+
+- [ ] `/auth/change-password` (current pwd verify + new pwd hash + new keypair re-wrap + revoke all sessions = 'admin' veya 'password_changed')
+- [ ] `/auth/recover/init` (username + recovery_code → tmp_token purpose=recovery)
+- [ ] `/auth/recover/complete` (tmp_token + new master_password + new public_key + new private_key_enc → eski user_keypairs invalidate; revoke all sessions = 'recovery'; eski wrap'lı item_shares accessibility kaybedilir, ADR-0004 §9)
+- [ ] Session binding flag (UA/IP değişimi audit, block değil)
+- [ ] RBAC middleware iskeleti — `requireRole(role...)`, `requirePermission(folder_id | item_id)` (effective permission resolver — admin bypass + item_shares + folder_permissions ancestor walk; full enforcement PR-8 ile birlikte)
+
+### 🔜 PR-8: Item CRUD + folder permissions enforcement (Faz 2 sonu)
 
 - [ ] Folder CRUD
 - [ ] Item CRUD (metadata envelope + secret client-provided)

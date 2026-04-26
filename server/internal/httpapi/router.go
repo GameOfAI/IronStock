@@ -14,6 +14,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"golang.org/x/time/rate"
 )
 
 // DBPinger is the minimum DB interface needed for /readyz.
@@ -60,11 +61,26 @@ func NewRouter(d Deps) http.Handler {
 
 	// Auth routes — only mounted when auth deps are provided.
 	if d.Auth != nil {
+		// Rate limit hot brute-force targets: ~5 burst, then 1 attempt /
+		// 12 seconds sustained per IP. Auth-flow.md §"Rate limit" gives a
+		// 5-attempts-per-15-minutes window; this is a tighter sliding-window
+		// approximation (sustained = 5 attempts/min cap).
+		authBruteRL := NewIPRateLimiter(rate.Every(12*time.Second), 5)
+
 		r.Route("/api/v1/auth", func(ar chi.Router) {
+			// Unauthenticated, brute-forceable.
 			ar.Post("/register", d.Auth.Register)
+			ar.With(authBruteRL.Middleware).Post("/login", d.Auth.Login)
+			ar.With(authBruteRL.Middleware).Post("/refresh", d.Auth.Refresh)
+
+			// tmp-token-protected (totp enroll).
 			ar.Post("/totp/init", d.Auth.TOTPInit)
-			ar.Post("/totp/verify", d.Auth.TOTPVerify)
-			// PR-6: login, refresh, logout, change-password, recover/init, recover/complete
+			ar.With(authBruteRL.Middleware).Post("/totp/verify", d.Auth.TOTPVerify)
+
+			// access-token-protected.
+			ar.Post("/logout", d.Auth.Logout)
+			ar.Post("/logout-all", d.Auth.LogoutAll)
+			// PR-7: change-password, recover/init, recover/complete
 		})
 	}
 
