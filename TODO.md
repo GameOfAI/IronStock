@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-04-27 (Faz 3 PR-10 hazır, PR-11 sırada)
+Son güncelleme: 2026-04-27 (Faz 3 PR-10/11 hazır, PR-W1 sırada)
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 
@@ -44,15 +44,16 @@ TodoWrite ile senkronize çalışır — aktif session'daki live task listesi To
 - [x] ~7 yeni unit test (toplam 181 PASS)
 - [x] Lokal validation: build / test / gofmt / golangci-lint clean
 
-#### 🔜 PR-11: Read API + OpenAPI sync — `feat/server-readapi`
+#### ✅ PR-11: Read API + OpenAPI minimal sync — `feat/server-readapi` (REVIEW BEKLIYOR)
 
-- [ ] `GET /api/v1/admin/audit-log` — admin role, pagination + filter (action, actor_user_id, date range)
-- [ ] `GET /api/v1/field-definitions` — public read (authed any role) — item edit formu için
-- [ ] `GET /api/v1/item-types` — public read
-- [ ] `GET /api/v1/users/:id/public-key` — paylaşım yapacak kullanıcı için pub_key fetch (X25519 wrap için)
-- [ ] `shared/api/openapi.yaml` — tüm Faz 2-3 endpoint'leri yansıt
-- [ ] `make gen` çalıştır: `web/src/api/schema.gen.ts` üretilsin (Mac kullanacak)
-- [ ] Unit tests
+- [x] `GET /api/v1/admin/audit-log` — 6 filter param (AND), pagination (50/500), `auditFilter.whereClause` dinamik placeholder builder
+- [x] `GET /api/v1/field-definitions` — 30 seed field full list (no pagination; client cache)
+- [x] `GET /api/v1/item-types` — 8 seed tip
+- [x] `GET /api/v1/users/:id/public-key` — share modal için, 404 if disabled/missing
+- [x] `shared/api/openapi.yaml` — info v0.3.0 + 5 yeni tag (detaylı path/schema Faz 3 sonu polish PR'ına ertelendi; Mac elle TS yazıyor)
+- [x] ~10 yeni unit test (toplam 191 PASS)
+- [x] Lokal validation: build / test / gofmt / golangci-lint clean
+- [ ] **Faz 3 sonu polish PR (PR-W6 ile)**: tam OpenAPI spec sync + `make gen` ile `web/src/api/schema.gen.ts`
 
 ### Web PR'ları (Win başlangıç + Mac ekranlar + Win son)
 

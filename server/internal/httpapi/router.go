@@ -29,13 +29,14 @@ type DBPinger interface {
 // Auth, Folder, Item, WS are optional: when nil their routes are not mounted
 // (useful for foundation tests that don't exercise those flows).
 type Deps struct {
-	Logger *slog.Logger
-	DB     DBPinger
-	Auth   *AuthHandlers
-	Folder *FolderHandlers
-	Item   *ItemHandlers
-	Admin  *AdminHandlers
-	WS     *WSHandlers
+	Logger  *slog.Logger
+	DB      DBPinger
+	Auth    *AuthHandlers
+	Folder  *FolderHandlers
+	Item    *ItemHandlers
+	Admin   *AdminHandlers
+	Catalog *CatalogHandlers
+	WS      *WSHandlers
 }
 
 // NewRouter builds a chi router with the standard middleware stack.
@@ -146,6 +147,19 @@ func NewRouter(d Deps) http.Handler {
 			ar.Post("/users/{id}/enable", d.Admin.EnableUser)
 			ar.Post("/users/{id}/roles", d.Admin.GrantRole)
 			ar.Delete("/users/{id}/roles/{role_name}", d.Admin.RevokeRole)
+			ar.Get("/audit-log", d.Admin.QueryAuditLog)
+		})
+	}
+
+	// Catalog routes — read-only lookup tables for the form/share flows.
+	// Any authenticated user may read these (no PII, no secrets).
+	if d.Catalog != nil && d.Auth != nil {
+		r.Route("/api/v1", func(cr chi.Router) {
+			cr.Use(timeoutMW)
+			cr.Use(RequireAccessToken(d.Auth.Service.JWT))
+			cr.Get("/field-definitions", d.Catalog.ListFieldDefinitions)
+			cr.Get("/item-types", d.Catalog.ListItemTypes)
+			cr.Get("/users/{id}/public-key", d.Catalog.GetUserPublicKey)
 		})
 	}
 

@@ -4,11 +4,11 @@ Son güncelleme: 2026-04-26
 
 ## Mevcut Durum
 
-- **Aktif Faz:** Faz 3 — Admin Web UI (PR-10 ✅ done, PR-11 sırada)
+- **Aktif Faz:** Faz 3 — Admin Web UI (PR-10 ✅, PR-11 ✅ done; PR-W1 sırada)
 - **Tamamlanan Faz:** Faz 0 + Faz 1 + Faz 2 (server MVP) ✅ 2026-04-26
 - **Çift makine workflow:** ▶ Mac (Pro) ↔ Win paralel. Win = 5 PR (server + foundation + auth + realtime/polish). Mac = 3 PR (admin + inventory ekranlar).
 - **Bloker:** Yok
-- **Bir sonraki adım:** **PR-11** — Server read API (audit query + field/type/user-pubkey + OpenAPI sync). Mac şu an repo inceleme + PR-W3 planlama yapıyor.
+- **Bir sonraki adım:** **PR-W1** — Web foundation (API client + token storage + refresh rotation + layout + routing). Mac PR-W3 başlamadan önce W1 + W2 da Win'de tamamlanmalı.
 
 ## Faz Durumu
 
@@ -51,6 +51,70 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-04-27 (Win) — Faz 3 PR-11: Audit log query + catalog read endpoints + OpenAPI minimal sync
+
+**Branch:** `feat/server-readapi` — review/merge bekliyor.
+
+**Server tarafı Faz 3 backend'i bu PR ile tamamlanıyor.** Web client'ın ihtiyacı olan tüm read endpoint'leri ve admin audit görüntüleme hazır.
+
+**Yeni endpoint'ler:**
+
+`GET /api/v1/admin/audit-log` (admin role)
+- 6 filter parametresi (AND-combined): `action`, `actor_user_id`, `resource_type`, `resource_id`, `from`, `to` (RFC3339).
+- Pagination: `limit` (default 50, max 500) + `offset`.
+- Yanıt: `{entries[], total (filtered), limit, offset}` — total filtered count, frontend doğru pagination yapsın.
+- `auditFilter.whereClause()` dinamik placeholder ($1, $2, ...) builder, count + page sorgularında ortak.
+- Resource type CHECK constraint mirror'lanmış (drift erken yakalanır).
+- ORDER BY id DESC (en yeni önce, BRIN index ile hızlı).
+
+`GET /api/v1/field-definitions` (any authed)
+- 30 seed field tanımının full liste (pagination yok — ~100 sınırı altında, client cache'ler).
+- Yanıt: `{field_definitions[]}` — id, key, label, field_type, is_secret, hint?, validation_regex?, allowed_values? (enum field'ları için).
+- Item edit formu için kritik (web Mac PR-W5).
+
+`GET /api/v1/item-types` (any authed)
+- 8 seed tip listesi: server, url, database, ssh_key, certificate, cloud_credential, note, generic.
+- Yanıt: `{item_types[]}` — id, key, label, icon?, suggested_fields, default_launchers (Faz 4 client tarafı).
+
+`GET /api/v1/users/{id}/public-key` (any authed)
+- Item paylaşım modal'ı için kritik: client recipient pub_key'i alır → X25519 wrap → `/items/:id/shares` POST.
+- 404 if user not found OR `status='disabled'` (paylaşım hedefi olamaz).
+- Yanıt: `{user_id, username, public_key (32B X25519, base64 in JSON)}`.
+
+**Yeni paket parçaları:**
+- `internal/httpapi/admin_audit.go` (AdminHandlers'a yeni metod): `QueryAuditLog`, `auditFilter` builder
+- `internal/httpapi/catalog_handlers.go` (yeni `CatalogHandlers`): 3 read endpoint
+
+**OpenAPI sync — minimal:**
+- `info.version` 0.1.0 → 0.3.0
+- `info.description` Faz 3 notu güncellendi
+- 5 yeni tag: folders, items, admin, catalog, realtime
+- **Detaylı path/schema'lar Faz 3 sonu polish PR'ında.** Mac elle TS tipleri yazıyor (PR-W1 fetch wrapper), tam spec'e bağımlı değil.
+
+**Wire:**
+- `httpapi.Deps.Catalog *CatalogHandlers`
+- `cmd/api/main.go`: CatalogHandlers instance
+- Router yeni route'lar `/api/v1/admin/audit-log` (admin gate) ve `/api/v1/{field-definitions, item-types, users/{id}/public-key}` (any-authed gate)
+
+**Tests (~10 yeni case, toplam 191 PASS):**
+- `httpapi/admin_audit_test.go`: buildAuditFilter (5 case: empty, all-fields, bad rtype, bad date, to-before-from) + validResourceType (8+4) + whereClause (empty + all-conditions placeholder check) + buildPageSQL (LIMIT/OFFSET advance) + emptyToNil (2 case)
+
+DB-bound integration testler Faz 3 sonu testcontainers PR'ında.
+
+**Lokal validation (Win, Go 1.26.2 + golangci-lint v1.62.2):**
+- `go build ./...` ✓
+- `go test ./...` ✓ 191 case PASS (önceki 181 + 10 yeni)
+- `gofmt -l .` clean
+- `golangci-lint run --timeout=5m ./...` 0 issues
+
+**Server tarafı Faz 3 BAĞIMLILIKLARI tamam:**
+- ✓ /ws WebSocket hub (PR-10)
+- ✓ Admin user mgmt + audit log query (PR-10/11)
+- ✓ Catalog read (PR-11) — field/type/user-pubkey
+- → Web tarafı için tüm REST + WS endpoint'leri hazır
+
+**Sıradaki:** PR-W1 — Web foundation (API client + token storage + refresh rotation + layout + routing). Mac için PR-W3 başlamadan önce W1 + W2 (Win) tamamlanmalı.
 
 ### 2026-04-27 (Win) — Faz 3 PR-10: WebSocket hub + admin user mgmt endpoints
 
