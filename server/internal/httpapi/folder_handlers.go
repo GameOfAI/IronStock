@@ -12,6 +12,7 @@ import (
 	"envanter.app/server/internal/audit"
 	"envanter.app/server/internal/auth"
 	"envanter.app/server/internal/crypto"
+	"envanter.app/server/internal/ws"
 )
 
 // FolderHandlers groups CRUD + ACL endpoints for /api/v1/folders.
@@ -19,10 +20,21 @@ import (
 // All routes are bearer-protected (RequireAccessToken middleware) — claims
 // are extracted from context. Each handler runs ResolveFolderPermission
 // before any state change; admin role bypasses (per RBAC §1).
+//
+// Hub is optional — when non-nil, mutations broadcast WS events.
 type FolderHandlers struct {
 	Service *auth.Service
 	Audit   *audit.Writer
 	Logger  *slog.Logger
+	Hub     *ws.Hub
+}
+
+// publishEvent is a no-op when Hub is nil.
+func (h *FolderHandlers) publishEvent(eventType, resourceID, actorUserID string) {
+	if h.Hub == nil {
+		return
+	}
+	h.Hub.Publish(ws.NewEvent(eventType, resourceID, actorUserID))
 }
 
 // folderRequest is the create / update body. name is plaintext; the server
@@ -147,6 +159,7 @@ func (h *FolderHandlers) Create(w http.ResponseWriter, r *http.Request) {
 		IPAddress:    parseIP(r.RemoteAddr),
 		UserAgent:    r.UserAgent(),
 	})
+	h.publishEvent(ws.EventFolderCreated, id, claims.Subject)
 
 	writeJSON(w, http.StatusCreated, folderResponse{
 		ID:         id,
@@ -393,6 +406,7 @@ func (h *FolderHandlers) Update(w http.ResponseWriter, r *http.Request) {
 		IPAddress:    parseIP(r.RemoteAddr),
 		UserAgent:    r.UserAgent(),
 	})
+	h.publishEvent(ws.EventFolderUpdated, id, claims.Subject)
 
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -452,6 +466,7 @@ func (h *FolderHandlers) Delete(w http.ResponseWriter, r *http.Request) {
 		IPAddress:    parseIP(r.RemoteAddr),
 		UserAgent:    r.UserAgent(),
 	})
+	h.publishEvent(ws.EventFolderDeleted, id, claims.Subject)
 
 	w.WriteHeader(http.StatusNoContent)
 }

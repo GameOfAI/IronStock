@@ -14,13 +14,26 @@ import (
 	"envanter.app/server/internal/audit"
 	"envanter.app/server/internal/auth"
 	"envanter.app/server/internal/crypto"
+	"envanter.app/server/internal/ws"
 )
 
+// publishEvent is a no-op when Hub is nil, otherwise fan-outs via Publish.
+func (h *ItemHandlers) publishEvent(eventType, resourceID, actorUserID string) {
+	if h.Hub == nil {
+		return
+	}
+	h.Hub.Publish(ws.NewEvent(eventType, resourceID, actorUserID))
+}
+
 // ItemHandlers groups the /api/v1/items endpoints. Bearer-protected.
+//
+// Hub is optional — when non-nil, mutations broadcast WS events for
+// connected clients to invalidate their cache.
 type ItemHandlers struct {
 	Service *auth.Service
 	Audit   *audit.Writer
 	Logger  *slog.Logger
+	Hub     *ws.Hub
 }
 
 // itemFieldInput is one row in the items.fields[] payload. value_enc and
@@ -237,6 +250,7 @@ func (h *ItemHandlers) Create(w http.ResponseWriter, r *http.Request) {
 		IPAddress: parseIP(r.RemoteAddr),
 		UserAgent: r.UserAgent(),
 	})
+	h.publishEvent(ws.EventItemCreated, req.ID, claims.Subject)
 
 	writeJSON(w, http.StatusCreated, itemResponse{
 		ID:         req.ID,
@@ -559,6 +573,7 @@ func (h *ItemHandlers) Update(w http.ResponseWriter, r *http.Request) {
 		IPAddress:    parseIP(r.RemoteAddr),
 		UserAgent:    r.UserAgent(),
 	})
+	h.publishEvent(ws.EventItemUpdated, id, claims.Subject)
 
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -614,6 +629,7 @@ func (h *ItemHandlers) Delete(w http.ResponseWriter, r *http.Request) {
 		IPAddress:    parseIP(r.RemoteAddr),
 		UserAgent:    r.UserAgent(),
 	})
+	h.publishEvent(ws.EventItemDeleted, id, claims.Subject)
 
 	w.WriteHeader(http.StatusNoContent)
 }

@@ -26,7 +26,7 @@ type DBPinger interface {
 
 // Deps groups dependencies needed for the HTTP layer.
 //
-// Auth, Folder, Item are optional: when nil their routes are not mounted
+// Auth, Folder, Item, WS are optional: when nil their routes are not mounted
 // (useful for foundation tests that don't exercise those flows).
 type Deps struct {
 	Logger *slog.Logger
@@ -34,6 +34,8 @@ type Deps struct {
 	Auth   *AuthHandlers
 	Folder *FolderHandlers
 	Item   *ItemHandlers
+	Admin  *AdminHandlers
+	WS     *WSHandlers
 }
 
 // NewRouter builds a chi router with the standard middleware stack.
@@ -53,13 +55,23 @@ func NewRouter(d Deps) http.Handler {
 	r.Use(slogRequestLogger(d.Logger))
 	// 5. Recoverer — catches panics, logs + 500 instead of crashing
 	r.Use(middleware.Recoverer)
-	// 6. Timeout — overall request budget; handlers should respect ctx
-	r.Use(middleware.Timeout(30 * time.Second))
 
-	// Health routes (unauthenticated)
+	// NOTE: Timeout middleware is NOT applied globally here — it wraps
+	// responses with http.TimeoutHandler which breaks Hijack (the WS
+	// upgrade path needs Hijack). Apply Timeout per-route or per-Group
+	// for endpoints that should be subject to it.
+	timeoutMW := middleware.Timeout(30 * time.Second)
+
+	// Health routes (unauthenticated, NOT timeout-wrapped — short anyway)
 	h := &handlers{deps: d}
 	r.Get("/healthz", h.Healthz)
 	r.Get("/readyz", h.Readyz)
+
+	// WebSocket route mounted BEFORE timeout-wrapped groups; the long-lived
+	// connection must not be wrapped by http.TimeoutHandler.
+	if d.WS != nil {
+		r.Get("/api/v1/ws", d.WS.Connect)
+	}
 
 	// Auth routes — only mounted when auth deps are provided.
 	if d.Auth != nil {
@@ -70,6 +82,9 @@ func NewRouter(d Deps) http.Handler {
 		authBruteRL := NewIPRateLimiter(rate.Every(12*time.Second), 5)
 
 		r.Route("/api/v1/auth", func(ar chi.Router) {
+			// REST routes are subject to the request budget; long-lived
+			// streaming endpoints (/ws) live outside this group.
+			ar.Use(timeoutMW)
 			// Unauthenticated, brute-forceable.
 			ar.Post("/register", d.Auth.Register)
 			ar.With(authBruteRL.Middleware).Post("/login", d.Auth.Login)
@@ -94,6 +109,7 @@ func NewRouter(d Deps) http.Handler {
 	// Inventory routes — folder + item. Bearer access required.
 	if d.Folder != nil && d.Auth != nil {
 		r.Route("/api/v1/folders", func(fr chi.Router) {
+			fr.Use(timeoutMW)
 			fr.Use(RequireAccessToken(d.Auth.Service.JWT))
 			fr.Get("/", d.Folder.List)
 			fr.Post("/", d.Folder.Create)
@@ -107,6 +123,7 @@ func NewRouter(d Deps) http.Handler {
 
 	if d.Item != nil && d.Auth != nil {
 		r.Route("/api/v1/items", func(ir chi.Router) {
+			ir.Use(timeoutMW)
 			ir.Use(RequireAccessToken(d.Auth.Service.JWT))
 			ir.Get("/", d.Item.List)
 			ir.Post("/", d.Item.Create)
@@ -115,6 +132,20 @@ func NewRouter(d Deps) http.Handler {
 			ir.Delete("/{id}", d.Item.Delete)
 			ir.Post("/{id}/shares", d.Item.Share)
 			ir.Delete("/{id}/shares/{user_id}", d.Item.Unshare)
+		})
+	}
+
+	// Admin routes — admin role required (RBAC middleware enforces).
+	if d.Admin != nil && d.Auth != nil {
+		r.Route("/api/v1/admin", func(ar chi.Router) {
+			ar.Use(timeoutMW)
+			ar.Use(RequireAccessToken(d.Auth.Service.JWT))
+			ar.Use(RequireRole(RoleAdmin))
+			ar.Get("/users", d.Admin.ListUsers)
+			ar.Post("/users/{id}/disable", d.Admin.DisableUser)
+			ar.Post("/users/{id}/enable", d.Admin.EnableUser)
+			ar.Post("/users/{id}/roles", d.Admin.GrantRole)
+			ar.Delete("/users/{id}/roles/{role_name}", d.Admin.RevokeRole)
 		})
 	}
 
