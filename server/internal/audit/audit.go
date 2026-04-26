@@ -30,6 +30,11 @@ const (
 	ActionAuthPwdChanged   = "auth.password_changed"
 	ActionAuthRecover      = "auth.recover"
 	ActionAuthRecoverFail  = "auth.recover_fail"
+
+	// ActionAuthSessionBindingChanged is emitted on /refresh when the
+	// User-Agent or IP differs from the row stored at session creation.
+	// Informational only — we do not block the refresh.
+	ActionAuthSessionBindingChanged = "auth.session_binding_changed"
 )
 
 // Resource type constants.

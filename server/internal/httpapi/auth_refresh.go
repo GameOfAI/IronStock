@@ -91,6 +91,28 @@ func (s *AuthHandlers) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Session binding flag (auth-flow.md "Session binding"): if UA or IP
+	// drifted from the value stowed at session creation, log it but do NOT
+	// block — drift is common (mobile networks, browser updates).
+	currentIP := parseIP(r.RemoteAddr)
+	currentUA := r.UserAgent()
+	if bindingChanged(row, currentIP.String(), currentUA) {
+		_ = s.Audit.Write(ctx, audit.Entry{
+			ActorUserID:  row.UserID,
+			Action:       audit.ActionAuthSessionBindingChanged,
+			ResourceType: audit.ResourceSession,
+			ResourceID:   row.ID,
+			Details: map[string]any{
+				"old_user_agent": ptrStringOrEmpty(row.UserAgent),
+				"new_user_agent": currentUA,
+				"old_ip":         ptrStringOrEmpty(row.IPAddress),
+				"new_ip":         currentIP.String(),
+			},
+			IPAddress: currentIP,
+			UserAgent: currentUA,
+		})
+	}
+
 	// All good: rotate. Mark the old row revoked='rotation' and create a
 	// new one in the same tx so the old token can never be replayed even
 	// if the client retries before the new token reaches it.
@@ -171,4 +193,17 @@ func ptrStringOrEmpty(p *string) string {
 		return ""
 	}
 	return *p
+}
+
+// bindingChanged reports whether the request's UA/IP drifted from the values
+// stowed at session creation. nil-or-empty old values are treated as match
+// (no row data → nothing to compare against).
+func bindingChanged(row auth.SessionRow, currentIP, currentUA string) bool {
+	if row.IPAddress != nil && *row.IPAddress != "" && *row.IPAddress != currentIP {
+		return true
+	}
+	if row.UserAgent != nil && *row.UserAgent != "" && *row.UserAgent != currentUA {
+		return true
+	}
+	return false
 }

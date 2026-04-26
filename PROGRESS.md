@@ -4,12 +4,12 @@ Son güncelleme: 2026-04-26
 
 ## Mevcut Durum
 
-- **Aktif Faz:** Faz 2 — Server MVP (PR-1, PR-2, PR-3, PR-4, PR-5 ✅ merged; PR-6 hazır, review/merge bekliyor)
+- **Aktif Faz:** Faz 2 — Server MVP (PR-1...PR-6 ✅ merged; PR-7 hazır, review/merge bekliyor)
 - **Tamamlanan Faz:** Faz 0 + Faz 1
 - **Çift makine workflow:** ⏸ **Mac M4 paused 2026-04-26** — kullanıcı tüm geliştirmeyi şimdilik Win'den yürütüyor. Mac yeniden devreye alınırsa kullanıcı bilgi verecek; o noktada deploy/k8s işleri Mac'te devam eder (ADR-0008).
 - **Bloker:** Yok
 - **Mac canlı cluster snapshot (son durum):** Tüm pod'lar 1/1 Running, init container ile 5 migration auto-apply (Faz 1), `/healthz` 200 OK. PR-3 merge sonrası 12 yeni migration için Docker build/push tetiklendi → ArgoCD sync → init container 17 migration toplam uygular (Mac yeniden açıldığında doğrulanmalı).
-- **Bir sonraki adım:** PR-6 review/merge → PR-7 (change-password + recovery flow + RBAC middleware iskeleti)
+- **Bir sonraki adım:** PR-7 review/merge → PR-8 (Item CRUD + folder permissions + RBAC effective resolver — Faz 2 son PR'ı)
 
 ## Faz Durumu
 
@@ -17,7 +17,7 @@ Son güncelleme: 2026-04-26
 |-----|-------|-----------|-------|-----|
 | 0 — Temel kurulum | VERIFY | 2026-04-24 | 2026-04-24 | Kod yazıldı, lokal smoke test user tarafında |
 | 1 — Veri modeli + kripto tasarımı | DONE | 2026-04-24 | 2026-04-24 | ER (17 tablo) + ADR 0004/0005/0006/0007 + auth-flow + 5 migration + OpenAPI + code gen |
-| 2 — Server MVP | ACTIVE | 2026-04-24 | — | PR-1 (foundation), PR-2 (DB+chi), PR-3 (12 migration + integration test), PR-4 (crypto), PR-5 (master key + auth primitives + register/TOTP) ✅ merged. PR-6 (login/refresh/logout(-all) + rate limit + lockout + access-token middleware) review bekliyor. PR-7 sırada (change-password + recovery + RBAC middleware iskeleti). Mac side ⏸ paused 2026-04-26. |
+| 2 — Server MVP | ACTIVE | 2026-04-24 | — | PR-1...PR-6 ✅ merged (foundation, DB+chi, migrations+IT, crypto, master key + register/TOTP, login/refresh/logout). PR-7 (change-password + recovery flow + RBAC iskelet + session binding flag) review bekliyor. PR-8 sırada (Item CRUD + folder permissions effective resolver — Faz 2 son PR). Mac side ⏸ paused 2026-04-26. |
 | 3 — Admin Web UI | TODO | — | — | Login + user mgmt + ağaç view |
 | 4 — Client MVP (Tauri) | TODO | — | — | Win+Mac, live sync, offline cache, E2E |
 | 5 — Production hardening | PARTIAL | 2026-04-25 | — | Container + GHCR + k8s + ArgoCD + DB migration init container + native cross-compile multi-arch + secret rotation tamam. Sealed Secrets, Helm, observability, Ingress+TLS hâlâ TODO |
@@ -52,6 +52,84 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-04-26 (Win) — Faz 2 PR-7: Change-Password + Recovery Flow + RBAC İskeleti + Session Binding Flag
+
+**Branch:** `feat/server-auth-recovery` — review/merge bekliyor.
+
+**Üç onaylanmış karar (kullanıcı ile mutabık kalındı):**
+
+1. **Change-password = priv key re-wrap, public_key sabit.** Sebep: `item_shares.e2e_dek_wrapped` satırları kullanıcının public_key'i ile X25519 wrap'lı; pub değişirse hem kendi item'larındaki paylaşımlar hem ona paylaşılan item'lar erişilemez hale gelir. Master parola değişimi rutin bir işlem; veri kaybı kabul edilemez. Bu yüzden client priv key'i eski KEK ile açıp yeni KEK ile yeniden wrap eder, server sadece `private_key_enc + kek_salt + kek_params + version + rotated_at`'i günceller. Recovery'de ise zorunlu full keypair rotation olur (eski master pwd kayıp, eski priv açılamaz, item_shares accessibility kaybedilir — UI prominent uyarı).
+
+2. **Recovery counter login ile paylaşılan.** Tek `users.failed_login_attempts` sütunu — yeni migration yok. Saldırgan login + recovery'i karıştırarak deneyemez (toplamda 10 hak). 10. denemede 30dk lock.
+
+3. **RBAC bu PR'da sadece iskelet.** `RequireRole(allowed...)` middleware (admin bypass + role intersection) + `Permission` tipi + sabitler + `Allows(want)` semantiği. Item/folder DB resolver'lar PR-8'e (Item CRUD ile birlikte SQL'leri test edilebilir hale gelecek).
+
+**Yeni endpoint'ler (`internal/httpapi/auth_*.go`):**
+
+`POST /api/v1/auth/change-password` (Bearer access)
+- Body: `{current_master_password, new_master_password, new_private_key_enc, new_kek_salt, new_kek_params}` — `public_key` YOK (sabit kalır).
+- Current password verify → fail: `recordLoginFailure` (paylaşılan counter) + 401.
+- Tek tx: users (password_hash + argon2_params + counter=0 + locked_until=NULL) + user_keypairs (priv_enc + kek_salt + kek_params + version++ + rotated_at) + `RevokeAllUserSessions('admin')` — tüm cihazlar yeni pwd ile yeniden login.
+- Audit `auth.password_changed`. 204 No Content.
+
+`POST /api/v1/auth/recover/init` (rate-limited, no auth)
+- Body: `{username, recovery_code}`. Generic 401 (username enumeration kapalı).
+- User lookup → unused recovery_codes (array_agg) → linear Argon2id verify (~10 max).
+- Match → tek tx: code'u `used_at + used_ip` ile işaretle + `RevokeAllUserSessions('recovery')` + commit. Sonra `auth.PurposeRecovery` tmp_token (15dk).
+- Audit `auth.recover` (step=init). Mismatch → `recordLoginFailure` + `auth.recover_fail`.
+
+`POST /api/v1/auth/recover/complete` (Bearer tmp_token, purpose=recovery)
+- Body: `{new_master_password, public_key (32B, YENİ), new_private_key_enc, new_kek_salt, new_kek_params}`.
+- Tek tx: users güncelle (status='active' geri set) + user_keypairs FULL rotate (yeni pub + priv_enc + kek_*) + `DELETE FROM recovery_codes` + 10 yeni `INSERT recovery_codes` + defansif `RevokeAllUserSessions('recovery')`.
+- Audit hem `auth.recover` (step=complete) hem `auth.password_changed` (via=recovery).
+- Yanıt: `{recovery_codes: [...10 plain]}` — tek seferlik.
+
+**Yeni middleware (`internal/httpapi/middleware_rbac.go`):**
+
+| Tip / Fonksiyon | Açıklama |
+|---|---|
+| `Permission` (string alias) | `PermissionNone/Read/Write` — SQL CHECK ile lowercase uyumlu |
+| `Permission.Allows(want)` | Write ⇒ Write only; Read ⇒ Read or Write satisfied |
+| `RoleAdmin / RoleWrite / RoleRead` | Migration 00003 seed mirror |
+| `RequireRole(allowed ...)` | chi middleware: admin bypass, otherwise claims.Roles ∩ allowed > 0 |
+| `hasRole(claims, role)` | private helper |
+| `writeMiddlewareForbidden` | 403 JSON envelope |
+
+**Session binding flag (`auth_refresh.go` ek):**
+- `auth.SessionRow` artık `UserAgent *string` + `IPAddress *string` (lookup sırasında `host(ip_address)::text`).
+- `bindingChanged(row, currentIP, currentUA)` — nil-or-empty stored = match (no flag).
+- Refresh handler: drift varsa `audit.ActionAuthSessionBindingChanged` (yeni constant) yazılır, blok yok.
+
+**Yeni audit constants:**
+- `ActionAuthSessionBindingChanged = "auth.session_binding_changed"`
+
+**Router wire:**
+- `/auth/recover/init` → brute RL altında (5 burst, sustained 1/12s).
+- `/auth/recover/complete` → tmp-token gated, RL yok (token ömrü kısa zaten).
+- `/auth/change-password` → access token gated, RL yok (saldırı için zaten geçerli token gerek).
+
+**Tests (~24 yeni case, toplam 150 PASS):**
+- `httpapi/middleware_rbac_test.go`: Permission.Allows matrix (6 case) + RequireRole NoClaims/AdminBypass/AllowedIntersect/NotInSet/EmptyClaims + hasRole 3 case
+- `httpapi/auth_refresh_test.go`: bindingChanged BothMatch/IPMismatch/UAMismatch/NilStored/EmptyStored
+- `httpapi/auth_change_password_test.go`: validateChangePassword 6 case (OK + 5 invalid)
+- `httpapi/auth_recover_test.go`: validateRecoverComplete 6 case (OK + 5 invalid)
+
+**Lokal validation (Win, Go 1.26.2 + golangci-lint v1.62.2):**
+- `go build ./...` ✓
+- `go test ./...` ✓ 150 case PASS (önceki 126 + 24 yeni)
+- `gofmt -l .` clean
+- `golangci-lint run --timeout=5m ./...` 0 issues
+
+**Bilinçli kapsam dışı (PR-8 — Faz 2 son PR):**
+- Folder CRUD
+- Item CRUD (metadata envelope + secret client-provided)
+- Item share + folder_permissions
+- `ResolveItemPermission(ctx, db, userID, itemID)` + `ResolveFolderPermission` (recursive ancestor walk SQL)
+- Item relationships API
+- WebSocket hub `/ws`
+
+**Sıradaki:** PR-8 — Faz 2 son PR. Item CRUD + folder permissions effective resolver.
 
 ### 2026-04-26 (Win) — Faz 2 PR-6: Login + Refresh Rotation + Logout(-all) + Rate Limit + Lockout
 

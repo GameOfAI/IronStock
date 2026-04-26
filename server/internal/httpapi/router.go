@@ -80,7 +80,12 @@ func NewRouter(d Deps) http.Handler {
 			// access-token-protected.
 			ar.Post("/logout", d.Auth.Logout)
 			ar.Post("/logout-all", d.Auth.LogoutAll)
-			// PR-7: change-password, recover/init, recover/complete
+			ar.Post("/change-password", d.Auth.ChangePassword)
+
+			// recovery flow — init is brute-forceable (rate-limit it),
+			// complete is tmp-token gated.
+			ar.With(authBruteRL.Middleware).Post("/recover/init", d.Auth.RecoverInit)
+			ar.Post("/recover/complete", d.Auth.RecoverComplete)
 		})
 	}
 
