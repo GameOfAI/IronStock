@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-04-26 (PR-9 hazır — Faz 2 son halka)
+Son güncelleme: 2026-04-26 (Faz 2 ✅ DONE, Faz 3 başlıyor — 8 PR planlı)
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 
@@ -22,7 +22,104 @@ TodoWrite ile senkronize çalışır — aktif session'daki live task listesi To
 
 ---
 
-## Aktif: Faz 2 — Server MVP
+## Aktif: Faz 3 — Admin Web UI (başlıyor 2026-04-26)
+
+**İş bölümü:** Win 5 PR (server + foundation + auth + realtime/polish), Mac Pro 3 PR (admin + inventory ekranlar). Mac token ekonomisi → self-contained ekran PR'ları Mac'e tahsis.
+
+**Hedef:** 5 günde Faz 3 BİTECEK. Bekleme yok, ardışık zincir.
+
+### Server PR'ları (Win)
+
+#### 🔜 PR-10: WebSocket hub + admin user mgmt — `feat/server-ws-admin`
+
+- [ ] `internal/ws/` paketi: hub + connection registry + access token gate (RequireAccessToken middleware reuse)
+- [ ] `GET /api/v1/ws` — upgrade endpoint, JWT validation, connection lifecycle
+- [ ] Pub/sub broadcast (folder/item events: `created`, `updated`, `deleted`, `shared`)
+- [ ] `internal/httpapi/admin_users.go`: `GET /api/v1/admin/users` (list + pagination, admin role)
+- [ ] `POST /api/v1/admin/users/:id/disable` + `/enable` (status flip)
+- [ ] `POST /api/v1/admin/users/:id/roles` + `DELETE /:role_name` (role grant/revoke)
+- [ ] `RequireRole(RoleAdmin)` middleware compose
+- [ ] Audit constants: `admin.user_disabled`, `admin.user_enabled`, `admin.role_granted`, `admin.role_revoked`
+- [ ] Unit tests + handler validation tests
+
+#### 🔜 PR-11: Read API + OpenAPI sync — `feat/server-readapi`
+
+- [ ] `GET /api/v1/admin/audit-log` — admin role, pagination + filter (action, actor_user_id, date range)
+- [ ] `GET /api/v1/field-definitions` — public read (authed any role) — item edit formu için
+- [ ] `GET /api/v1/item-types` — public read
+- [ ] `GET /api/v1/users/:id/public-key` — paylaşım yapacak kullanıcı için pub_key fetch (X25519 wrap için)
+- [ ] `shared/api/openapi.yaml` — tüm Faz 2-3 endpoint'leri yansıt
+- [ ] `make gen` çalıştır: `web/src/api/schema.gen.ts` üretilsin (Mac kullanacak)
+- [ ] Unit tests
+
+### Web PR'ları (Win başlangıç + Mac ekranlar + Win son)
+
+#### 🔜 PR-W1: Foundation — `feat/web-foundation` (Win)
+
+- [ ] `web/src/api/client.ts` — typed fetch wrapper (schema.gen.ts'ten import)
+- [ ] Token storage (localStorage + memory hybrid, refresh rotation logic)
+- [ ] Refresh interceptor (access expired → refresh → retry orijinal request; reuse_detected → logout)
+- [ ] Error mapping (server `code` → kullanıcı toast / inline form errors)
+- [ ] Layout: sidebar + topbar + main content + toast container
+- [ ] React Router: auth-gate (`/login` accessible, geri kalan token zorunlu)
+- [ ] Theme provider (light/dark CSS vars)
+- [ ] Vite config: proxy `/api` + `/ws` → backend (dev mode)
+- [ ] Unit tests (Vitest): client fetch, token storage, error mapping
+
+#### 🔜 PR-W2: Auth screens — `feat/web-auth` (Win)
+
+- [ ] Login form (`/login`): username + master_password + totp_code (single submit)
+- [ ] TOTP setup wizard (`/totp/setup`): QR code render + secret backup + verify
+- [ ] Recovery init (`/recover`): username + recovery code → tmp_token
+- [ ] Recovery complete: new master pwd + new keypair gen (client-side X25519) + submit
+- [ ] Change password modal (Settings) — current pwd + new pwd + client-side priv re-wrap
+- [ ] Auto-logout on refresh failure
+- [ ] Unit tests (form validation, token flow)
+
+#### 🔜 PR-W3: Admin screens — `feat/web-admin` (**Mac**)
+
+- [ ] User list page (`/admin/users`): table + pagination + role badges
+- [ ] Role assign/revoke buttons (admin / write / read)
+- [ ] Disable/enable toggle
+- [ ] Audit log viewer (`/admin/audit-log`): filter (action, user, date) + pagination + JSON details collapse
+- [ ] Empty state, loading skeleton, error toast
+- [ ] Unit tests (table interaction, filter state)
+
+#### 🔜 PR-W4: Inventory read — `feat/web-inventory-read` (**Mac**)
+
+- [ ] Folder tree component (sol sidebar, recursive expand/collapse)
+- [ ] Item list (orta panel): tablo + folder filter + search box (HMAC blind index)
+- [ ] Item detail panel (sağ): metadata + fields (decrypted display)
+- [ ] Empty/loading states
+- [ ] Permission badges per item (read/write)
+- [ ] Unit tests (tree expand state, list filtering)
+
+#### 🔜 PR-W5: Inventory write — `feat/web-inventory-write` (**Mac**)
+
+- [ ] Folder create modal (parent picker)
+- [ ] Folder rename + delete + drag-drop re-parent (basic)
+- [ ] Item create form (item type seçimi + dynamic field rendering by field_definition list)
+- [ ] Field tipleri: text / password (toggle visibility) / url / textarea / enum (dropdown)
+- [ ] **Client-side encryption:** owner DEK gen + X25519 wrap + field value encrypt (crypto-js veya WebCrypto)
+- [ ] Item edit (PATCH semantik — fields replace-all)
+- [ ] Item delete confirm
+- [ ] Sharing modal: user picker + role select + recipient pub_key fetch + DEK re-wrap
+- [ ] Unit tests (form state, encryption flow)
+
+#### 🔜 PR-W6: Realtime + polish — `feat/web-realtime-polish` (Win)
+
+- [ ] WebSocket client (`/ws` connect with access token)
+- [ ] Event handlers: folder/item create/update/delete/share → state invalidate / refetch
+- [ ] Reconnect logic (exponential backoff)
+- [ ] i18n (Türkçe öncelik, EN fallback, react-i18next)
+- [ ] Dark mode toggle (localStorage persist)
+- [ ] Responsive breakpoints (tablet + mobile sidebar collapse)
+- [ ] A11y pass (keyboard nav, aria-labels, focus management)
+- [ ] **Faz 3 BİTECEK** — kapanış commit'i
+
+---
+
+## Tamamlanan: Faz 2 — Server MVP (2026-04-26)
 
 ### ✅ PR-1: Foundation (config + logging) — MERGED `cb87259`
 

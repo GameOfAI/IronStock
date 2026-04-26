@@ -4,12 +4,11 @@ Son güncelleme: 2026-04-26
 
 ## Mevcut Durum
 
-- **Aktif Faz:** Faz 2 — Server MVP (PR-1...PR-8 ✅ merged; PR-9 hazır → **Faz 2 son halka, merge edilince Faz 3 başlar**)
-- **Tamamlanan Faz:** Faz 0 + Faz 1
-- **Çift makine workflow:** ⏸ **Mac M4 paused 2026-04-26** — Mac (Pro) Faz 3 başlangıcında devreye girecek. PR-9 merge'den sonra Faz 3 PR'ları Mac (Pro) ↔ Win arasında paralel iş bölümüyle planlanacak.
+- **Aktif Faz:** Faz 3 — Admin Web UI (başlıyor — 8 PR planlandı, Mac ↔ Win paralel iş bölümü)
+- **Tamamlanan Faz:** Faz 0 + Faz 1 + **Faz 2 (server MVP) ✅ 2026-04-26**
+- **Çift makine workflow:** ▶ **Mac (Pro) Faz 3 ile yeniden devrede.** Win = Server + Foundation + Auth + Realtime/Polish (5 PR). Mac = Admin + Inventory Read + Inventory Write (3 PR). Mac token ekonomisi gözetilerek **self-contained ekran PR'ları** Mac'e tahsis.
 - **Bloker:** Yok
-- **Mac canlı cluster snapshot (son durum):** Tüm pod'lar 1/1 Running, init container ile 5 migration auto-apply (Faz 1), `/healthz` 200 OK. PR-3 merge sonrası 12 yeni migration için Docker build/push tetiklendi → ArgoCD sync → init container 17 migration toplam uygular (Mac yeniden açıldığında doğrulanmalı).
-- **Bir sonraki adım:** PR-9 review/merge → **Faz 2 BİTECEK** → Faz 3 PR planlaması (Mac ↔ Win paralel)
+- **Bir sonraki adım:** **PR-10** — Server WebSocket hub + admin user mgmt endpoints (Win, başlıyor). Mac 3. günden itibaren PR-W3 ile katılır.
 
 ## Faz Durumu
 
@@ -17,8 +16,8 @@ Son güncelleme: 2026-04-26
 |-----|-------|-----------|-------|-----|
 | 0 — Temel kurulum | VERIFY | 2026-04-24 | 2026-04-24 | Kod yazıldı, lokal smoke test user tarafında |
 | 1 — Veri modeli + kripto tasarımı | DONE | 2026-04-24 | 2026-04-24 | ER (17 tablo) + ADR 0004/0005/0006/0007 + auth-flow + 5 migration + OpenAPI + code gen |
-| 2 — Server MVP | ACTIVE | 2026-04-24 | — | PR-1...PR-8 ✅ merged (foundation, DB+chi, migrations+IT, crypto, register/TOTP, login/refresh/logout, change-pwd/recovery/RBAC iskelet, folder CRUD+ACL). PR-9 (Item CRUD + item_shares + ResolveItemPermission birleşim) review bekliyor — **merge edilince Faz 2 BİTİYOR**. WebSocket Faz 3'e, item_relationships + field/type admin Faz 5'e ertelendi. Mac side ⏸ paused 2026-04-26 (Faz 3 başında devreye girecek). |
-| 3 — Admin Web UI | TODO | — | — | Login + user mgmt + ağaç view |
+| 2 — Server MVP | DONE | 2026-04-24 | 2026-04-26 | PR-1...PR-9 ✅ merged. 10 auth endpoint, folder/item CRUD, RBAC 3 katmanlı, E2E hibrit, 174 unit test, 17 migration. WebSocket → Faz 3, item_relationships + field/type admin → Faz 5 (parking). |
+| 3 — Admin Web UI | ACTIVE | 2026-04-26 | — | 8 PR planlı (5 Win + 3 Mac). Win: PR-10 (server WS+admin), PR-11 (server read API), PR-W1 (web foundation), PR-W2 (web auth), PR-W6 (websocket+polish). Mac (Pro): PR-W3 (admin UI), PR-W4 (inventory read), PR-W5 (inventory write). Hedef: 5 günde Faz 3 BİTECEK. |
 | 4 — Client MVP (Tauri) | TODO | — | — | Win+Mac, live sync, offline cache, E2E |
 | 5 — Production hardening | PARTIAL | 2026-04-25 | — | Container + GHCR + k8s + ArgoCD + DB migration init container + native cross-compile multi-arch + secret rotation tamam. Sealed Secrets, Helm, observability, Ingress+TLS hâlâ TODO |
 
@@ -52,6 +51,60 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-04-26 (Win) — Faz 3 başlıyor: PR planlaması + Mac (Pro) ↔ Win iş bölümü
+
+**Faz 2 BİTTİ** (PR-9 merge `08786e7`). Server tarafı tam fonksiyonel: register/TOTP/login/refresh/logout/change-pwd/recover + folder CRUD + item CRUD + paylaşım + RBAC + audit + brute-force guards. 174 unit test PASS, 17 migration, ~10K LOC.
+
+**Faz 3 — Admin Web UI** başlıyor. Kullanıcı tarayıcıdan envanter işlemlerini yapabilir hale gelecek.
+
+**Karar: Mac (Pro) ↔ Win paralel iş bölümü.**
+
+Mac Pro paketi → daha az token. Self-contained ekran PR'ları Mac'e, mimari + entegrasyon Win'e. Win 5 PR, Mac 3 PR.
+
+**Win (5 PR):**
+
+| # | Branch | Kapsam | LOC | Sıra |
+|---|--------|--------|-----|------|
+| PR-10 | `feat/server-ws-admin` | Server: WebSocket hub `/ws` (access token gate, broadcast pub/sub) + admin user mgmt endpoints (list/disable/role-grant) | ~1000 | 1. |
+| PR-11 | `feat/server-readapi` | Server: audit log query (admin, pagination + filter) + `GET /field-definitions` + `GET /item-types` + `GET /users/:id/public-key` + OpenAPI sync | ~700 | 2. |
+| PR-W1 | `feat/web-foundation` | Web: API client SDK (fetch + token storage + refresh rotation) + layout (sidebar/topbar) + routing (auth-gate) + error mapping + toast | ~1100 | 3. |
+| PR-W2 | `feat/web-auth` | Web: login + TOTP setup + recover screens + change-password modal | ~900 | 4. |
+| PR-W6 | `feat/web-realtime-polish` | Web: WebSocket integration + i18n (Türkçe) + dark mode + responsive + a11y | ~800 | son (Mac PR-W5 sonrası) |
+
+**Mac Pro (3 PR — self-contained ekranlar):**
+
+| # | Branch | Kapsam | LOC | Bağımlılık |
+|---|--------|--------|-----|------------|
+| PR-W3 | `feat/web-admin` | Admin user list + role assign + disable/enable + audit log viewer (filter + pagination) | ~800 | PR-10, PR-11, PR-W2 |
+| PR-W4 | `feat/web-inventory-read` | Folder tree (sol sidebar) + item list (orta panel, search box) + item detail panel (sağ, read-only) | ~1300 | PR-11, PR-W2 |
+| PR-W5 | `feat/web-inventory-write` | Folder create/rename/delete + item create/edit form (field tipleri) + delete + paylaşım modal | ~1200 | PR-W4 |
+
+**Toplam:** 8 PR, ~8000 LOC.
+
+**Hız zinciri (5 günlük hedef):**
+
+```
+Gün 1: Win PR-10 (server WS+admin)
+Gün 2: Win PR-11 (server read API) + PR-W1 (web foundation)
+Gün 3: Win PR-W2 (auth) ║ Mac PR-W3 (admin) — paralel
+Gün 4: Win bekler/Faz 5 prep ║ Mac PR-W4 (inventory read)
+Gün 5: Win PR-W6 (websocket+polish) ║ Mac PR-W5 (inventory write)
+       → FAZ 3 BİTER
+```
+
+**Çakışma koruması:**
+- `server/**` → Win sahibi
+- `web/**` → 3. gün öncesi Win, sonrası Mac (W3-W5 farklı route'lar)
+- `shared/api/openapi.yaml` → Win (PR-11'de sync edilir)
+- `PROGRESS.md` / `TODO.md` → ikisi de günlük entry yazar (tarih + makine etiketi)
+
+**Erteleme (Faz 4-5'e):**
+- Tauri client (Faz 4) — Win+Mac native
+- Production hardening (Faz 5) — Sealed Secrets, Helm, observability, packaging
+- item_relationships endpoint, field/type admin API → Faz 5 parking
+
+**Sıradaki adım (Win):** PR-10'a başlıyorum — server WebSocket hub + admin endpoints.
 
 ### 2026-04-26 (Win) — Faz 2 PR-9: Item CRUD + item_shares + RBAC item resolver — **FAZ 2 SON HALKA**
 
