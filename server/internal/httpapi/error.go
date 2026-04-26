@@ -47,6 +47,15 @@ func writeError(w http.ResponseWriter, logger *slog.Logger, status int, code, us
 	})
 }
 
+// writeInvalidCreds writes the canonical 401 invalid_credentials response.
+// Used by login (any factor failed) and refresh (token unknown / expired).
+// The Turkish user message intentionally does not say which factor failed —
+// don't give the attacker an oracle.
+func writeInvalidCreds(w http.ResponseWriter, logger *slog.Logger, cause error) {
+	writeError(w, logger, http.StatusUnauthorized, ErrCodeInvalidCreds,
+		"Kullanıcı adı, şifre veya TOTP kodu hatalı.", cause)
+}
+
 // decodeJSON reads and decodes the request body into dst. Returns false (and
 // writes a 400 response) on error so the handler can return immediately.
 func decodeJSON(w http.ResponseWriter, r *http.Request, logger *slog.Logger, dst any) bool {

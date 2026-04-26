@@ -1,0 +1,346 @@
+package httpapi
+
+import (
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+
+	"envanter.app/server/internal/audit"
+	"envanter.app/server/internal/auth"
+	"envanter.app/server/internal/crypto"
+)
+
+// loginRequest is the body of POST /api/v1/auth/login.
+//
+// Per docs/auth-flow.md §3, login is single-step: password + TOTP submitted
+// together. The error response is intentionally generic ("invalid credentials")
+// regardless of which factor failed — denies the attacker an oracle.
+type loginRequest struct {
+	Username string `json:"username"`
+	Password string `json:"master_password"`
+	TOTPCode string `json:"totp_code"`
+}
+
+type loginResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	// ExpiresIn is the access-token lifetime in seconds. Refresh-token
+	// lifetime is fixed (auth.RefreshTokenLifetime) and not echoed.
+	ExpiresIn int      `json:"expires_in"`
+	TokenType string   `json:"token_type"` // "Bearer"
+	UserID    string   `json:"user_id"`
+	Roles     []string `json:"roles"`
+}
+
+// Login implements POST /api/v1/auth/login.
+//
+// Steps:
+//  1. Lookup user (by lowercased username), check status + lockout window.
+//  2. Verify password. On failure: increment counter / set locked_until.
+//  3. Decrypt TOTP secret, verify code. On failure: increment counter.
+//  4. Both factors OK: reset counter, set last_login_at, create session row,
+//     issue access + refresh tokens.
+//  5. Audit auth.login on success, auth.login_fail on any failure.
+//
+// Generic error envelope: any password / TOTP / status / lockout failure
+// returns 401 invalid_credentials. The audit log keeps the precise reason.
+func (s *AuthHandlers) Login(w http.ResponseWriter, r *http.Request) {
+	var req loginRequest
+	if !decodeJSON(w, r, s.Logger, &req) {
+		return
+	}
+	if req.Username == "" || req.Password == "" || req.TOTPCode == "" {
+		writeError(w, s.Logger, http.StatusBadRequest, ErrCodeBadRequest,
+			"username, master_password, totp_code zorunlu.",
+			errors.New("missing field"))
+		return
+	}
+
+	ctx := r.Context()
+	userRow, err := fetchUserForLogin(ctx, s.Service.DB, strings.ToLower(req.Username))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			s.recordLoginFail(ctx, r, "", "user_not_found")
+			writeInvalidCreds(w, s.Logger, errors.New("user not found"))
+			return
+		}
+		writeError(w, s.Logger, http.StatusInternalServerError, ErrCodeInternal,
+			"Kullanıcı sorgulanamadı.", err)
+		return
+	}
+
+	// Status / lockout gates BEFORE we burn CPU on Argon2 — this is a tiny
+	// timing channel (attacker learns "user exists, locked") but acceptable
+	// per ADR-0004 §10. The alternative (always Argon2 then bail) costs ~50ms
+	// per locked-account login attempt and helps brute force hardly at all.
+	if userRow.Status == "disabled" {
+		s.recordLoginFail(ctx, r, userRow.ID, "disabled")
+		writeError(w, s.Logger, http.StatusForbidden, ErrCodeAccountLocked,
+			"Hesap devre dışı.", errors.New("disabled"))
+		return
+	}
+	if userRow.Status == "pending_totp" {
+		s.recordLoginFail(ctx, r, userRow.ID, "pending_totp")
+		writeError(w, s.Logger, http.StatusForbidden, ErrCodeAccountPendingMFA,
+			"TOTP kurulumu tamamlanmadı.", errors.New("pending_totp"))
+		return
+	}
+	if auth.IsLocked(userRow.LockedUntil) {
+		s.recordLoginFail(ctx, r, userRow.ID, "locked")
+		writeError(w, s.Logger, http.StatusForbidden, ErrCodeAccountLocked,
+			"Hesap geçici olarak kilitli. Lütfen biraz sonra tekrar deneyin.",
+			errors.New("locked"))
+		return
+	}
+
+	// Verify password.
+	salt, err := extractSaltFromParams(userRow.Argon2Params)
+	if err != nil {
+		writeError(w, s.Logger, http.StatusInternalServerError, ErrCodeInternal,
+			"Şifre parametreleri okunamadı.", err)
+		return
+	}
+	pwOK, err := auth.VerifyPassword(req.Password, userRow.PasswordHash, salt, userRow.Argon2Params)
+	if err != nil {
+		writeError(w, s.Logger, http.StatusInternalServerError, ErrCodeInternal,
+			"Şifre doğrulanamadı.", err)
+		return
+	}
+	if !pwOK {
+		_ = recordLoginFailure(ctx, s.Service.DB, userRow.ID)
+		s.recordLoginFail(ctx, r, userRow.ID, "wrong_password")
+		writeInvalidCreds(w, s.Logger, errors.New("wrong password"))
+		return
+	}
+
+	// Verify TOTP. Decrypt secret with master cipher.
+	totpEnc, err := fetchTOTPSecret(ctx, s.Service.DB, userRow.ID)
+	if err != nil {
+		// Status 'active' with no totp row should be unreachable, but
+		// guard anyway.
+		writeError(w, s.Logger, http.StatusInternalServerError, ErrCodeInternal,
+			"TOTP secret bulunamadı.", err)
+		return
+	}
+	aad := crypto.MakeAAD("totp_secrets", userRow.ID, "secret_enc")
+	totpSecret, err := s.Service.Master.Open(totpEnc, aad)
+	if err != nil {
+		writeError(w, s.Logger, http.StatusInternalServerError, ErrCodeInternal,
+			"TOTP secret çözülemedi.", err)
+		return
+	}
+	if err := auth.VerifyTOTP(totpSecret, req.TOTPCode); err != nil {
+		_ = recordLoginFailure(ctx, s.Service.DB, userRow.ID)
+		s.recordLoginFail(ctx, r, userRow.ID, "wrong_totp")
+		writeInvalidCreds(w, s.Logger, err)
+		return
+	}
+
+	// All factors OK: create session in a tx so the failed-login counter
+	// reset and session insert are atomic.
+	refresh, err := auth.GenerateRefresh()
+	if err != nil {
+		writeError(w, s.Logger, http.StatusInternalServerError, ErrCodeInternal,
+			"Refresh token üretilemedi.", err)
+		return
+	}
+
+	tx, err := s.Service.DB.Begin(ctx)
+	if err != nil {
+		writeError(w, s.Logger, http.StatusInternalServerError, ErrCodeInternal,
+			"Veritabanı hatası.", err)
+		return
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	if err := recordLoginSuccess(ctx, tx, userRow.ID); err != nil {
+		writeError(w, s.Logger, http.StatusInternalServerError, ErrCodeInternal,
+			"Login durumu güncellenemedi.", err)
+		return
+	}
+
+	sessionID, err := auth.CreateSession(ctx, tx,
+		userRow.ID, refresh.Hash,
+		r.UserAgent(), parseIP(r.RemoteAddr),
+		refresh.ExpiresAt,
+	)
+	if err != nil {
+		writeError(w, s.Logger, http.StatusInternalServerError, ErrCodeInternal,
+			"Oturum oluşturulamadı.", err)
+		return
+	}
+
+	roles, err := fetchUserRoles(ctx, tx, userRow.ID)
+	if err != nil {
+		writeError(w, s.Logger, http.StatusInternalServerError, ErrCodeInternal,
+			"Roller okunamadı.", err)
+		return
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		writeError(w, s.Logger, http.StatusInternalServerError, ErrCodeInternal,
+			"İşlem tamamlanamadı.", err)
+		return
+	}
+
+	accessToken, err := s.Service.JWT.IssueAccess(userRow.ID, sessionID, roles)
+	if err != nil {
+		writeError(w, s.Logger, http.StatusInternalServerError, ErrCodeInternal,
+			"Access token üretilemedi.", err)
+		return
+	}
+
+	_ = s.Audit.Write(ctx, audit.Entry{
+		ActorUserID:  userRow.ID,
+		Action:       audit.ActionAuthLogin,
+		ResourceType: audit.ResourceSession,
+		ResourceID:   sessionID,
+		IPAddress:    parseIP(r.RemoteAddr),
+		UserAgent:    r.UserAgent(),
+	})
+
+	writeJSON(w, http.StatusOK, loginResponse{
+		AccessToken:  accessToken,
+		RefreshToken: refresh.Token,
+		ExpiresIn:    int(auth.AccessTokenLifetime.Seconds()),
+		TokenType:    "Bearer",
+		UserID:       userRow.ID,
+		Roles:        roles,
+	})
+}
+
+// userLoginRow holds the columns we need to authenticate.
+type userLoginRow struct {
+	ID             string
+	PasswordHash   []byte
+	Argon2Params   []byte
+	Status         string
+	FailedAttempts int
+	LockedUntil    *time.Time
+}
+
+// fetchUserForLogin returns the row needed to verify the password and check
+// lockout state. Returns pgx.ErrNoRows if the username doesn't exist.
+func fetchUserForLogin(ctx context.Context, db auth.DBExec, usernameLower string) (userLoginRow, error) {
+	const sqlText = `
+		SELECT id::text, password_hash, argon2_params,
+		       status, failed_login_attempts, locked_until
+		FROM users
+		WHERE username = $1
+		LIMIT 1
+	`
+	var row userLoginRow
+	err := db.QueryRow(ctx, sqlText, usernameLower).Scan(
+		&row.ID, &row.PasswordHash, &row.Argon2Params,
+		&row.Status, &row.FailedAttempts, &row.LockedUntil,
+	)
+	return row, err
+}
+
+// fetchTOTPSecret returns the encrypted TOTP secret blob for a user.
+func fetchTOTPSecret(ctx context.Context, db auth.DBExec, userID string) ([]byte, error) {
+	const sqlText = `
+		SELECT secret_enc
+		FROM totp_secrets
+		WHERE user_id = $1::uuid AND verified = true
+		LIMIT 1
+	`
+	var enc []byte
+	err := db.QueryRow(ctx, sqlText, userID).Scan(&enc)
+	return enc, err
+}
+
+// fetchUserRoles returns the role names for a user. Empty slice = no roles.
+//
+// Uses array_agg + COALESCE so we get exactly one row back (empty array
+// when the user has no roles), letting us reuse QueryRow rather than
+// growing the auth.DBExec interface with a Query method.
+func fetchUserRoles(ctx context.Context, db auth.DBExec, userID string) ([]string, error) {
+	const sqlText = `
+		SELECT COALESCE(array_agg(r.name ORDER BY r.id), '{}')
+		FROM user_roles ur
+		JOIN roles r ON r.id = ur.role_id
+		WHERE ur.user_id = $1::uuid
+	`
+	var names []string
+	err := db.QueryRow(ctx, sqlText, userID).Scan(&names)
+	if err != nil {
+		return nil, err
+	}
+	return names, nil
+}
+
+// recordLoginFailure increments the counter and locks the account if the
+// threshold is hit. Runs in its own implicit-tx (no caller-supplied tx)
+// because it must persist even when login fails (we deliberately don't
+// roll it back).
+func recordLoginFailure(ctx context.Context, db auth.DBExec, userID string) error {
+	// Single SQL: increment, and if the new value would be >= max, set
+	// locked_until and reset the counter. Postgres CASE keeps it atomic.
+	const sqlText = `
+		UPDATE users
+		SET failed_login_attempts = CASE
+		        WHEN failed_login_attempts + 1 >= $2 THEN 0
+		        ELSE failed_login_attempts + 1
+		    END,
+		    locked_until = CASE
+		        WHEN failed_login_attempts + 1 >= $2 THEN now() + ($3 * interval '1 second')
+		        ELSE locked_until
+		    END
+		WHERE id = $1::uuid
+	`
+	_, err := db.Exec(ctx, sqlText, userID,
+		auth.MaxFailedLoginAttempts,
+		int(auth.LockoutDuration.Seconds()),
+	)
+	return err
+}
+
+// recordLoginSuccess clears failure state on a successful authentication.
+func recordLoginSuccess(ctx context.Context, db auth.DBExec, userID string) error {
+	const sqlText = `
+		UPDATE users
+		SET failed_login_attempts = 0,
+		    locked_until = NULL,
+		    last_login_at = now()
+		WHERE id = $1::uuid
+	`
+	_, err := db.Exec(ctx, sqlText, userID)
+	return err
+}
+
+// extractSaltFromParams pulls the base64 salt out of argon2_params jsonb.
+// Layout written by /register: {... , "salt_b64": "..."}.
+func extractSaltFromParams(paramsJSON []byte) ([]byte, error) {
+	var bag struct {
+		SaltB64 string `json:"salt_b64"`
+	}
+	if err := json.Unmarshal(paramsJSON, &bag); err != nil {
+		return nil, err
+	}
+	if bag.SaltB64 == "" {
+		return nil, errors.New("salt_b64 missing in argon2_params")
+	}
+	return base64.StdEncoding.DecodeString(bag.SaltB64)
+}
+
+// recordLoginFail emits an audit_log row for a failed attempt. ActorUserID is
+// empty when the username didn't exist (we don't want to leak existence into
+// the audit detail field beyond the action).
+func (s *AuthHandlers) recordLoginFail(ctx context.Context, r *http.Request, userID, reason string) {
+	_ = s.Audit.Write(ctx, audit.Entry{
+		ActorUserID:  userID,
+		Action:       audit.ActionAuthLoginFail,
+		ResourceType: audit.ResourceUser,
+		ResourceID:   userID,
+		Details:      map[string]any{"reason": reason},
+		IPAddress:    parseIP(r.RemoteAddr),
+		UserAgent:    r.UserAgent(),
+	})
+}

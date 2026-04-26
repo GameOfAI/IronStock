@@ -4,12 +4,12 @@ Son güncelleme: 2026-04-26
 
 ## Mevcut Durum
 
-- **Aktif Faz:** Faz 2 — Server MVP (PR-1, PR-2, PR-3 ✅ merged; PR-4 + PR-5 hazır, review/merge bekliyor)
+- **Aktif Faz:** Faz 2 — Server MVP (PR-1, PR-2, PR-3, PR-4, PR-5 ✅ merged; PR-6 hazır, review/merge bekliyor)
 - **Tamamlanan Faz:** Faz 0 + Faz 1
 - **Çift makine workflow:** ⏸ **Mac M4 paused 2026-04-26** — kullanıcı tüm geliştirmeyi şimdilik Win'den yürütüyor. Mac yeniden devreye alınırsa kullanıcı bilgi verecek; o noktada deploy/k8s işleri Mac'te devam eder (ADR-0008).
 - **Bloker:** Yok
 - **Mac canlı cluster snapshot (son durum):** Tüm pod'lar 1/1 Running, init container ile 5 migration auto-apply (Faz 1), `/healthz` 200 OK. PR-3 merge sonrası 12 yeni migration için Docker build/push tetiklendi → ArgoCD sync → init container 17 migration toplam uygular (Mac yeniden açıldığında doğrulanmalı).
-- **Bir sonraki adım:** PR-4 + PR-5 review/merge → PR-6 (login + refresh rotation + logout + change-password + recovery + RBAC middleware iskeleti)
+- **Bir sonraki adım:** PR-6 review/merge → PR-7 (change-password + recovery flow + RBAC middleware iskeleti)
 
 ## Faz Durumu
 
@@ -17,7 +17,7 @@ Son güncelleme: 2026-04-26
 |-----|-------|-----------|-------|-----|
 | 0 — Temel kurulum | VERIFY | 2026-04-24 | 2026-04-24 | Kod yazıldı, lokal smoke test user tarafında |
 | 1 — Veri modeli + kripto tasarımı | DONE | 2026-04-24 | 2026-04-24 | ER (17 tablo) + ADR 0004/0005/0006/0007 + auth-flow + 5 migration + OpenAPI + code gen |
-| 2 — Server MVP | ACTIVE | 2026-04-24 | — | PR-1 (foundation), PR-2 (DB+chi), PR-3 (12 migration + integration test) ✅ merged. PR-4 (crypto) ve PR-5 (master key bootstrap + auth primitives + register/TOTP) review bekliyor. PR-6 sırada (login/refresh/logout/change-pwd/recovery + RBAC middleware). Mac side ⏸ paused 2026-04-26. |
+| 2 — Server MVP | ACTIVE | 2026-04-24 | — | PR-1 (foundation), PR-2 (DB+chi), PR-3 (12 migration + integration test), PR-4 (crypto), PR-5 (master key + auth primitives + register/TOTP) ✅ merged. PR-6 (login/refresh/logout(-all) + rate limit + lockout + access-token middleware) review bekliyor. PR-7 sırada (change-password + recovery + RBAC middleware iskeleti). Mac side ⏸ paused 2026-04-26. |
 | 3 — Admin Web UI | TODO | — | — | Login + user mgmt + ağaç view |
 | 4 — Client MVP (Tauri) | TODO | — | — | Win+Mac, live sync, offline cache, E2E |
 | 5 — Production hardening | PARTIAL | 2026-04-25 | — | Container + GHCR + k8s + ArgoCD + DB migration init container + native cross-compile multi-arch + secret rotation tamam. Sealed Secrets, Helm, observability, Ingress+TLS hâlâ TODO |
@@ -52,6 +52,84 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-04-26 (Win) — Faz 2 PR-6: Login + Refresh Rotation + Logout(-all) + Rate Limit + Lockout
+
+**Branch:** `feat/server-auth-session` — review/merge bekliyor.
+
+**Plan B genişletmesi:** PR-5 sonrası kalan auth çalışmasını **2'ye böldük** — PR-6 (session lifecycle) + PR-7 (change-password + recovery + RBAC). PR-6 single review unit olarak ~1100 LOC; PR-7'ye kadar geçen sürede session akışları test edilebilir hale geldi.
+
+**Karar: tek-adım login.** `docs/auth-flow.md §3` `{username, password, totp_code}`'u tek body'de istiyor. MFA-bridge token (`mfa-required` purpose) eklemeyi düşünmüştüm, vazgeçtim — auth-flow.md'ye uyalım, fail mesajı zaten generic (oracle yok), 1 round-trip yeterli.
+
+**Yeni endpoint'ler (`internal/httpapi/auth_*.go`):**
+
+`POST /api/v1/auth/login`
+- Body: `{username, master_password, totp_code}`. Generic 401 invalid_credentials her başarısız faktörde.
+- Lookup user (lowercased username). Status check ('disabled' → 403, 'pending_totp' → 403 account_pending_totp, locked → 403 account_locked).
+- Password verify (Argon2id, salt jsonb içinden `salt_b64`'ten). Fail → `recordLoginFailure` (counter++, 10'da lock 30dk).
+- TOTP verify (envelope decrypt). Fail → counter++.
+- Tüm faktörler OK: tx içinde `recordLoginSuccess` (counter=0, last_login_at=now) + `auth.CreateSession` + `fetchUserRoles` (array_agg) + commit. Access JWT (15dk, sessionID + roles) + opaque refresh (32B hex, 7g).
+- Audit `auth.login` / `auth.login_fail` (reason: user_not_found / pending_totp / disabled / locked / wrong_password / wrong_totp).
+
+`POST /api/v1/auth/refresh`
+- Body: `{refresh_token}`. SHA-256 hash → sessions lookup.
+- **Reuse detection:** Eğer matching row revoked_at IS NOT NULL ise → `RevokeAllUserSessions(reason='reuse_detected')` + `auth.refresh_reuse_detected` audit + 401.
+- Expired check: row.ExpiresAt < now → 401 (cleanup cron 'expired' reason'la sweepleyecek).
+- Happy path: tx içinde `RevokeSession(old_id, 'rotation')` + yeni session + audit `auth.refresh` (rotated_from kayıtlı). Yeni access + refresh dönülür.
+
+`POST /api/v1/auth/logout` (Bearer access)
+- `RevokeSession(claims.ID, 'logout')`. Idempotent (where revoked_at IS NULL). Audit `auth.logout`. 204 No Content.
+
+`POST /api/v1/auth/logout-all` (Bearer access)
+- `RevokeAllUserSessions(claims.Subject, 'logout_all')`. Audit `auth.logout_all`. 204 No Content.
+
+**Yeni `internal/auth/`:**
+
+| Dosya | İçerik |
+|-------|--------|
+| `lockout.go` | `MaxFailedLoginAttempts=10`, `LockoutDuration=30m`, `IsLocked(*time.Time)` (nil/zero/past = false; future = true, nowFn-pinnable) |
+| `session.go` | `RevokeReason*` 7 sabit (CHECK constraint mirror), `SessionRow{ID,UserID,ExpiresAt,RevokedAt,RevokeReason}.IsActive(now)`, `DBExec` interface (Pool + Tx satisfies), `CreateSession`, `LookupSessionByRefreshHash`, `RevokeSession`, `RevokeAllUserSessions`, `TouchSession` |
+
+**Yeni `internal/httpapi/`:**
+
+| Dosya | İçerik |
+|-------|--------|
+| `auth_login.go` | `Login` handler + `userLoginRow` + `fetchUserForLogin/TOTPSecret/UserRoles` + `recordLoginFailure/Success` (CASE-based atomic counter+lock) + `extractSaltFromParams` |
+| `auth_refresh.go` | `Refresh` handler + reuse detection + rotation tx |
+| `auth_logout.go` | `Logout` + `LogoutAll` + `requireAccessToken` inline helper |
+| `middleware_authn.go` | `RequireAccessToken(signer)` chi middleware → claims context'e koyar; `ClaimsFromContext` accessor; `CtxKeyClaims AuthContextKey` |
+| `middleware_ratelimit.go` | `IPRateLimiter` (token bucket per-IP, sweep idle buckets); `Middleware` 429 + Retry-After header; `clientIP` (strip port post-RealIP) |
+
+**`error.go`:** `writeInvalidCreds(w, logger, cause)` — kanonik 401 response (Türkçe generic msg).
+
+**Router wire:**
+- `/auth/login`, `/auth/refresh`, `/auth/totp/verify`: brute-force RL (5 burst, sustained 1/12s = ~5/min) — auth-flow.md §"Rate limit"'in (5/15dk) tighter sliding-window approximation.
+- `/auth/logout`, `/auth/logout-all`: handler içinde `requireAccessToken` inline (audit log için missing-token vakası). Middleware versiyon ileride item endpoint'lerinde kullanılacak.
+
+**Yeni dependency:**
+- `golang.org/x/time v0.3.0` indirect → direct (rate.Limiter için)
+
+**Tests (~40 yeni case, toplam 126 PASS):**
+- `auth/lockout_test.go`: nil/zero/past/future + nowFn pin + policy constants
+- `auth/session_test.go`: `IsActive` 3 case + `validRevokeReason` whitelist + nullables
+- `httpapi/middleware_authn_test.go`: NoAuth / BearerPrefixMissing / BadToken / WrongPurpose (tmp token reddedildi) / HappyPath (claims ctx'te) / EmptyCtx
+- `httpapi/middleware_ratelimit_test.go`: BurstAllowed / OverBurst429 / PerIPSeparation / RetryAfterHeader / clientIP 3 case
+- `httpapi/auth_login_test.go`: `extractSaltFromParams` 4 case + `ptrStringOrEmpty`
+
+**Lokal validation (Win, Go 1.26.2 + golangci-lint v1.62.2):**
+- `go build ./...` ✓
+- `go test ./...` ✓ 126 case PASS (önceki 86 + ~40 yeni)
+- `gofmt -l .` clean
+- `golangci-lint run --timeout=5m ./...` 0 issues
+
+**Bilinçli kapsam dışı (PR-7+):**
+- `/auth/change-password` (password verify + new keypair + revoke all sessions)
+- `/auth/recover/{init,complete}` (recovery code → tmp_token → new keypair, eski wrap'lı item_shares kaybedilir)
+- RBAC middleware (`requireRole`, `requirePermission(folder|item)`)
+- Session binding flag (UA/IP değişimi audit)
+- WebSocket `/ws` access token gate
+
+**Sıradaki:** PR-7 — change-password + recovery flow + RBAC middleware iskeleti.
 
 ### 2026-04-26 (Win) — Faz 2 PR-5: Auth Primitives + Register + TOTP Enroll/Verify
 
