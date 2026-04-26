@@ -42,6 +42,14 @@ const (
 	ActionFolderDeleted          = "folder.deleted"
 	ActionFolderPermissionGrant  = "folder.permission_granted"
 	ActionFolderPermissionRevoke = "folder.permission_revoked"
+
+	// Item lifecycle (PR-9).
+	ActionItemCreated      = "item.created"
+	ActionItemUpdated      = "item.updated"
+	ActionItemDeleted      = "item.deleted"
+	ActionItemFieldUpdated = "item.field_updated"
+	ActionItemShared       = "item.shared"
+	ActionItemUnshared     = "item.unshared"
 )
 
 // ResourceFolder is the audit resource type for folder rows.
