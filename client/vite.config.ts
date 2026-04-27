@@ -5,7 +5,7 @@ import path from 'node:path';
 
 // Tauri 2 ile uyumlu Vite config.
 // Tailwind CSS-first plugin buraya dahil; vitest.config.ts ayrı tutuldu (lightningcss linux binary sorunu).
-export default defineConfig(async () => ({
+export default defineConfig({
   plugins: [react(), tailwindcss()],
 
   resolve: {
@@ -32,4 +32,4 @@ export default defineConfig(async () => ({
     minify: !process.env.TAURI_ENV_DEBUG ? 'esbuild' : false,
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
   },
-}));
+});
