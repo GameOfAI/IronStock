@@ -59,14 +59,15 @@ describe('WsProvider', () => {
   });
 
   it('updates status when client emits', async () => {
-    const { _mockClient } = await import('@/api/ws');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mod = (await import('@/api/ws')) as any;
     render(
       <WsProvider>
         <StatusDisplay />
       </WsProvider>,
     );
     act(() => {
-      (_mockClient as { _emit: (s: string) => void })._emit('connected');
+      mod._mockClient._emit('connected');
     });
     expect(screen.getByTestId('status').textContent).toBe('connected');
   });
