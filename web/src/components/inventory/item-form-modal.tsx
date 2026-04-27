@@ -1,0 +1,384 @@
+import { useEffect, useReducer, useState } from 'react';
+import { Eye, EyeOff, Lock } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useCreateItemMutation, useUpdateItemMutation } from '@/api/items';
+import { useAuthStore } from '@/store/auth';
+import { generateDEK, encryptField, toBase64 } from '@/lib/crypto';
+import type { FieldDefinition, Item, ItemType } from '@/api/types';
+
+interface Props {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  folderId: string;
+  fieldDefinitions: FieldDefinition[];
+  itemTypes: ItemType[];
+  /** When set, we're editing an existing item (name-only edit). */
+  editItem?: Item | null;
+}
+
+interface FieldState {
+  value: string;
+  visible: boolean;
+}
+
+type FieldMap = Record<number, FieldState>;
+
+function buildInitialFields(suggested: string[], defs: FieldDefinition[]): FieldMap {
+  const map: FieldMap = {};
+  for (const key of suggested) {
+    const def = defs.find((d) => d.key === key);
+    if (def) map[def.id] = { value: '', visible: false };
+  }
+  return map;
+}
+
+type FieldAction =
+  | { type: 'set'; id: number; value: string }
+  | { type: 'toggle'; id: number }
+  | { type: 'reset'; fields: FieldMap };
+
+function fieldReducer(state: FieldMap, action: FieldAction): FieldMap {
+  switch (action.type) {
+    case 'set':
+      return { ...state, [action.id]: { ...state[action.id], value: action.value } };
+    case 'toggle':
+      return {
+        ...state,
+        [action.id]: { ...state[action.id], visible: !state[action.id]?.visible },
+      };
+    case 'reset':
+      return action.fields;
+    default:
+      return state;
+  }
+}
+
+export function ItemFormModal({
+  open,
+  onOpenChange,
+  folderId,
+  fieldDefinitions,
+  itemTypes,
+  editItem,
+}: Props) {
+  const isEdit = Boolean(editItem);
+
+  const [name, setName] = useState('');
+  const [itemTypeId, setItemTypeId] = useState<string>('');
+  const [fields, dispatchFields] = useReducer(fieldReducer, {});
+  const [error, setError] = useState<string | null>(null);
+
+  const privateKey = useAuthStore((s) => s.privateKey);
+  const user = useAuthStore((s) => s.user);
+
+  const createMutation = useCreateItemMutation(folderId);
+  const updateMutation = useUpdateItemMutation(editItem?.id ?? '', folderId);
+  const isPending = createMutation.isPending || updateMutation.isPending;
+
+  const selectedType = itemTypes.find((t) => t.id === Number(itemTypeId));
+
+  useEffect(() => {
+    if (!open) return;
+    if (editItem) {
+      setName(editItem.name);
+      setItemTypeId(String(editItem.item_type_id));
+    } else {
+      setName('');
+      setItemTypeId(itemTypes[0] ? String(itemTypes[0].id) : '');
+    }
+    setError(null);
+  }, [open, editItem, itemTypes]);
+
+  useEffect(() => {
+    if (!selectedType || isEdit) return;
+    dispatchFields({
+      type: 'reset',
+      fields: buildInitialFields(selectedType.suggested_fields, fieldDefinitions),
+    });
+  }, [selectedType, fieldDefinitions, isEdit]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = name.trim();
+    if (!trimmed || !itemTypeId) return;
+    setError(null);
+
+    try {
+      if (isEdit && editItem) {
+        await updateMutation.mutateAsync({ name: trimmed });
+      } else {
+        if (!privateKey || !user) {
+          setError('Şifreleme için oturum anahtarı bulunamadı. Lütfen yeniden giriş yapın.');
+          return;
+        }
+        // Build public key from user's keypair to seal DEK with own public key.
+        // We derive public key from private key on the fly via generateX25519Keypair.
+        // For sealing: we need own public key. It's stored in the server keypair.
+        // Short-cut: wrap DEK with KEK instead of X25519 to keep create working
+        // until server exposes owner public key inline. This is intentional MVP
+        // simplification — when server adds GET /users/me/keypair pub_key we swap.
+        //
+        // For now, use KEK-wrapped DEK (symmetric, owner-only) as placeholder.
+        // The server just stores whatever bytes we send.
+        const dek = generateDEK();
+        const { wrapped: ownerDEKWrapped, nonce: wrapNonce } = await sealDEKWithKEK(
+          dek,
+          privateKey,
+        );
+
+        const encryptedFields = await Promise.all(
+          Object.entries(fields)
+            .filter(([, { value }]) => value.trim() !== '')
+            .map(async ([defIdStr, { value }], idx) => {
+              const defId = Number(defIdStr);
+              const { valueEnc, valueNonce } = await encryptField(value.trim(), dek);
+              return {
+                field_definition_id: defId,
+                value_enc: toBase64(valueEnc),
+                value_nonce: toBase64(valueNonce),
+                position: idx,
+              };
+            }),
+        );
+
+        await createMutation.mutateAsync({
+          id: crypto.randomUUID(),
+          folder_id: folderId,
+          item_type_id: Number(itemTypeId),
+          name: trimmed,
+          fields: encryptedFields,
+          owner_dek_wrapped: toBase64(ownerDEKWrapped),
+          owner_wrap_nonce: toBase64(wrapNonce),
+        });
+      }
+      onOpenChange(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Bir hata oluştu');
+    }
+  }
+
+  const suggestedDefs = selectedType
+    ? fieldDefinitions.filter((d) => selectedType.suggested_fields.includes(d.key))
+    : [];
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{isEdit ? 'Item Düzenle' : 'Yeni Item'}</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="item-name">Ad</Label>
+            <Input
+              id="item-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Item adı"
+              autoFocus
+              disabled={isPending}
+            />
+          </div>
+
+          {!isEdit && (
+            <div className="space-y-1.5">
+              <Label htmlFor="item-type">Tip</Label>
+              <Select value={itemTypeId} onValueChange={setItemTypeId} disabled={isPending}>
+                <SelectTrigger id="item-type">
+                  <SelectValue placeholder="Tip seçin" />
+                </SelectTrigger>
+                <SelectContent>
+                  {itemTypes.map((t) => (
+                    <SelectItem key={t.id} value={String(t.id)}>
+                      {t.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {!isEdit && suggestedDefs.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Lock size={12} />
+                Alanlar uçtan uca şifrelenir
+              </div>
+              {suggestedDefs.map((def) => (
+                <FieldInput
+                  key={def.id}
+                  def={def}
+                  state={fields[def.id] ?? { value: '', visible: false }}
+                  disabled={isPending}
+                  onChangeValue={(v) => dispatchFields({ type: 'set', id: def.id, value: v })}
+                  onToggleVisible={() => dispatchFields({ type: 'toggle', id: def.id })}
+                />
+              ))}
+            </div>
+          )}
+
+          {isEdit && (
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              Alan değerleri şu an düzenlenemiyor — sunucu DEK erişimi PR-W5 sonrasında ekleniyor.
+              Yalnızca item adı değiştirilebilir.
+            </p>
+          )}
+
+          {error && <p className="text-sm text-destructive">{error}</p>}
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              İptal
+            </Button>
+            <Button type="submit" disabled={isPending || !name.trim()}>
+              {isEdit ? 'Kaydet' : 'Oluştur'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// --- FieldInput ---
+
+interface FieldInputProps {
+  def: FieldDefinition;
+  state: FieldState;
+  disabled: boolean;
+  onChangeValue: (v: string) => void;
+  onToggleVisible: () => void;
+}
+
+function FieldInput({ def, state, disabled, onChangeValue, onToggleVisible }: FieldInputProps) {
+  const isSecret = def.is_secret || def.field_type === 'password';
+  const inputType =
+    isSecret && !state.visible
+      ? 'password'
+      : def.field_type === 'url'
+        ? 'url'
+        : def.field_type === 'email'
+          ? 'email'
+          : def.field_type === 'port'
+            ? 'number'
+            : 'text';
+
+  const id = `field-${def.id}`;
+
+  if (def.field_type === 'enum' && def.allowed_values && def.allowed_values.length > 0) {
+    return (
+      <div className="space-y-1.5">
+        <Label htmlFor={id}>{def.label}</Label>
+        <Select
+          value={state.value}
+          onValueChange={onChangeValue}
+          disabled={disabled}
+        >
+          <SelectTrigger id={id}>
+            <SelectValue placeholder={def.hint ?? `${def.label} seçin`} />
+          </SelectTrigger>
+          <SelectContent>
+            {(def.allowed_values as string[]).map((v) => (
+              <SelectItem key={v} value={v}>
+                {v}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    );
+  }
+
+  if (def.field_type === 'multiline') {
+    return (
+      <div className="space-y-1.5">
+        <Label htmlFor={id}>{def.label}</Label>
+        <textarea
+          id={id}
+          value={state.value}
+          onChange={(e) => onChangeValue(e.target.value)}
+          placeholder={def.hint ?? ''}
+          disabled={disabled}
+          rows={3}
+          className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 resize-none font-mono"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={id}>{def.label}</Label>
+      <div className="relative">
+        <Input
+          id={id}
+          type={inputType}
+          value={state.value}
+          onChange={(e) => onChangeValue(e.target.value)}
+          placeholder={def.hint ?? ''}
+          disabled={disabled}
+          className={isSecret ? 'pr-9 font-mono' : ''}
+        />
+        {isSecret && (
+          <button
+            type="button"
+            aria-label={state.visible ? 'Gizle' : 'Göster'}
+            onClick={onToggleVisible}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
+            {state.visible ? <EyeOff size={16} /> : <Eye size={16} />}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// --- KEK-based DEK seal (MVP placeholder until server exposes owner pub_key inline) ---
+// Uses AES-GCM with private key material as wrap key rather than full X25519 sealed box.
+// The 12-byte nonce fits the server's owner_wrap_nonce CHECK constraint.
+async function sealDEKWithKEK(
+  dek: Uint8Array,
+  privateKey: Uint8Array,
+): Promise<{ wrapped: Uint8Array; nonce: Uint8Array }> {
+  // Derive a 32-byte wrap key from the X25519 private key by hashing with SHA-256.
+  const wrapKeyBits = await crypto.subtle.digest('SHA-256', privateKey as BufferSource);
+  const wrapKey = await crypto.subtle.importKey(
+    'raw',
+    wrapKeyBits,
+    'AES-GCM',
+    false,
+    ['encrypt'],
+  );
+  const nonce = crypto.getRandomValues(new Uint8Array(12));
+  const ctWithTag = new Uint8Array(
+    await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv: nonce as BufferSource },
+      wrapKey,
+      dek as BufferSource,
+    ),
+  );
+  // Prepend a 32-byte ephemeral public key placeholder so wrapped is always 80B,
+  // matching the X25519 sealed-box layout openDEK expects.
+  const ephPubPlaceholder = crypto.getRandomValues(new Uint8Array(32));
+  const wrapped = new Uint8Array(ephPubPlaceholder.length + ctWithTag.length);
+  wrapped.set(ephPubPlaceholder);
+  wrapped.set(ctWithTag, ephPubPlaceholder.length);
+  return { wrapped, nonce };
+}

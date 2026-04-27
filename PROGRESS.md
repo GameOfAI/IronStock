@@ -4,11 +4,11 @@ Son güncelleme: 2026-04-27
 
 ## Mevcut Durum
 
-- **Aktif Faz:** Faz 3 — Admin Web UI (PR-10/11/12/W1/W2/W3 ✅; PR-W4 review/merge bekliyor)
+- **Aktif Faz:** Faz 3 — Admin Web UI (PR-10/11/12/W1/W2/W3/W4 ✅ merged; PR-W5 push edildi, CI bekliyor)
 - **Tamamlanan Faz:** Faz 0 + Faz 1 + Faz 2 (server MVP) ✅ 2026-04-26
-- **Çift makine workflow:** ▶ Win backend + foundation + auth ✅. Mac PR-W3 (admin) merged, PR-W4 (inventory read) push edildi.
-- **Bloker:** PR-W5 decryption için server itemResponse'a `owner_dek_wrapped + wrap_nonce` eklenmeli (Win sahası — PR-W4 sonrası iletilecek).
-- **Bir sonraki adım:** PR-W4 merge → Mac PR-W5 (inventory write + decrypt) başlar.
+- **Çift makine workflow:** ▶ Win backend + foundation + auth ✅. Mac PR-W3/W4 merged ✅, PR-W5 (inventory write) branch push edildi.
+- **Bloker (kısmi):** Alan decrypt + item sharing için server itemResponse'a `owner_dek_wrapped + wrap_nonce` eklenmeli. Amber UI uyarısı eklendi, Win'e iletildi.
+- **Bir sonraki adım:** PR-W5 CI green → merge → Win PR-W6 (websocket+polish) → Faz 3 DONE.
 
 ## Faz Durumu
 
@@ -51,6 +51,68 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-04-27 (Mac) — Faz 3 PR-W5: Inventory write — folder/item CRUD + E2E encryption + share UI
+
+**Branch:** `feat/web-inventory-write` — push edildi, CI bekliyor.
+
+**Mac'in son Faz 3 PR'ı.** Folder/item oluştur/sil/yeniden adlandır; E2E alan şifreleme (client-side DEK gen + AES-GCM); paylaşım UI (amber banner — server DEK expose gerekiyor).
+
+**Crypto primitives (`lib/crypto.ts` eklenti):**
+
+| Fonksiyon | Açıklama |
+|-----------|----------|
+| `generateDEK()` | 32B rastgele AES-256 DEK |
+| `sealDEK(dek, recipientPubKey)` | X25519 sealed-box: ephemeral keypair + ECDH + AES-GCM → 80B wrapped + 12B nonce |
+| `openDEK(wrapped, nonce, privateKey)` | sealDEK tersi, privateKey PKCS#8'e dönüştürülüp WebCrypto'ya geçirilir |
+| `encryptField(value, dek)` | AES-256-GCM field encrypt → value_enc (ciphertext+tag) + value_nonce (12B) |
+| `decryptField(valueEnc, valueNonce, dek)` | AES-256-GCM field decrypt → string |
+
+**Yeni API mutations:**
+
+| Dosya | Hook | Endpoint |
+|-------|------|----------|
+| `folders.ts` | `useCreateFolderMutation`, `useUpdateFolderMutation(id)`, `useDeleteFolderMutation` | `POST/PUT/DELETE /api/v1/folders` |
+| `items.ts` | `useCreateItemMutation(folderId)`, `useUpdateItemMutation(id, folderId)`, `useDeleteItemMutation(folderId)`, `useShareItemMutation(itemId)`, `useUnshareItemMutation(itemId)` | `POST/PUT/DELETE /api/v1/items`, `/items/:id/shares` |
+| `catalog.ts` | `useUserPublicKey(userId)` | `GET /api/v1/users/:id/public-key` |
+
+**Yeni componentler (`components/inventory/`):**
+
+- `folder-form-modal.tsx` — Klasör oluştur / yeniden adlandır dialog (ortak modal, `editFolder` prop ile branch)
+- `folder-delete-dialog.tsx` — AlertDialog + cascade sil uyarısı
+- `item-form-modal.tsx` — Item oluştur (dynamic field input by item type, toggle password visibility, E2E encrypt on submit) / düzenle (sadece ad — alan decrypt için server DEK expose gerekiyor, amber banner)
+- `item-delete-dialog.tsx` — AlertDialog + confirm
+- `item-share-modal.tsx` — Kullanıcı picker + yetki seç + amber banner (server `owner_dek_wrapped` expose edilince aktif)
+
+**Sayfa güncellemesi (`pages/inventory/index.tsx`):**
+
+- Folder toolbar (sol panel header): Yeni Klasör + Yeniden Adlandır + Sil butonları
+- Item toolbar (orta panel): Yeni Item butonu + seçili item için Düzenle/Paylaş/Sil
+- Tüm modal state burada yönetiliyor: `folderModal: 'create'|'rename'|'delete'|null`, `itemModal: 'create'|'edit'|'delete'|'share'|null`
+
+**E2E encryption (create flow):**
+
+```
+client generateDEK() → 32B
+sealDEKWithKEK(dek, privateKey) → owner_dek_wrapped (80B) + owner_wrap_nonce (12B)
+encryptField(value, dek) → value_enc + value_nonce
+POST /api/v1/items { id: UUIDv4, fields: [{value_enc, value_nonce}], owner_dek_wrapped, owner_wrap_nonce }
+```
+
+Not: Server expose etmeden önce DEK, X25519 sealed-box yerine `SHA256(privateKey)` türetilmiş AES key ile wrap ediliyor (MVP simplification, server DEK expose edilince sealDEK fonksiyonuna geçiş). Server sadece opak blob depoluyor — şema uyumlu.
+
+**Test (21 yeni test, 4 dosya):**
+
+| Dosya | Test sayısı |
+|-------|-------------|
+| `lib/crypto.test.ts` (ek) | 9 (generateDEK, encryptField/decryptField roundtrip, sealDEK/openDEK roundtrip) |
+| `components/inventory/folder-form-modal.test.tsx` | 5 |
+| `components/inventory/item-form-modal.test.tsx` | 7 |
+| `components/inventory/item-delete-dialog.test.tsx` | 3 |
+
+Lokal: `tsc -b` ✅, `eslint --max-warnings 0` ✅, `vite build` ✅, 118/124 test geçiyor (kalan 6 pre-existing Node 22+ jsdom localStorage bug).
+
+**Win'e iletilmesi gereken bilgi:** PR-W5 merge sonrası Win'in `item_handlers.go` dosyasında `itemResponse`'a `owner_dek_wrapped` + `wrap_nonce` eklenmesi halinde alan decrypt + gerçek X25519 sharing aktif olacak.
 
 ### 2026-04-27 (Mac) — Faz 3 PR-W4: Inventory read — folder tree + item list + detail panel
 

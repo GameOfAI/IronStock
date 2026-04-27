@@ -1,18 +1,11 @@
 /**
- * Folder endpoints — read-only hooks for PR-W4 (inventory read).
- *
- * Server `GET /api/v1/folders[?parent_id=]` lazy-loaded model:
- *   - Without parent_id → root folders the caller can READ
- *   - With parent_id    → immediate children (gated by Read on parent)
- *
- * Tree node ilk kez expand edilince useChildFolders aktive olur, sonraki
- * collapse/expand'lerde TanStack Query cache'inden gelir.
+ * Folder endpoints — read + write hooks (PR-W4 read, PR-W5 write).
  */
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from './client';
 import { queryKeys } from './query';
-import type { Folder, FolderListResponse } from './types';
+import type { Folder, FolderListResponse, FolderRequest } from './types';
 
 /**
  * Root folder'ları çeker (parent_id yok). Tree'nin başlangıç noktası.
@@ -40,13 +33,49 @@ export function useChildFolders(parentId: string | null, enabled: boolean) {
 }
 
 /**
- * Tek folder detayı — breadcrumb için. PR-W4'te detail panel
- * "Klasör: ..." göstergesinde kullanılır.
+ * Tek folder detayı — breadcrumb için.
  */
 export function useFolder(id: string | null) {
   return useQuery({
     queryKey: queryKeys.folders.detail(id ?? ''),
     queryFn: () => apiFetch<Folder>(`/api/v1/folders/${id}`),
     enabled: id !== null,
+  });
+}
+
+export function useCreateFolderMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (req: FolderRequest) =>
+      apiFetch<Folder>('/api/v1/folders', { method: 'POST', body: req }),
+    onSuccess: (_, req) => {
+      qc.invalidateQueries({ queryKey: queryKeys.folders.byParent(req.parent_id ?? null) });
+    },
+  });
+}
+
+export function useUpdateFolderMutation(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (req: FolderRequest) =>
+      apiFetch<Folder>(`/api/v1/folders/${id}`, { method: 'PUT', body: req }),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: queryKeys.folders.byParent(data.parent_id ?? null) });
+      qc.invalidateQueries({ queryKey: queryKeys.folders.detail(id) });
+    },
+  });
+}
+
+export function useDeleteFolderMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, parentId }: { id: string; parentId: string | null }) =>
+      apiFetch<void>(`/api/v1/folders/${id}`, { method: 'DELETE' }).then(() => ({
+        id,
+        parentId,
+      })),
+    onSuccess: ({ parentId }) => {
+      qc.invalidateQueries({ queryKey: queryKeys.folders.byParent(parentId) });
+    },
   });
 }
