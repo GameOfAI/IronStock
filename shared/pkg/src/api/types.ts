@@ -167,6 +167,9 @@ export interface Item {
   created_at: string;
   updated_at: string;
   permission: Permission;
+  /** PR-13 sonrası sunucu tarafından doldurulur. Yoksa client decrypt edemez. */
+  owner_dek_wrapped?: string;
+  owner_wrap_nonce?: string;
 }
 
 export interface ItemListResponse {
