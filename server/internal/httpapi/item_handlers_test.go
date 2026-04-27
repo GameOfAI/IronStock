@@ -137,6 +137,56 @@ func TestNullableJSON(t *testing.T) {
 	}
 }
 
+func TestItemResponseJSON_OmitsEmptyDEK(t *testing.T) {
+	resp := itemResponse{
+		ID:         "01890dca-2200-7e85-9b1c-2c2bbf6bc65a",
+		FolderID:   "01890dcb-1100-7e85-9b1c-2c2bbf6bc65a",
+		ItemTypeID: 1,
+		Name:       "test",
+		Fields:     []itemFieldOutput{},
+	}
+	b, err := json.Marshal(resp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := m["owner_dek_wrapped"]; ok {
+		t.Error("owner_dek_wrapped should be omitted when nil")
+	}
+	if _, ok := m["owner_wrap_nonce"]; ok {
+		t.Error("owner_wrap_nonce should be omitted when nil")
+	}
+}
+
+func TestItemResponseJSON_IncludesDEK(t *testing.T) {
+	resp := itemResponse{
+		ID:              "01890dca-2200-7e85-9b1c-2c2bbf6bc65a",
+		FolderID:        "01890dcb-1100-7e85-9b1c-2c2bbf6bc65a",
+		ItemTypeID:      1,
+		Name:            "test",
+		Fields:          []itemFieldOutput{},
+		OwnerDEKWrapped: []byte("wrapped-dek"),
+		OwnerWrapNonce:  []byte("nonce-12byte"),
+	}
+	b, err := json.Marshal(resp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := m["owner_dek_wrapped"]; !ok {
+		t.Error("owner_dek_wrapped should be present")
+	}
+	if _, ok := m["owner_wrap_nonce"]; !ok {
+		t.Error("owner_wrap_nonce should be present")
+	}
+}
+
 func TestFieldInputsToOutputs_Empty(t *testing.T) {
 	got := fieldInputsToOutputs(nil)
 	if len(got) != 0 {
