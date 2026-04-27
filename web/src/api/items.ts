@@ -1,18 +1,16 @@
 /**
- * Item endpoints — read-only hooks for PR-W4 (inventory read).
- *
- * Server kontratı:
- *   GET /api/v1/items?folder_id=X[&q=]   — folder_id zorunlu (DOS guard)
- *   GET /api/v1/items/:id                — tek item detail
- *
- * Item value_enc field'ları client-encrypted. PR-W4 metadata + label
- * gösteriyor; decryption PR-W5'te owner_dek_wrapped expose edilince geliyor.
+ * Item endpoints — read + write hooks (PR-W4 read, PR-W5 write).
  */
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from './client';
 import { queryKeys } from './query';
-import type { Item, ItemListResponse } from './types';
+import type {
+  Item,
+  ItemCreateRequest,
+  ItemListResponse,
+  ShareItemRequest,
+} from './types';
 
 /**
  * Bir folder'daki item'ları (ve opsiyonel arama sonuçlarını) çeker.
@@ -37,5 +35,53 @@ export function useItem(id: string | null) {
     queryKey: queryKeys.items.detail(id ?? ''),
     queryFn: () => apiFetch<Item>(`/api/v1/items/${id}`),
     enabled: id !== null && id !== '',
+  });
+}
+
+export function useCreateItemMutation(folderId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (req: ItemCreateRequest) =>
+      apiFetch<Item>('/api/v1/items', { method: 'POST', body: req }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.items.byFolder(folderId) });
+    },
+  });
+}
+
+export function useUpdateItemMutation(id: string, folderId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (req: { name: string }) =>
+      apiFetch<void>(`/api/v1/items/${id}`, { method: 'PUT', body: req }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.items.detail(id) });
+      qc.invalidateQueries({ queryKey: queryKeys.items.byFolder(folderId) });
+    },
+  });
+}
+
+export function useDeleteItemMutation(folderId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<void>(`/api/v1/items/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.items.byFolder(folderId) });
+    },
+  });
+}
+
+export function useShareItemMutation(itemId: string) {
+  return useMutation({
+    mutationFn: (req: ShareItemRequest) =>
+      apiFetch<void>(`/api/v1/items/${itemId}/shares`, { method: 'POST', body: req }),
+  });
+}
+
+export function useUnshareItemMutation(itemId: string) {
+  return useMutation({
+    mutationFn: (userId: string) =>
+      apiFetch<void>(`/api/v1/items/${itemId}/shares/${userId}`, { method: 'DELETE' }),
   });
 }

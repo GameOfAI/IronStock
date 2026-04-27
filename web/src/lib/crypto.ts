@@ -176,6 +176,187 @@ export async function encryptPrivateKey(
   return out;
 }
 
+// --- Item E2E encryption (PR-W5, ADR-0004 §5) ---
+
+/**
+ * PKCS#8 DER prefix for X25519 private key (RFC 8410).
+ * 16-byte fixed header; raw 32-byte key appended directly.
+ */
+const X25519_PKCS8_PREFIX = new Uint8Array([
+  0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x6e,
+  0x04, 0x22, 0x04, 0x20,
+]);
+
+function rawX25519PrivToPkcs8(rawKey: Uint8Array): Uint8Array {
+  const out = new Uint8Array(X25519_PKCS8_PREFIX.length + rawKey.length);
+  out.set(X25519_PKCS8_PREFIX);
+  out.set(rawKey, X25519_PKCS8_PREFIX.length);
+  return out;
+}
+
+/** Generate a fresh 32-byte AES-256 DEK for a new item. */
+export function generateDEK(): Uint8Array {
+  return crypto.getRandomValues(new Uint8Array(32));
+}
+
+/**
+ * Seal a DEK with a recipient's raw X25519 public key (sealed-box variant):
+ *   1. Generate ephemeral X25519 key pair
+ *   2. ECDH(ephemeral_priv, recipient_pub) → 32B shared secret
+ *   3. AES-256-GCM-encrypt(DEK, shared_secret, nonce)
+ *   4. wrapped = ephemeral_pub_raw (32B) || ciphertext+tag (48B) = 80B
+ *
+ * Returns `wrapped` (80B) + `nonce` (12B) — maps to
+ * itemRequest.owner_dek_wrapped / owner_wrap_nonce.
+ */
+export async function sealDEK(
+  dek: Uint8Array,
+  recipientPublicKey: Uint8Array,
+): Promise<{ wrapped: Uint8Array; nonce: Uint8Array }> {
+  const ephKP = (await crypto.subtle.generateKey(
+    { name: 'X25519' },
+    true,
+    ['deriveBits'],
+  )) as CryptoKeyPair;
+  const ephPubRaw = new Uint8Array(await crypto.subtle.exportKey('raw', ephKP.publicKey));
+
+  const recipPubKey = await crypto.subtle.importKey(
+    'raw',
+    recipientPublicKey as BufferSource,
+    { name: 'X25519' },
+    false,
+    [],
+  );
+  const sharedBits = new Uint8Array(
+    await crypto.subtle.deriveBits(
+      { name: 'X25519', public: recipPubKey } as AlgorithmIdentifier,
+      ephKP.privateKey,
+      256,
+    ),
+  );
+
+  const wrapKey = await crypto.subtle.importKey(
+    'raw',
+    sharedBits as BufferSource,
+    'AES-GCM',
+    false,
+    ['encrypt'],
+  );
+  const nonce = crypto.getRandomValues(new Uint8Array(NONCE_LEN));
+  const ctWithTag = new Uint8Array(
+    await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv: nonce as BufferSource },
+      wrapKey,
+      dek as BufferSource,
+    ),
+  );
+
+  const wrapped = new Uint8Array(ephPubRaw.length + ctWithTag.length);
+  wrapped.set(ephPubRaw);
+  wrapped.set(ctWithTag, ephPubRaw.length);
+  return { wrapped, nonce };
+}
+
+/**
+ * Open a sealed DEK using the owner's raw X25519 private key.
+ * Inverse of sealDEK.
+ */
+export async function openDEK(
+  wrapped: Uint8Array,
+  nonce: Uint8Array,
+  privateKey: Uint8Array,
+): Promise<Uint8Array> {
+  const ephPubRaw = wrapped.subarray(0, 32);
+  const ctWithTag = wrapped.subarray(32);
+
+  const ephPubKey = await crypto.subtle.importKey(
+    'raw',
+    ephPubRaw as BufferSource,
+    { name: 'X25519' },
+    false,
+    [],
+  );
+  const pkcs8 = rawX25519PrivToPkcs8(privateKey);
+  const privCryptoKey = await crypto.subtle.importKey(
+    'pkcs8',
+    pkcs8 as BufferSource,
+    { name: 'X25519' },
+    false,
+    ['deriveBits'],
+  );
+  const sharedBits = new Uint8Array(
+    await crypto.subtle.deriveBits(
+      { name: 'X25519', public: ephPubKey } as AlgorithmIdentifier,
+      privCryptoKey,
+      256,
+    ),
+  );
+  const unwrapKey = await crypto.subtle.importKey(
+    'raw',
+    sharedBits as BufferSource,
+    'AES-GCM',
+    false,
+    ['decrypt'],
+  );
+  return new Uint8Array(
+    await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: nonce as BufferSource },
+      unwrapKey,
+      ctWithTag as BufferSource,
+    ),
+  );
+}
+
+/**
+ * Encrypt a field value string with the item's DEK.
+ * Returns value_enc (ciphertext+tag) and value_nonce (12B) — maps to
+ * itemFieldInput.value_enc / value_nonce (both base64 on wire).
+ */
+export async function encryptField(
+  value: string,
+  dek: Uint8Array,
+): Promise<{ valueEnc: Uint8Array; valueNonce: Uint8Array }> {
+  const nonce = crypto.getRandomValues(new Uint8Array(NONCE_LEN));
+  const key = await crypto.subtle.importKey(
+    'raw',
+    dek as BufferSource,
+    'AES-GCM',
+    false,
+    ['encrypt'],
+  );
+  const ct = new Uint8Array(
+    await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv: nonce as BufferSource },
+      key,
+      new TextEncoder().encode(value) as BufferSource,
+    ),
+  );
+  return { valueEnc: ct, valueNonce: nonce };
+}
+
+/**
+ * Decrypt a field value. `valueEnc` is ciphertext+tag; `valueNonce` is 12B.
+ */
+export async function decryptField(
+  valueEnc: Uint8Array,
+  valueNonce: Uint8Array,
+  dek: Uint8Array,
+): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    dek as BufferSource,
+    'AES-GCM',
+    false,
+    ['decrypt'],
+  );
+  const pt = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: valueNonce as BufferSource },
+    key,
+    valueEnc as BufferSource,
+  );
+  return new TextDecoder().decode(pt);
+}
+
 // --- X25519 keypair generation (register / recover) ---
 
 /**

@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-04-27 (Faz 3 PR-W1/W2/W3 merged, Mac PR-W4 push edildi review/merge bekliyor)
+Son güncelleme: 2026-04-27 (Faz 3 PR-W1/W2/W3/W4 merged ✅, Mac PR-W5 push edildi CI bekliyor)
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 
@@ -120,17 +120,20 @@ Mac sorularından doğan ufak server PR'ı (Q4: KEK türetme için keypair fetch
 - [x] URL state pattern: `?folder=&item=&q=` (PR-W3 ile tutarlı)
 - [⏸] **Field decrypt** — PR-W5'te. Server itemResponse'a `owner_dek_wrapped + wrap_nonce` eklenmesi gerekiyor; UI'da amber info kutusu ile kullanıcıya açıklandı.
 
-#### 🔜 PR-W5: Inventory write — `feat/web-inventory-write` (**Mac**)
+#### ✅ PR-W5: Inventory write — `feat/web-inventory-write` (**Mac**) — CI bekliyor
 
-- [ ] Folder create modal (parent picker)
-- [ ] Folder rename + delete + drag-drop re-parent (basic)
-- [ ] Item create form (item type seçimi + dynamic field rendering by field_definition list)
-- [ ] Field tipleri: text / password (toggle visibility) / url / textarea / enum (dropdown)
-- [ ] **Client-side encryption:** owner DEK gen + X25519 wrap + field value encrypt (crypto-js veya WebCrypto)
-- [ ] Item edit (PATCH semantik — fields replace-all)
-- [ ] Item delete confirm
-- [ ] Sharing modal: user picker + role select + recipient pub_key fetch + DEK re-wrap
-- [ ] Unit tests (form state, encryption flow)
+- [x] Folder create modal (parent picker ile — `FolderFormModal` create mode)
+- [x] Folder rename modal (`FolderFormModal` edit mode, `editFolder` prop)
+- [x] Folder delete dialog (`FolderDeleteDialog` — cascade sil uyarısı)
+- [x] Item create form (item type seçimi + dynamic field rendering by field_definition)
+- [x] Field tipleri: text / password (toggle Eye/EyeOff) / url / email / port / multiline (textarea) / enum (Select)
+- [x] **Client-side encryption:** DEK gen + AES-GCM field encrypt + MVP sealed-box wrap (SHA256(privateKey) → wrap key; X25519 sealDEK hazır, server DEK expose edilince geçiş)
+- [x] Item edit (ad-only — alan decrypt için server `owner_dek_wrapped` expose gerekiyor; amber banner)
+- [x] Item delete dialog (`ItemDeleteDialog` — confirm + onDeleted callback)
+- [x] Sharing modal (`ItemShareModal` — UI hazır + amber banner; server expose bekleniyor)
+- [x] Unit tests — 21 test, 4 dosya (crypto + folder modal + item modal + delete dialog)
+- [x] Toolbar: folder (Yeni/Rename/Sil) + item (Yeni/Düzenle/Paylaş/Sil) butonları inventory sayfasına eklendi
+- [⏸] **Alan decrypt + gerçek X25519 sharing** — Win'de server `item_handlers.go` → `itemResponse`'a `owner_dek_wrapped + wrap_nonce` eklenince aktif
 
 #### 🔜 PR-W6: Realtime + polish — `feat/web-realtime-polish` (Win)
 
