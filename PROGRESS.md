@@ -4,11 +4,11 @@ Son güncelleme: 2026-04-27
 
 ## Mevcut Durum
 
-- **Aktif Faz:** Faz 3 — Admin Web UI (PR-10/11/12/W1/W2 ✅; PR-W3 review/merge bekliyor)
+- **Aktif Faz:** Faz 3 — Admin Web UI (PR-10/11/12/W1/W2/W3 ✅; PR-W4 review/merge bekliyor)
 - **Tamamlanan Faz:** Faz 0 + Faz 1 + Faz 2 (server MVP) ✅ 2026-04-26
-- **Çift makine workflow:** ▶ Win foundation + auth tamam. Mac PR-W3 push edildi, CI yeşili bekleniyor. Sırada Mac PR-W4 (inventory read).
-- **Bloker:** Yok
-- **Bir sonraki adım:** PR-W3 merge → Mac PR-W4 (inventory read) başlar. Win paralelde PR-W6 (realtime+polish) hazırlığı.
+- **Çift makine workflow:** ▶ Win backend + foundation + auth ✅. Mac PR-W3 (admin) merged, PR-W4 (inventory read) push edildi.
+- **Bloker:** PR-W5 decryption için server itemResponse'a `owner_dek_wrapped + wrap_nonce` eklenmeli (Win sahası — PR-W4 sonrası iletilecek).
+- **Bir sonraki adım:** PR-W4 merge → Mac PR-W5 (inventory write + decrypt) başlar.
 
 ## Faz Durumu
 
@@ -51,6 +51,59 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-04-27 (Mac) — Faz 3 PR-W4: Inventory read — folder tree + item list + detail panel
+
+**Branch:** `feat/web-inventory-read` — push edildi, CI yeşili bekleniyor.
+
+**KeePassXC tarzı 3-panel envanter view'u.** PR-W3'ten sonra Mac'in 2. PR'ı, ekran-spesifik token-verimli pattern (foundation tamamen Win'den hazır geldi).
+
+**Yeni hooks (`src/api/`):**
+
+| Dosya | Hook(lar) | Endpoint |
+|-------|-----------|----------|
+| `folders.ts` | `useRootFolders`, `useChildFolders(id, enabled)`, `useFolder(id)` | `GET /folders[?parent_id=]`, `/folders/:id` |
+| `items.ts` | `useItems(folderId, q?)`, `useItem(id)` | `GET /items?folder_id=&q=`, `/items/:id` |
+| `catalog.ts` | `useFieldDefinitions`, `useItemTypes` | `GET /field-definitions`, `/item-types` (`staleTime: Infinity` — semi-static lookup) |
+
+**Sayfa:**
+
+`/inventory` (`pages/inventory/index.tsx` ~110 LOC) — 3-panel grid:
+- Sol: FolderTree (260px sabit)
+- Orta: Search (debounced 300ms) + ItemList (esneme)
+- Sağ: ItemDetail (max 420px)
+- URL state: `?folder=<id>&item=<id>&q=<text>` — bookmark + back button (PR-W3 ile tutarlı pattern, ADR-0009 §1)
+- Folder seçince eski `item` sıfırlanır; search değişince eski `item` sıfırlanır (sonuç değişebilir)
+
+**Yeni componentler (`components/inventory/`):**
+
+- `folder-tree.tsx` — root folders + lazy-load child level (`useChildFolders(id, isExpanded)`)
+- `folder-tree-node.tsx` — recursive node, chevron expand/collapse + Loader/Error/Empty inline state, depth-based indent (12px/level)
+- `item-list.tsx` — Table + skeleton + empty (klasör seçilmemiş / boş / search no-match) + error states + click-to-select row highlight
+- `item-search.tsx` — debounced Input + clear button. HMAC blind-index = exact match → "Tam item adı (ör. mysql-prod)" placeholder uyarısı
+- `item-detail.tsx` — header (icon + name + type + permission badge + dates) + alt panel field listesi + amber bilgi kutusu ("Alan değerleri uçtan uca şifreli. PR-W5 düzenleme modunda görüntülenecek.")
+- `item-field-row.tsx` — label + key + field_type meta + 🔒 "Şifreli" placeholder (decrypt PR-W5'te)
+- `permission-badge.tsx` — read/write × full vs compact (W/R) modları, table cell için kompakt
+
+**Önemli karar — decrypt deferred:**
+
+`itemResponse` Go struct'ı `owner_dek_wrapped + wrap_nonce` döndürmüyor (server item_handlers.go). Yani client decrypt edemiyor. PR-W4 sadece metadata + field tanımı (catalog) gösterimi yapıyor. PR-W5'te Win'den şu istek: itemResponse'a wrapped DEK ekle (caller pub_key'ine wrap, leak yok). UI'da bu durum amber info kutusunda kullanıcıya açık.
+
+**Test (34 yeni test, 7 dosya):**
+
+| Dosya | Test sayısı |
+|-------|-------------|
+| `api/folders.test.ts` | 6 |
+| `api/items.test.ts` | 5 |
+| `components/inventory/folder-tree.test.tsx` | 4 |
+| `components/inventory/item-list.test.tsx` | 6 |
+| `components/inventory/item-detail.test.tsx` | 5 |
+| `components/inventory/item-search.test.tsx` | 4 (fake timers + fireEvent) |
+| `components/inventory/permission-badge.test.tsx` | 4 |
+
+Lokal: `tsc -b` ✅, `eslint --max-warnings 0` ✅, `vite build` ✅, 97/103 test geçiyor (kalan 6 PR-W1 lokal Node 22+ jsdom localStorage bug'ı, CI Node 20'da geçiyor).
+
+**Sıradaki:** PR-W4 review/merge → Mac PR-W5 (inventory write + decrypt). Ön gerekli: server itemResponse'a wrapped DEK alanı.
 
 ### 2026-04-27 (Mac) — Faz 3 PR-W3: Admin user mgmt + audit log viewer
 
