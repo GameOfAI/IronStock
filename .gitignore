@@ -35,6 +35,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 .turbo/
+# Root workspace lockfile is platform-specific (lightningcss native binaries);
+# CI regenerates it fresh on Linux via `npm install`.
+/package-lock.json
 
 # Build / Output
 /build/
