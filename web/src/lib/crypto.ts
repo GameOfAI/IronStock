@@ -139,8 +139,14 @@ export async function decryptPrivateKey(
   const nonce = privateKeyEnc.subarray(HEADER_LEN, HEADER_LEN + NONCE_LEN);
   const cipherWithTag = privateKeyEnc.subarray(HEADER_LEN + NONCE_LEN);
 
-  const key = await crypto.subtle.importKey('raw', kek, 'AES-GCM', false, ['decrypt']);
-  const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: nonce }, key, cipherWithTag);
+  // TS 5.7 sıkılaştırdı: Uint8Array<ArrayBufferLike> != BufferSource (SAB
+  // ayırımı). Runtime'da hep ArrayBuffer-backed; WebCrypto için cast yeterli.
+  const key = await crypto.subtle.importKey('raw', kek as BufferSource, 'AES-GCM', false, ['decrypt']);
+  const plaintext = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: nonce as BufferSource },
+    key,
+    cipherWithTag as BufferSource,
+  );
   return new Uint8Array(plaintext);
 }
 
@@ -154,9 +160,13 @@ export async function encryptPrivateKey(
   kek: Uint8Array,
 ): Promise<Uint8Array> {
   const nonce = crypto.getRandomValues(new Uint8Array(NONCE_LEN));
-  const key = await crypto.subtle.importKey('raw', kek, 'AES-GCM', false, ['encrypt']);
+  const key = await crypto.subtle.importKey('raw', kek as BufferSource, 'AES-GCM', false, ['encrypt']);
   const cipherWithTag = new Uint8Array(
-    await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, key, plaintext),
+    await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv: nonce as BufferSource },
+      key,
+      plaintext as BufferSource,
+    ),
   );
   const out = new Uint8Array(HEADER_LEN + NONCE_LEN + cipherWithTag.length);
   out[0] = FORMAT_VERSION;

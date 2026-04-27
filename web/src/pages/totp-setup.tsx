@@ -25,15 +25,11 @@ import { useToast } from '@/hooks/use-toast';
 import { useTOTPInitMutation, useTOTPVerifyMutation } from '@/api/auth';
 
 export default function TOTPSetupPage() {
+  // Hooks önce çağrılmalı (React Hooks rule). Early-return for invalid
+  // tmpToken aşağıda; effect içinde de tekrar guard ediyoruz.
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-
-  const tmpToken = (location.state as { tmpToken?: string } | null)?.tmpToken;
-  if (!tmpToken) {
-    return <Navigate to="/login" replace />;
-  }
-
   const initMut = useTOTPInitMutation();
   const verifyMut = useTOTPVerifyMutation();
   const [phase, setPhase] = React.useState<'enroll' | 'verify' | 'recovery_codes'>('enroll');
@@ -42,8 +38,10 @@ export default function TOTPSetupPage() {
   const [code, setCode] = React.useState('');
   const [recoveryCodes, setRecoveryCodes] = React.useState<string[]>([]);
 
+  const tmpToken = (location.state as { tmpToken?: string } | null)?.tmpToken;
+
   React.useEffect(() => {
-    if (phase !== 'enroll') return;
+    if (!tmpToken || phase !== 'enroll') return;
     initMut.mutate(tmpToken, {
       onSuccess: (res) => {
         setOtpAuthUrl(res.otpauth_uri);
@@ -61,9 +59,14 @@ export default function TOTPSetupPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, tmpToken]);
 
+  // Render-time guard. After hooks, before JSX.
+  if (!tmpToken) {
+    return <Navigate to="/login" replace />;
+  }
+
   async function onVerify(e: React.FormEvent) {
     e.preventDefault();
-    if (!code) return;
+    if (!code || !tmpToken) return;
     try {
       const res = await verifyMut.mutateAsync({ tmpToken, code });
       setRecoveryCodes(res.recovery_codes);
