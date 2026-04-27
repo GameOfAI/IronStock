@@ -4,11 +4,11 @@ Son güncelleme: 2026-04-27
 
 ## Mevcut Durum
 
-- **Aktif Faz:** Faz 3 — Admin Web UI (PR-10/11/12/W1 ✅; PR-W2 hazır, Mac PR-W3 başlayabilir)
+- **Aktif Faz:** Faz 3 — Admin Web UI (PR-10/11/12/W1/W2 ✅; PR-W3 review/merge bekliyor)
 - **Tamamlanan Faz:** Faz 0 + Faz 1 + Faz 2 (server MVP) ✅ 2026-04-26
-- **Çift makine workflow:** ▶ Win Faz 3 backend + foundation + auth tamam. Mac (Pro) PR-W2 merge sonrası **PR-W3 (admin)** başlayabilir.
+- **Çift makine workflow:** ▶ Win foundation + auth tamam. Mac PR-W3 push edildi, CI yeşili bekleniyor. Sırada Mac PR-W4 (inventory read).
 - **Bloker:** Yok
-- **Bir sonraki adım:** PR-W2 merge → Mac PR-W3 başlar (admin user list + audit log viewer). Win sırasında PR-W6 (websocket+polish) için bekleme moduna geçer.
+- **Bir sonraki adım:** PR-W3 merge → Mac PR-W4 (inventory read) başlar. Win paralelde PR-W6 (realtime+polish) hazırlığı.
 
 ## Faz Durumu
 
@@ -51,6 +51,77 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-04-27 (Mac) — Faz 3 PR-W3: Admin user mgmt + audit log viewer
+
+**Branch:** `feat/web-admin` — push edildi, CI yeşili bekleniyor.
+
+**Mac sırası açıldı.** Win'in PR-W2 (auth + KEK) merge'i sonrası foundation + auth context + KEK store hazırdı; bu PR onun üzerine admin sayfalarını koydu.
+
+**Yeni hooks (`src/api/admin.ts` ~95 LOC):**
+
+| Hook | Endpoint |
+|------|----------|
+| `useUsers({limit, offset})` | `GET /api/v1/admin/users` |
+| `useGrantRoleMutation(userId)` | `POST /admin/users/:id/roles` |
+| `useRevokeRoleMutation(userId)` | `DELETE /admin/users/:id/roles/:role_name` |
+| `useDisableUserMutation(userId)` | `POST /admin/users/:id/disable` |
+| `useEnableUserMutation(userId)` | `POST /admin/users/:id/enable` |
+| `useAuditLog(filters)` | `GET /api/v1/admin/audit-log?...` |
+
+Tüm mutation'lar `onSuccess`'te `queryClient.invalidateQueries({queryKey:['admin','users']})` çağırıyor; tablo otomatik tazeleniyor.
+
+**Sayfalar:**
+
+`/admin/users` (`pages/admin/users.tsx` ~95 LOC) — KeePassXC tarzı tablo:
+- Kolonlar: Kullanıcı / Email / Status (renkli badge) / Roller (multi-badge group) / Son Giriş (relative time + tooltip) / [⋮] dropdown
+- DropdownMenu içinde: 3 rol checkbox (admin / write / read) + Devre Dışı / Etkinleştir
+- Self-protection: kendi admin rolü ve kendi disable disabled state + tooltip ("Kendi admin rolünüzü kaldıramazsınız")
+- Disable destructive → AlertDialog confirm; role toggle idempotent → optimistic, hata olunca toast
+- Pagination URL state: `?page=2&size=50` — bookmark + back button + paylaşılabilir URL
+
+`/admin/audit-log` (`pages/admin/audit-log.tsx` ~150 LOC) — filtreli audit görüntüleyici:
+- 5 filter (action / actor / resource_type / from / to) — URL search params'a tam sync
+- Action sütunu: lucide icon + renk + monospace label (29 audit constant tabloda)
+- Aktör sütunu: `useUsers` cache'inden client-side `userMap` lookup; null → "Sistem", map'te yoksa → "silinmiş kullanıcı" italic fallback (ADR-0009 §5)
+- Resource sütunu: `type:UUID` — UUID 8 hane gösterimi + title attribute'ta tam UUID
+- Detay sütunu: `[▶]` chevron toggle → inline Collapsible açılıyor (modal yok), pretty-print JSON (`details + ip_address + user_agent` birleştirilir)
+- Birden fazla satır aynı anda açılabilir — audit araştırması pattern'i
+- Filter değişince `page=1`'e dönüş
+
+**Yeni componentler:**
+
+`components/admin/`:
+- `status-badge.tsx` — 4 status × renkli outline badge (active/pending_totp/disabled/locked)
+- `role-badges.tsx` — admin (default mavi dolu) + write/read (outline), sıralı gösterim
+- `action-icon.tsx` — 29 audit action × icon + color tablosu, `ALL_AUDIT_ACTIONS` filter dropdown export
+- `user-table.tsx` — pure presentational table + skeleton + empty state
+- `user-actions-menu.tsx` — DropdownMenu + 3 role checkbox + disable/enable + self-protection tooltips
+- `disable-confirm-dialog.tsx` — AlertDialog (yıkıcı aksiyon onayı)
+- `audit-filters.tsx` — 2 Select + 2 datetime-local + Clear button; lokal/UTC dönüşüm helper'ları (`localToISOZ` / `isoZToLocal`)
+- `audit-row.tsx` — Collapsible inline detail expansion + actor lookup + resource truncation
+
+`components/common/`:
+- `pagination.tsx` — Prev/Next + sayfa boyutu Select (25/50/100) + total counter
+- `relative-time.tsx` — "2dk önce" + Tooltip ile tam tarih (Türkçe locale)
+
+**shadcn primitives eklendi:** badge, dropdown-menu, checkbox, collapsible, popover, tooltip, alert-dialog (`npx shadcn@latest add ...`).
+
+**Test (29 yeni test, 7 dosya):**
+
+| Dosya | Test sayısı | Kapsam |
+|-------|-------------|--------|
+| `api/admin.test.ts` | 7 | hook'ların apiFetch'i doğru çağırması + mutation invalidation |
+| `components/admin/audit-row.test.tsx` | 6 | userMap lookup, "Sistem" / "silinmiş kullanıcı" fallback, JSON expand, UUID truncation |
+| `components/admin/audit-filters.test.tsx` | 4 | Clear button conditional, datetime mapping |
+| `components/admin/user-table.test.tsx` | 4 | render/empty/skeleton/last-login fallback |
+| `components/admin/role-badges.test.tsx` | 3 | empty/render/order |
+| `components/admin/status-badge.test.tsx` | 1 | 4 status label |
+| `components/common/pagination.test.tsx` | 4 | render/disable/click |
+
+Lokal: `tsc -b` ✅, `eslint --max-warnings 0` ✅, `vite build` ✅, 62/68 test geçiyor (kalan 6 PR-W1'in lokal Node 22+ jsdom localStorage bug'ı; Node 20 CI'da geçiyor).
+
+**Sıradaki:** PR-W3 review/merge → Mac PR-W4 (inventory read: folder tree + item list + detail panel).
 
 ### 2026-04-27 (Win) — Faz 3 PR-W2: Web auth — login + TOTP setup + recovery + change-password + KEK akışı
 

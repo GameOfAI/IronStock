@@ -1,38 +1,12 @@
 /**
- * Admin placeholder — Mac doldurur (PR-W3 admin user mgmt + audit log).
+ * Admin sayfaları için barrel re-export.
+ *
+ * App.tsx route ağacı şunu bekler:
+ *   import AdminUsersPage, { AdminAuditLogPage } from '@/pages/admin';
  */
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-
-export default function AdminUsersPage() {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Kullanıcı Yönetimi</CardTitle>
-        <CardDescription>PR-W3 (Mac) — user list + role assign + disable/enable</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <p className="text-sm text-muted-foreground">
-          Mac sahası: <code>web/src/pages/admin/**</code>. Mac branch:{' '}
-          <code>feat/web-admin</code>.
-        </p>
-      </CardContent>
-    </Card>
-  );
-}
-
-export function AdminAuditLogPage() {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Audit Log</CardTitle>
-        <CardDescription>PR-W3 (Mac) — filter + pagination + JSON details</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <p className="text-sm text-muted-foreground">
-          Backend hazır: <code>GET /api/v1/admin/audit-log</code>.
-        </p>
-      </CardContent>
-    </Card>
-  );
-}
+// Barrel re-export — App.tsx route ağacı bu dosyadan iki page'i de
+// alır. Fast-refresh uyarısı barrel pattern'inde anlamsız.
+/* eslint-disable react-refresh/only-export-components */
+export { default } from './users';
+export { AdminAuditLogPage } from './audit-log';

@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-04-27 (Faz 3 PR-W1 merged, PR-W2 hazır, Mac PR-W3 unlock yaklaşıyor)
+Son güncelleme: 2026-04-27 (Faz 3 PR-W1/W2 merged, Mac PR-W3 push edildi review/merge bekliyor)
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 
@@ -97,14 +97,17 @@ Mac sorularından doğan ufak server PR'ı (Q4: KEK türetme için keypair fetch
 - [x] **Karar değişikliği:** ADR-0009 `argon2-browser` yerine `hash-wasm` (Vite uyumluluğu, modern API). ADR §3 spirit korunuyor (WASM Argon2id).
 - [x] Lokal validation atlandı (Win'de Node yok), CI'a güveniyoruz
 
-#### 🔜 PR-W3: Admin screens — `feat/web-admin` (**Mac**)
+#### ✅ PR-W3: Admin screens — `feat/web-admin` (**Mac**) — review/merge bekliyor
 
-- [ ] User list page (`/admin/users`): table + pagination + role badges
-- [ ] Role assign/revoke buttons (admin / write / read)
-- [ ] Disable/enable toggle
-- [ ] Audit log viewer (`/admin/audit-log`): filter (action, user, date) + pagination + JSON details collapse
-- [ ] Empty state, loading skeleton, error toast
-- [ ] Unit tests (table interaction, filter state)
+- [x] User list page (`/admin/users`): table + pagination + role badges (URL state)
+- [x] Role assign/revoke (DropdownMenu içinde 3 checkbox + optimistic + toast)
+- [x] Disable/enable toggle (AlertDialog confirm + self-protection guards)
+- [x] Audit log viewer (`/admin/audit-log`): 5 filter + URL state + pagination + Collapsible inline JSON details
+- [x] Empty state, loading skeleton, error toast (her sayfada)
+- [x] Unit tests — 29 test, 7 dosya (hook calls + table render + audit row + pagination)
+- [x] Self-protection: kendi admin rolü ve disable disabled + tooltip
+- [x] Username mapping: useUsers cache → userMap, "Sistem"/"silinmiş kullanıcı" fallback (ADR-0009 §5)
+- [x] shadcn primitives: badge, dropdown-menu, checkbox, collapsible, popover, tooltip, alert-dialog
 
 #### 🔜 PR-W4: Inventory read — `feat/web-inventory-read` (**Mac**)
 
