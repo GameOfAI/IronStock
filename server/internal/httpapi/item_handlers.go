@@ -69,16 +69,20 @@ type itemRequest struct {
 
 // itemResponse is the API representation. name is decrypted for the caller;
 // fields are returned as-is (still client-encrypted).
+// owner_dek_wrapped / owner_wrap_nonce are the caller's row from item_shares
+// (populated on GET /items/:id; omitted on LIST to keep payloads lean).
 type itemResponse struct {
-	ID         string              `json:"id"`
-	FolderID   string              `json:"folder_id"`
-	ItemTypeID int16               `json:"item_type_id"`
-	Name       string              `json:"name"`
-	Fields     []itemFieldOutput   `json:"fields"`
-	CreatedBy  string              `json:"created_by"`
-	CreatedAt  string              `json:"created_at"`
-	UpdatedAt  string              `json:"updated_at"`
-	Permission auth.ItemPermission `json:"permission"`
+	ID              string              `json:"id"`
+	FolderID        string              `json:"folder_id"`
+	ItemTypeID      int16               `json:"item_type_id"`
+	Name            string              `json:"name"`
+	Fields          []itemFieldOutput   `json:"fields"`
+	CreatedBy       string              `json:"created_by"`
+	CreatedAt       string              `json:"created_at"`
+	UpdatedAt       string              `json:"updated_at"`
+	Permission      auth.ItemPermission `json:"permission"`
+	OwnerDEKWrapped []byte              `json:"owner_dek_wrapped,omitempty"`
+	OwnerWrapNonce  []byte              `json:"owner_wrap_nonce,omitempty"`
 }
 
 type itemFieldOutput struct {
@@ -253,15 +257,17 @@ func (h *ItemHandlers) Create(w http.ResponseWriter, r *http.Request) {
 	h.publishEvent(ws.EventItemCreated, req.ID, claims.Subject)
 
 	writeJSON(w, http.StatusCreated, itemResponse{
-		ID:         req.ID,
-		FolderID:   req.FolderID,
-		ItemTypeID: req.ItemTypeID,
-		Name:       req.Name,
-		Fields:     fieldInputsToOutputs(req.Fields),
-		CreatedBy:  claims.Subject,
-		CreatedAt:  createdAt,
-		UpdatedAt:  updatedAt,
-		Permission: auth.ItemPermWrite,
+		ID:              req.ID,
+		FolderID:        req.FolderID,
+		ItemTypeID:      req.ItemTypeID,
+		Name:            req.Name,
+		Fields:          fieldInputsToOutputs(req.Fields),
+		CreatedBy:       claims.Subject,
+		CreatedAt:       createdAt,
+		UpdatedAt:       updatedAt,
+		Permission:      auth.ItemPermWrite,
+		OwnerDEKWrapped: req.OwnerDEKWrapped,
+		OwnerWrapNonce:  req.OwnerWrapNonce,
 	})
 }
 
@@ -300,7 +306,7 @@ func (h *ItemHandlers) Get(w http.ResponseWriter, r *http.Request) {
 		perm = p
 	}
 
-	item, err := fetchItemFull(ctx, h.Service.DB, h.Service, id)
+	item, err := fetchItemFull(ctx, h.Service.DB, h.Service, id, claims.Subject)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, h.Logger, http.StatusNotFound, ErrCodeBadRequest,
@@ -664,8 +670,10 @@ func fetchItemForUpdate(ctx context.Context, db auth.DBExec, id string) (itemRow
 	return row, err
 }
 
-// fetchItemFull returns the item + decrypted name + fields.
-func fetchItemFull(ctx context.Context, db auth.DBExec, svc *auth.Service, id string) (itemResponse, error) {
+// fetchItemFull returns the item + decrypted name + fields + caller's DEK wrap.
+// userID is used to look up the caller's e2e_dek_wrapped row in item_shares.
+// When the row is absent (e.g. admin with no share), DEK fields are omitted.
+func fetchItemFull(ctx context.Context, db auth.DBExec, svc *auth.Service, id, userID string) (itemResponse, error) {
 	row, err := fetchItemForUpdate(ctx, db, id)
 	if err != nil {
 		return itemResponse{}, err
@@ -678,16 +686,40 @@ func fetchItemFull(ctx context.Context, db auth.DBExec, svc *auth.Service, id st
 	if err != nil {
 		return itemResponse{}, err
 	}
+	dekWrapped, wrapNonce, err := fetchCallerDEK(ctx, db, id, userID)
+	if err != nil {
+		return itemResponse{}, err
+	}
 	return itemResponse{
-		ID:         row.ID,
-		FolderID:   row.FolderID,
-		ItemTypeID: row.ItemTypeID,
-		Name:       name,
-		Fields:     fields,
-		CreatedBy:  row.CreatedBy,
-		CreatedAt:  row.CreatedAt,
-		UpdatedAt:  row.UpdatedAt,
+		ID:              row.ID,
+		FolderID:        row.FolderID,
+		ItemTypeID:      row.ItemTypeID,
+		Name:            name,
+		Fields:          fields,
+		CreatedBy:       row.CreatedBy,
+		CreatedAt:       row.CreatedAt,
+		UpdatedAt:       row.UpdatedAt,
+		OwnerDEKWrapped: dekWrapped,
+		OwnerWrapNonce:  wrapNonce,
 	}, nil
+}
+
+// fetchCallerDEK returns the caller's e2e_dek_wrapped + wrap_nonce from
+// item_shares. Returns nil slices (no error) when no share row exists for the
+// caller (admin bypass path).
+func fetchCallerDEK(ctx context.Context, db auth.DBExec, itemID, userID string) ([]byte, []byte, error) {
+	const sqlText = `
+		SELECT e2e_dek_wrapped, wrap_nonce
+		FROM item_shares
+		WHERE item_id = $1::uuid AND user_id = $2::uuid
+		LIMIT 1
+	`
+	var dek, nonce []byte
+	err := db.QueryRow(ctx, sqlText, itemID, userID).Scan(&dek, &nonce)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil, nil
+	}
+	return dek, nonce, err
 }
 
 func fetchItemFields(ctx context.Context, db auth.DBExec, itemID string) ([]itemFieldOutput, error) {
