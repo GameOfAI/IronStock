@@ -4,10 +4,10 @@ Son güncelleme: 2026-04-27
 
 ## Mevcut Durum
 
-- **Aktif Faz:** Faz 4 — Tauri Desktop Client (PR-S1 ✅ merged; PR-C2 sırada)
+- **Aktif Faz:** Faz 4 — Tauri Desktop Client (PR-S1 ✅ merged; PR-C2 ✅ push edildi, CI bekliyor)
 - **Tamamlanan Faz:** Faz 0 + Faz 1 + Faz 2 (server MVP) ✅ + Faz 3 (Admin Web UI) ✅ 2026-04-27
-- **Son tamamlanan:** PR-W6 (realtime+polish) merged → **Faz 3 DONE**. PR-S1 (shared workspace) merged — Faz 4'ün ilk PR'ı.
-- **Bir sonraki adım:** PR-C2 (feat/client-foundation) — Tauri client'a Tailwind, shadcn, TanStack Query, Zustand, AppShell + CI job.
+- **Son tamamlanan:** PR-C2 (client-foundation) — branch push edildi, CI bekliyor. Sırada: PR-C3 (client-auth).
+- **Bir sonraki adım:** PR-C3 (feat/client-auth) — login formu, KEK derive, Zustand auth, TOTP wizard.
 
 ## Faz Durumu
 
@@ -50,6 +50,47 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-04-27 (Win) — Faz 4 PR-C2: Client foundation — Tailwind 4 + shadcn/ui + TanStack Query + Zustand + ConnectionGate + CI
+
+**Branch:** `feat/client-foundation` — push edildi, CI bekliyor.
+
+**Faz 4'ün ikinci PR'ı.** Tauri client'a web admin UI ile tutarlı bir foundation kuruldu.
+
+**Web'den farklı tasarım kararları:**
+
+1. **ConnectionGate (yeni):** Desktop client farklı sunuculara bağlanabilir. `serverUrl` boşsa `/config` ekranına yönlendirir. Sıra: `/config` → `ConnectionGate` → `AuthGate` → `AppShell`.
+2. **`api/client.ts` — configurable base URL:** Web'de path'ler `/api/v1/...` (proxy), client'ta `${baseUrl}/api/v1/...`. `setBaseUrl()` / `getBaseUrl()` module-level fonksiyonlar. Connection store hydration'da ve `setConnection()` çağrısında sync edilir.
+3. **`store/connection.ts` (yeni):** `serverUrl + tlsSkipVerify` localStorage'da persist. `onRehydrateStorage` hook'u ile sayfa yenilemesinde `api/client` baseUrl'i güncellenir.
+4. **`AppShell` — admin nav yok:** Faz 4 MVP'de inventory-only. Lock butonu var (PR-C1'de Rust keyring entegre edilince aktif olur, şimdilik logout gibi davranır). WsStatusDot yok (PR-C4'te eklenir).
+5. **`vitest.config.ts` ayrı:** PR-S1'de öğrenilen ders — `@tailwindcss/vite` lightningcss platform binary sorununu önlemek için test config'i ayrı tutuldu.
+6. **`index.css` Tauri ek:** `user-select: none` body'de (desktop app hissi), `input/textarea`'da `user-select: text` override.
+
+**Oluşturulan dosyalar:**
+- `client/package.json` — deps: Radix UI (dialog/label/slot/toast), TanStack Query, Zustand, lucide-react, react-router-dom, CVA, clsx, tailwind-merge. devDeps: Tailwind 4, testing-library, jsdom.
+- `client/vite.config.ts` — Tailwind 4 plugin + `@/` alias (Tauri opts korundu).
+- `client/vitest.config.ts` — ayrı config, tailwindcss plugin yok.
+- `client/tsconfig.json` — `baseUrl + paths: @/* → ./src/*` eklendi.
+- `client/src/index.css` — Tailwind 4 + shadcn token seti.
+- `client/src/lib/cn.ts` — clsx + tailwind-merge.
+- `client/src/api/{errors,types,token-storage,query,client}.ts`
+- `client/src/store/{auth,ui,connection}.ts`
+- `client/src/components/ui/{button,input,label,skeleton,card,toast,toaster}.tsx`
+- `client/src/components/layout/{theme-provider,app-shell}.tsx`
+- `client/src/hooks/use-toast.ts`
+- `client/src/routes/{auth-gate,connection-gate}.tsx`
+- `client/src/pages/{config,login,inventory,not-found}.tsx`
+- `client/src/App.tsx` + `client/src/main.tsx` (tam yeniden yazım)
+- `client/src/test/setup.ts`
+- Test dosyaları: `lib/cn.test.ts`, `api/token-storage.test.ts`, `api/client.test.ts`, `store/auth.test.ts`, `store/connection.test.ts` — **21 test case**
+- `.github/workflows/ci.yml` — `client` job (tsc + lint + test + vite build, Tauri binary derlenmez)
+
+**Bilinçli kapsam dışı:**
+- Login formu + KEK derive → PR-C3
+- Folder/item UI → PR-C4
+- E2E decrypt → PR-C5
+- Rust keyring + tray → PR-C1
+- Tauri binary CI → PR-C6
 
 ### 2026-04-27 (Mac) — Faz 4 PR-S1: @envanter/shared workspace — ortak tipler + kripto
 

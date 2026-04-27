@@ -1,10 +1,18 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
+import path from 'node:path';
 
 // Tauri 2 ile uyumlu Vite config.
-// https://tauri.app/v1/guides/getting-started/setup/vite/
-export default defineConfig(async () => ({
-  plugins: [react()],
+// Tailwind CSS-first plugin buraya dahil; vitest.config.ts ayrı tutuldu (lightningcss linux binary sorunu).
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
+
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, 'src'),
+    },
+  },
 
   // Tauri dev server'ı sabit portta ister
   clearScreen: false,
@@ -24,4 +32,4 @@ export default defineConfig(async () => ({
     minify: !process.env.TAURI_ENV_DEBUG ? 'esbuild' : false,
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
   },
-}));
+});

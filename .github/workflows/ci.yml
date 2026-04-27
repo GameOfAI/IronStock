@@ -126,6 +126,40 @@ jobs:
       - name: Build
         run: npm run build
 
+  # ---------------- Client (Tauri frontend — Vite + React + TS) ----------------
+  # Rust/Tauri binary derlenmez (platform native tool gerektirir, ~10dk).
+  # Sadece TS/React katmanı: tsc + lint + test + vite build.
+  # Tauri binary CI'ı PR-C6 (client-win-packaging) ile eklenecek.
+  client:
+    name: Client (Vite)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install
+        working-directory: '.'
+        run: npm install --no-audit --no-fund
+
+      - name: Type check
+        run: npx tsc -b
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build (Vite only, no Tauri binary)
+        run: npm run build
+
   # ---------------- Server Integration (testcontainers + Postgres) ----------------
   # Build tag 'integration' ile yazılan testler. testcontainers-go gerçek Postgres
   # container'ı başlatır → migration up/down/up + seed validation. Docker GitHub
@@ -178,14 +212,15 @@ jobs:
       - name: Determine tags
         id: tags
         run: |
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
             VERSION="${GITHUB_REF#refs/tags/}"
-            echo "api=ghcr.io/${{ github.repository_owner }}/envanter-api:${VERSION},ghcr.io/${{ github.repository_owner }}/envanter-api:latest" >> $GITHUB_OUTPUT
-            echo "web=ghcr.io/${{ github.repository_owner }}/envanter-web:${VERSION},ghcr.io/${{ github.repository_owner }}/envanter-web:latest" >> $GITHUB_OUTPUT
+            echo "api=ghcr.io/${OWNER}/envanter-api:${VERSION},ghcr.io/${OWNER}/envanter-api:latest" >> $GITHUB_OUTPUT
+            echo "web=ghcr.io/${OWNER}/envanter-web:${VERSION},ghcr.io/${OWNER}/envanter-web:latest" >> $GITHUB_OUTPUT
           else
             SHA="${GITHUB_SHA::7}"
-            echo "api=ghcr.io/${{ github.repository_owner }}/envanter-api:main-${SHA},ghcr.io/${{ github.repository_owner }}/envanter-api:latest" >> $GITHUB_OUTPUT
-            echo "web=ghcr.io/${{ github.repository_owner }}/envanter-web:main-${SHA},ghcr.io/${{ github.repository_owner }}/envanter-web:latest" >> $GITHUB_OUTPUT
+            echo "api=ghcr.io/${OWNER}/envanter-api:main-${SHA},ghcr.io/${OWNER}/envanter-api:latest" >> $GITHUB_OUTPUT
+            echo "web=ghcr.io/${OWNER}/envanter-web:main-${SHA},ghcr.io/${OWNER}/envanter-web:latest" >> $GITHUB_OUTPUT
           fi
 
       - name: Build & push API image

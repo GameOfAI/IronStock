@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-04-27 (Faz 3 ✅ TAMAMLANDI — Faz 4 ACTIVE, PR-S1 merged ✅)
+Son güncelleme: 2026-04-27 (Faz 3 ✅ TAMAMLANDI — Faz 4 ACTIVE, PR-S1 ✅ + PR-C2 ✅ push edildi)
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 
@@ -420,15 +420,19 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 
 ### Client PR'ları (Mac — bağımlılık yok)
 
-#### [ ] PR-C2: Client foundation — `feat/client-foundation`
+#### ✅ PR-C2: Client foundation — `feat/client-foundation` — CI bekliyor
 
-- [ ] `client/package.json` → Tailwind 4, shadcn/ui, TanStack Query, Zustand, hash-wasm
-- [ ] `client/vite.config.ts` + `client/vitest.config.ts` (ayrı — lightningcss dersi öğrenildi)
-- [ ] `client/tsconfig.json` + path alias `@/`
-- [ ] `client/src/` AppShell (Tauri window chrome yok, kendi app shell)
-- [ ] React Router v6: `ConnectionGate` (sunucu URL girilmemişse config ekranı) + `AuthGate`
-- [ ] Connection config ekranı (URL + TLS bypass geçici)
-- [ ] CI: `web` job yanına `client` job eklendi (tsc + lint + test + build)
+- [x] `client/package.json` → Tailwind 4, shadcn/ui, TanStack Query, Zustand, Radix UI, react-router-dom
+- [x] `client/vite.config.ts` + `client/vitest.config.ts` (ayrı — lightningcss dersi öğrenildi)
+- [x] `client/tsconfig.json` + path alias `@/`
+- [x] `client/src/` AppShell (Tauri window chrome yok, kendi app shell — admin nav yok, Lock butonu var)
+- [x] React Router v6: `ConnectionGate` (sunucu URL girilmemişse config ekranı) + `AuthGate`
+- [x] Connection config ekranı (URL + TLS bypass) + `store/connection.ts` (persist + api/client sync)
+- [x] `api/client.ts` — configurable base URL (setBaseUrl/getBaseUrl)
+- [x] `store/{auth,ui,connection}.ts`, `api/{errors,types,token-storage,query,client}.ts`
+- [x] shadcn/ui primitives: button, input, label, skeleton, card, toast, toaster
+- [x] 21 test case (cn, token-storage, auth store, connection store, api/client)
+- [x] CI: `client` job eklendi (tsc + lint + test + vite build, Tauri binary derlenmez)
 
 #### [ ] PR-C3: Client auth — `feat/client-auth`
 
