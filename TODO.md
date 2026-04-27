@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-04-27 (Faz 3 PR-W1..W5 merged ✅, PR-W6 push edildi CI bekliyor — Faz 3 son PR)
+Son güncelleme: 2026-04-27 (Faz 3 ✅ TAMAMLANDI — Faz 4 ACTIVE, PR-S1 merged ✅)
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 
@@ -22,11 +22,9 @@ TodoWrite ile senkronize çalışır — aktif session'daki live task listesi To
 
 ---
 
-## Aktif: Faz 3 — Admin Web UI (başlıyor 2026-04-26)
+## ✅ Tamamlandı: Faz 3 — Admin Web UI (2026-04-26 → 2026-04-27)
 
-**İş bölümü:** Win 5 PR (server + foundation + auth + realtime/polish), Mac Pro 3 PR (admin + inventory ekranlar). Mac token ekonomisi → self-contained ekran PR'ları Mac'e tahsis.
-
-**Hedef:** 5 günde Faz 3 BİTECEK. Bekleme yok, ardışık zincir.
+**Sonuç:** 9 PR (Win 6 + Mac 3), 1 gün — tümü merged. WS realtime, E2E kripto, admin+inventory UI tamamlandı.
 
 ### Server PR'ları (Win)
 
@@ -148,7 +146,7 @@ Mac sorularından doğan ufak server PR'ı (Q4: KEK türetme için keypair fetch
 - [x] Server: `?access_token=` query param fallback (browser WS header seti yapamıyor)
 - [x] **10 yeni test** (WsClient status transitions + WsProvider render/status)
 - [⏸] i18n (react-i18next) → Faz 4+ (UI zaten Türkçe, priority düşük)
-- [ ] **Faz 3 DONE** — PR-W6 merge sonrası kapanış commit'i
+- [x] **Faz 3 DONE** — PR-W6 merged ✅ 2026-04-27
 
 ---
 
@@ -404,19 +402,86 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 - [ ] Audit log görüntüleyici
 - [ ] Responsive layout + dark mode
 
-## Faz 4 — Client MVP Tauri (~1-2 hafta)
+## Aktif: Faz 4 — Client MVP Tauri
 
-- [ ] Tauri project config Windows + macOS target
-- [ ] Server connection config ekranı (URL + TLS cert trust)
-- [ ] Auth akışı (login + MFA + master key derive Argon2id)
-- [ ] Master key in-memory vault (uygulama kapanınca silinir)
-- [ ] Envanter UI (ağaç + detay panel, KeePassXC görseli)
-- [ ] WebSocket live sync
-- [ ] Şifrelenmiş offline cache (SQLite + SQLCipher, local DEK master key'den derive)
-- [ ] Client-side E2E şifreleme (secret field'lar)
-- [ ] Reconnect logic + offline mode indicator
-- [ ] Copy-to-clipboard auto-clear (30sn)
-- [ ] Auto-lock after idle (10dk default, 5/10/15/30 configurable)
+**İş bölümü:** Mac bağımlılık gerektirmeyen PR'lar (S1, C2, C3, C4, C5), Win platform-specific PR'lar (C1 keyring/Rust, C6 Win binary).
+
+### Ortak (Shared) PR'lar
+
+#### ✅ PR-S1: @envanter/shared workspace — `feat/shared-workspace` — merged
+
+- [x] Root `package.json` (npm workspaces: shared/pkg, web, client)
+- [x] `shared/pkg/` → `@envanter/shared` paketi (crypto + api/types + api/errors)
+- [x] `web/src/{lib/crypto,api/types,api/errors}.ts` → re-export stub'ları
+- [x] `client/package.json` + `web/package.json` → `@envanter/shared` bağımlılığı
+- [x] `vitest.config.ts` ayrıldı (tailwindcss plugin → lightningcss Linux sorunu çözüldü)
+- [x] Root `package-lock.json` `.gitignore`'a eklendi
+- [x] CI: Install adımı root'tan çalışıyor
+
+### Client PR'ları (Mac — bağımlılık yok)
+
+#### [ ] PR-C2: Client foundation — `feat/client-foundation`
+
+- [ ] `client/package.json` → Tailwind 4, shadcn/ui, TanStack Query, Zustand, hash-wasm
+- [ ] `client/vite.config.ts` + `client/vitest.config.ts` (ayrı — lightningcss dersi öğrenildi)
+- [ ] `client/tsconfig.json` + path alias `@/`
+- [ ] `client/src/` AppShell (Tauri window chrome yok, kendi app shell)
+- [ ] React Router v6: `ConnectionGate` (sunucu URL girilmemişse config ekranı) + `AuthGate`
+- [ ] Connection config ekranı (URL + TLS bypass geçici)
+- [ ] CI: `web` job yanına `client` job eklendi (tsc + lint + test + build)
+
+#### [ ] PR-C3: Client auth — `feat/client-auth`
+
+- [ ] Login formu (username + master_password + TOTP)
+- [ ] KEK derive (Argon2id via `@envanter/shared/crypto`) + private_key decrypt
+- [ ] Auth state: Zustand (memory-only, Faz 4 MVP — Rust keyring PR-C1'e kadar)
+- [ ] Logout + auto-lock hook (inactivity timer)
+- [ ] TOTP setup wizard (yeni kullanıcılar için)
+- [ ] `@/api/client.ts` Bearer + refresh interceptor (web'den adapt)
+
+#### [ ] PR-C4: Client inventory read — `feat/client-inventory-read`
+
+- [ ] Folder tree (sol panel)
+- [ ] Item listesi (orta panel, debounced search)
+- [ ] Item detail panel (sağ — alanlar amber "şifreli" placeholder)
+- [ ] WsClient + WsProvider (web'den taşı, `@envanter/shared` import)
+- [ ] TanStack Query: folder/item hook'ları (web `api/` adapt)
+
+#### [ ] PR-C5: Client E2E decrypt — `feat/client-crypto`
+
+- [ ] Field decrypt UI (DEK açma + alan gösterme)
+- [ ] Copy-to-clipboard auto-clear (30sn, Tauri clipboard API)
+- [ ] Password field toggle (Eye/EyeOff)
+- [ ] Item create form + E2E encrypt (web item-form-modal'den adapt)
+
+### Client PR'ları (Win — platform-specific)
+
+#### [ ] PR-C1: Rust keyring + inactivity lock + tray — `feat/client-rust-foundation`
+
+- [ ] `tauri-plugin-keychain` (Mac) + Windows Credential Store → KEK persist
+- [ ] Inactivity timer Rust side (10dk default, configurable)
+- [ ] System tray icon (lock/unlock/quit)
+- [ ] Auto-lock → Zustand state clear
+
+#### [ ] PR-C6: Windows binary + packaging — `feat/client-win-packaging`
+
+- [ ] `tauri build --target x86_64-pc-windows-msvc`
+- [ ] MSI installer config (Tauri bundler)
+- [ ] Code signing (self-signed başlangıç)
+- [ ] GitHub Actions: `client` CI job Windows runner'da
+
+### Server PR'ları (Win — web ile uyum)
+
+#### [ ] PR-13: Server item DEK expose — `feat/server-item-dek`
+
+- [ ] `itemResponse` → `owner_dek_wrapped + owner_wrap_nonce` alanları eklendi
+- [ ] Client decrypt + real X25519 sharing aktif olur (PR-W5 amber banner kalkar)
+
+### Ertelenen (Win PR'ı bekliyor)
+
+- [⏸] Alan decrypt tam çalışması → PR-13 (server DEK expose) merge sonrası
+- [⏸] Gerçek X25519 sharing → PR-13 sonrası (web share modal amber banner)
+- [⏸] Rust keyring entegrasyonu → PR-C1 (Win) sonrası
 
 ## Faz 5 — Production hardening (~1 hafta)
 

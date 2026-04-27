@@ -4,10 +4,10 @@ Son güncelleme: 2026-04-27
 
 ## Mevcut Durum
 
-- **Aktif Faz:** Faz 3 — Admin Web UI (PR-10/11/12/W1/W2/W3/W4/W5 ✅ merged; PR-W6 CI bekliyor)
-- **Tamamlanan Faz:** Faz 0 + Faz 1 + Faz 2 (server MVP) ✅ 2026-04-26
-- **Çift makine workflow:** ▶ Win backend + foundation + auth ✅. Mac tüm ekran PR'ları merged ✅. PR-W6 (realtime+polish) push edildi — Faz 3 son PR.
-- **Bir sonraki adım:** PR-W6 CI green → merge → **Faz 3 DONE** → Faz 4 (Tauri client).
+- **Aktif Faz:** Faz 4 — Tauri Desktop Client (PR-S1 ✅ merged; PR-C2 sırada)
+- **Tamamlanan Faz:** Faz 0 + Faz 1 + Faz 2 (server MVP) ✅ + Faz 3 (Admin Web UI) ✅ 2026-04-27
+- **Son tamamlanan:** PR-W6 (realtime+polish) merged → **Faz 3 DONE**. PR-S1 (shared workspace) merged — Faz 4'ün ilk PR'ı.
+- **Bir sonraki adım:** PR-C2 (feat/client-foundation) — Tauri client'a Tailwind, shadcn, TanStack Query, Zustand, AppShell + CI job.
 
 ## Faz Durumu
 
@@ -16,8 +16,8 @@ Son güncelleme: 2026-04-27
 | 0 — Temel kurulum | VERIFY | 2026-04-24 | 2026-04-24 | Kod yazıldı, lokal smoke test user tarafında |
 | 1 — Veri modeli + kripto tasarımı | DONE | 2026-04-24 | 2026-04-24 | ER (17 tablo) + ADR 0004/0005/0006/0007 + auth-flow + 5 migration + OpenAPI + code gen |
 | 2 — Server MVP | DONE | 2026-04-24 | 2026-04-26 | PR-1...PR-9 ✅ merged. 10 auth endpoint, folder/item CRUD, RBAC 3 katmanlı, E2E hibrit, 174 unit test, 17 migration. WebSocket → Faz 3, item_relationships + field/type admin → Faz 5 (parking). |
-| 3 — Admin Web UI | ACTIVE | 2026-04-26 | — | 9 PR planlı (Win 6 + Mac 3). Win: PR-10 (server WS+admin) ✅, PR-11 (server read API) ✅, PR-12 (/users/me/keypair, Mac sorularından sonra eklendi), PR-W1 (web foundation), PR-W2 (web auth), PR-W6 (websocket+polish). Mac (Pro): PR-W3 (admin UI), PR-W4 (inventory read), PR-W5 (inventory write). ADR-0009 (Mac) merged. Hedef: 5 günde Faz 3 BİTECEK. |
-| 4 — Client MVP (Tauri) | TODO | — | — | Win+Mac, live sync, offline cache, E2E |
+| 3 — Admin Web UI | DONE | 2026-04-26 | 2026-04-27 | 9 PR (Win 6 + Mac 3). PR-10/11/12/W1/W2/W3/W4/W5/W6 tümü merged ✅. WS client + realtime cache invalidation + responsive sidebar + A11y + E2E crypto primitives + admin/inventory UI. |
+| 4 — Client MVP (Tauri) | ACTIVE | 2026-04-27 | — | PR-S1 (shared workspace) ✅ merged. Sırada: PR-C2 (client foundation), PR-C3 (auth), PR-C4 (inventory read), PR-C5 (crypto+E2E). |
 | 5 — Production hardening | PARTIAL | 2026-04-25 | — | Container + GHCR + k8s + ArgoCD + DB migration init container + native cross-compile multi-arch + secret rotation tamam. Sealed Secrets, Helm, observability, Ingress+TLS hâlâ TODO |
 
 Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tamamlandı · `VERIFY` doğrulama bekliyor · `BLOCKED` bloke · `TODO` beklemede
@@ -50,6 +50,29 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-04-27 (Mac) — Faz 4 PR-S1: @envanter/shared workspace — ortak tipler + kripto
+
+**Branch:** `feat/shared-workspace` → PR #23 — CI ✅ merged.
+
+**Faz 4'ün ilk PR'ı.** Hem `web/` hem `client/` tarafından kullanılacak ortak paket oluşturuldu.
+
+**Yapılanlar:**
+
+- Root `package.json` (npm workspaces: shared/pkg, web, client) eklendi
+- `shared/pkg/` → `@envanter/shared` paketi oluşturuldu (private, ESM, exports map)
+  - `./crypto` → `src/crypto.ts` (Argon2id KEK, AES-GCM wrap/unwrap, X25519 sealed-box, encryptField/decryptField)
+  - `./api/types` → `src/api/types.ts` (tüm server DTO interface'leri)
+  - `./api/errors` → `src/api/errors.ts` (ApiError class + ErrCode + helpers)
+- `web/src/{lib/crypto,api/types,api/errors}.ts` → tek satır re-export stub'ları (mevcut import değişmedi)
+- `client/package.json` + `web/package.json` → `"@envanter/shared": "*"` eklendi
+- CI fix: web Install adımı root'tan çalışacak şekilde güncellendi
+- `vitest.config.ts` ayrı oluşturuldu — tailwindcss plugin dışarıda (lightningcss Linux binary sorunu çözüldü)
+- Root `package-lock.json` `.gitignore`'a eklendi (Mac lockfile'ı Linux binary'si içermiyordu)
+
+**Sonuç:** `tsc -b` sıfır hata, 128/134 test pass (6 pre-existing localStorage mock sorunu, PR-S1 ile ilgisiz).
+
+---
 
 ### 2026-04-27 (Mac) — Faz 3 PR-W6: Realtime + polish — WebSocket client + dark mode + responsive
 
