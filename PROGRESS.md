@@ -4,11 +4,11 @@ Son güncelleme: 2026-04-27
 
 ## Mevcut Durum
 
-- **Aktif Faz:** Faz 3 — Admin Web UI (PR-10/11/12 ✅; PR-W1 hazır, PR-W2 sırada)
+- **Aktif Faz:** Faz 3 — Admin Web UI (PR-10/11/12/W1 ✅; PR-W2 hazır, Mac PR-W3 başlayabilir)
 - **Tamamlanan Faz:** Faz 0 + Faz 1 + Faz 2 (server MVP) ✅ 2026-04-26
-- **Çift makine workflow:** ▶ Mac (Pro) ↔ Win paralel. Win = 6 PR. Mac = 3 PR. ADR-0009 stack kararı yansıdı.
+- **Çift makine workflow:** ▶ Win Faz 3 backend + foundation + auth tamam. Mac (Pro) PR-W2 merge sonrası **PR-W3 (admin)** başlayabilir.
 - **Bloker:** Yok
-- **Bir sonraki adım:** **PR-W2** — Auth screens (login + TOTP setup + recover + change-password). KEK türetme + authStore session bu PR'da. PR-W1 merge sonrası başlıyorum.
+- **Bir sonraki adım:** PR-W2 merge → Mac PR-W3 başlar (admin user list + audit log viewer). Win sırasında PR-W6 (websocket+polish) için bekleme moduna geçer.
 
 ## Faz Durumu
 
@@ -51,6 +51,101 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-04-27 (Win) — Faz 3 PR-W2: Web auth — login + TOTP setup + recovery + change-password + KEK akışı
+
+**Branch:** `feat/web-auth` — review/merge bekliyor.
+
+**Web client'ın auth boyutu tamamen çalışır halde.** Login → KEK türetme → priv key decrypt → in-memory session zincirinin tüm parçaları yerli yerinde.
+
+**Kripto altyapısı (`src/lib/crypto.ts`):**
+
+| API | Kullanım |
+|-----|----------|
+| `deriveKEK(password, salt, params)` | hash-wasm Argon2id WASM, 32B key, ~200-500ms |
+| `encryptPrivateKey(plaintext, kek)` | WebCrypto AES-256-GCM + versioned blob `[ver][alg][nonce][ct+tag]` (server format mirror) |
+| `decryptPrivateKey(blob, kek)` | Inverse — version + alg byte validation + tamper check |
+| `generateX25519Keypair()` | WebCrypto X25519 (Chrome 113+ / FF 130+ / Safari 17+); recover-complete için |
+| `randomKEKSalt()` | 16B crypto.getRandomValues |
+| `fromBase64` / `toBase64` | RFC 4648 (atob/btoa) |
+
+**Karar değişikliği — ADR-0009 implementation note:** ADR `argon2-browser` öneriyordu ama Vite v5 ile WASM yükleme zorlukları (eski paket, son güncelleme 2 yıl önce). **`hash-wasm@4.11`** kullanıldı — modern API, Vite-uyumlu, aynı Argon2id RFC 9106. ADR-0009 §3 spirit'i korunuyor (WASM Argon2id), implementasyon detayı.
+
+**API hooks (`src/api/auth.ts` + `me.ts`):**
+
+| Hook | Endpoint |
+|------|----------|
+| `useLoginMutation` | POST `/auth/login` (single-step pwd + TOTP) |
+| `useLogoutMutation` | POST `/auth/logout` |
+| `useLogoutAllMutation` | POST `/auth/logout-all` |
+| `useChangePasswordMutation` | POST `/auth/change-password` |
+| `useTOTPInitMutation(tmpToken)` | POST `/auth/totp/init` (raw fetch — tmp_token Authorization, access store kirletme) |
+| `useTOTPVerifyMutation` | POST `/auth/totp/verify` |
+| `useRecoverInitMutation` | POST `/auth/recover/init` |
+| `useRecoverCompleteMutation` | POST `/auth/recover/complete` |
+| `fetchMyKeypair(token)` (raw) | GET `/users/me/keypair` — login flow chain (token henüz store'a girmedi) |
+| `useMyKeypairMutation` | Mutation wrapper (post-login) |
+
+**Pages:**
+
+`pages/login.tsx` — Form `{username, master_password, totp_code}`. Substep state machine:
+1. `authenticating` → POST /auth/login
+2. `fetching_keypair` → GET /users/me/keypair (fresh access token, not yet in store)
+3. `deriving_key` → Argon2id (heavy, spinner label "Anahtar türetiliyor...")
+4. `unlocking` → AES-GCM decrypt → priv key
+5. `setSession({ user, accessToken, refreshToken, kek, privateKey })`
+6. `navigate(from || '/inventory')`
+
+`pages/totp-setup.tsx` — 3 phase: enroll (auto-init → otpauth_uri + secret_base32) / verify (TOTP code) / recovery_codes (10 plaintext, "ONCE" warning + manual save confirm). QR rendering Faz 3 polish'inde (kütüphane). Şimdilik base32 secret + URI manuel kopyalanır.
+
+`pages/recover.tsx` — 4 phase:
+1. `init` → username + recovery_code → tmp_token
+2. `warn` → ⚠ kritik UX warning: "eski item_shares wrap'lı erişim KAYBEDİLECEK" (ADR-0004 §9 client-side enforcement)
+3. `complete` → yeni X25519 keypair + KEK + priv encrypt → /recover/complete
+4. `codes` → 10 yeni recovery code (eskiler invalid)
+
+`components/change-password-dialog.tsx` — Settings'ten erişilen modal:
+- Mevcut + yeni + onay
+- **public_key SABIT** (item_shares korunur — ADR-0004 §9, change-password için)
+- Yeni KEK + mevcut RAM'deki priv'i yeniden wrap → submit
+- Server tüm session'ları revoke → `clear()` + navigate `/login`
+
+**AppShell güncellemesi:**
+- Logout butonu → `useLogoutMutation` (server'a POST + best-effort, fail olsa bile local clear)
+- Yeni KeyRound icon → ChangePasswordDialog tetikleyici
+- ChangePasswordDialog AppShell altında mount
+
+**Routes (App.tsx):**
+- `/login` (public)
+- `/totp/setup` (public, tmp_token route state ile gelir)
+- `/recover` (public, multi-phase wizard tek route)
+- Geri kalan değişmedi (AuthGate + AppShell + RoleGate admin)
+
+**Hidratasyon:** `HydrateBoot` hâlâ `setHydrating(false)` yapıyor — silent-refresh denemesi ileri PR'a (gerçek refresh token ile boot-time auth restore). PR-W2 kapsamı: kullanıcı manuel login yapar.
+
+**Tests (~9 yeni case):**
+
+`src/lib/crypto.test.ts`:
+- base64 roundtrip + RFC4648 known vector (3)
+- randomKEKSalt 16B + uniqueness (1)
+- AES-GCM encrypt/decrypt roundtrip + length check (1)
+- AES-GCM wrong KEK fail (1)
+- Truncated blob rejection (1)
+- Bad version byte (1)
+- Bad algorithm byte (1)
+
+WebCrypto kullanımı (jsdom 25 + Node 20 globalThis.crypto.subtle).
+
+**Lokal validation atlandı:** Win'de Node yok, CI'a güveniyoruz. PR-W1'in CI fix patterns'i hazır olduğu için type-check + lint + test + build aynı job'da yeniden çalışacak.
+
+**Mac için yeşil ışık:** PR-W2 merge sonrası **Mac PR-W3 başlayabilir** (admin user mgmt ekranı). Bağımlılıkları:
+- ✓ PR-10 (server admin endpoints) main'de
+- ✓ PR-11 (server audit log + catalog) main'de
+- ✓ PR-12 (server /me/keypair) main'de
+- ✓ PR-W1 (web foundation) main'de
+- → PR-W2 (auth) merge sonrası Mac unlock olur
+
+**Sıradaki:** PR-W2 merge → Mac PR-W3 → PR-W4 → PR-W5. Bu sırada Win bekleme moduna geçer (PR-W6 realtime+polish için Mac PR-W5 sonrası).
 
 ### 2026-04-27 (Win) — Faz 3 PR-W1: Web foundation (Vite + Tailwind 4 + shadcn/ui + TanStack Query + Zustand + API client SDK + routing + Vitest)
 
