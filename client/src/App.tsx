@@ -10,6 +10,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { AuthGate } from '@/routes/auth-gate';
 import { ConnectionGate } from '@/routes/connection-gate';
 import { useInactivityLock } from '@/hooks/use-inactivity-lock';
+import { WsProvider } from '@/components/ws-provider';
 
 import ConfigPage from '@/pages/config';
 import LoginPage from '@/pages/login';
@@ -76,7 +77,7 @@ export default function App() {
 
               {/* Authenticated */}
               <Route element={<AuthGate />}>
-                <Route element={<AppShell />}>
+                <Route element={<WsProvider><AppShell /></WsProvider>}>
                   <Route index element={<Navigate to="/inventory" replace />} />
                   <Route path="/inventory/*" element={<InventoryPage />} />
                 </Route>
