@@ -10,6 +10,8 @@ export type {
   RecoverCompleteResponse,
   TOTPInitResponse,
   TOTPVerifyRequest,
+  TOTPVerifyResponse,
+  RecoverInitResponse,
   MyKeypairResponse,
   Folder,
   FolderRequest,

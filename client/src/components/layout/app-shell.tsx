@@ -22,7 +22,7 @@ import { Folder, LogOut, Sun, Moon, Monitor, Menu, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/auth';
 import { useUIStore } from '@/store/ui';
-import { clearAllTokens } from '@/api/token-storage';
+import { useLogoutMutation } from '@/api/auth';
 import { cn } from '@/lib/cn';
 
 // --- Theme toggle ---
@@ -85,20 +85,19 @@ export function AppShell() {
   const clear = useAuthStore((s) => s.clear);
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
+  const logoutMut = useLogoutMutation();
   const [mobileOpen, setMobileOpen] = React.useState(false);
 
   function handleLogout() {
-    // Best-effort server logout — client önce state'i temizler.
-    // PR-C3'te gerçek logout API mutation eklenir.
-    clearAllTokens();
+    // Best-effort: önce local state temizlenir, ardından server'a bildirim.
     clear();
     navigate('/login', { replace: true });
+    logoutMut.mutate();
   }
 
   function handleLock() {
     // PR-C1'de: Rust keyring'den KEK silinir, sadece privateKey memory temizlenir.
-    // Şimdilik tam logout.
-    clearAllTokens();
+    // MVP: tam clear + login'e yönlendir.
     clear();
     navigate('/login', { replace: true });
   }
@@ -126,7 +125,7 @@ export function AppShell() {
           >
             <Menu className="h-5 w-5" />
           </Button>
-          <span className="text-sm font-semibold">Envanter</span>
+          <span className="text-sm font-semibold">IronStock</span>
           <span className="hidden text-xs text-muted-foreground sm:inline">v0.4</span>
         </div>
 

@@ -46,6 +46,8 @@ export interface LoginResponse {
   token_type: 'Bearer';
   user_id: string;
   roles: string[];
+  /** TOTP setup gerektiğinde döner; access_token yerine bu alanla /totp/setup'a yönlendir. */
+  tmp_token?: string;
 }
 
 export interface RefreshRequest {
