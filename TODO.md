@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-04-27 (Faz 3 PR-W1/W2/W3/W4 merged ✅, Mac PR-W5 push edildi CI bekliyor)
+Son güncelleme: 2026-04-27 (Faz 3 PR-W1..W5 merged ✅, PR-W6 push edildi CI bekliyor — Faz 3 son PR)
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 
@@ -135,16 +135,20 @@ Mac sorularından doğan ufak server PR'ı (Q4: KEK türetme için keypair fetch
 - [x] Toolbar: folder (Yeni/Rename/Sil) + item (Yeni/Düzenle/Paylaş/Sil) butonları inventory sayfasına eklendi
 - [⏸] **Alan decrypt + gerçek X25519 sharing** — Win'de server `item_handlers.go` → `itemResponse`'a `owner_dek_wrapped + wrap_nonce` eklenince aktif
 
-#### 🔜 PR-W6: Realtime + polish — `feat/web-realtime-polish` (Win)
+#### ✅ PR-W6: Realtime + polish — `feat/web-realtime-polish` — CI bekliyor
 
-- [ ] WebSocket client (`/ws` connect with access token)
-- [ ] Event handlers: folder/item create/update/delete/share → state invalidate / refetch
-- [ ] Reconnect logic (exponential backoff)
-- [ ] i18n (Türkçe öncelik, EN fallback, react-i18next)
-- [ ] Dark mode toggle (localStorage persist)
-- [ ] Responsive breakpoints (tablet + mobile sidebar collapse)
-- [ ] A11y pass (keyboard nav, aria-labels, focus management)
-- [ ] **Faz 3 BİTECEK** — kapanış commit'i
+- [x] WebSocket client (`api/ws.ts` — connect + exponential backoff reconnect + event dispatch)
+- [x] Event handlers: folder/item mutasyonlarında `queryClient.invalidateQueries` (cache invalidation)
+- [x] Reconnect logic (1s → 2 → 4 → … → 30s cap, attempt counter sıfırlanır open'da)
+- [x] Dark mode toggle (ThemeToggle zaten vardı, AppShell'e entegre + `sidebarCollapsed` persist)
+- [x] Responsive: hamburger mobile + icon-only collapsed desktop sidebar (md breakpoint)
+- [x] A11y: `role="navigation"`, `aria-label` tüm icon button + nav link'lere, `role="main"`
+- [x] WsProvider (React Context ile status expose, `useWsStatus()` hook)
+- [x] WS status indicator (TopBar'da: connected→gizli, reconnecting→spinner, offline→WifiOff)
+- [x] Server: `?access_token=` query param fallback (browser WS header seti yapamıyor)
+- [x] **10 yeni test** (WsClient status transitions + WsProvider render/status)
+- [⏸] i18n (react-i18next) → Faz 4+ (UI zaten Türkçe, priority düşük)
+- [ ] **Faz 3 DONE** — PR-W6 merge sonrası kapanış commit'i
 
 ---
 

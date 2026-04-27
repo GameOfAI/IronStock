@@ -4,11 +4,10 @@ Son güncelleme: 2026-04-27
 
 ## Mevcut Durum
 
-- **Aktif Faz:** Faz 3 — Admin Web UI (PR-10/11/12/W1/W2/W3/W4 ✅ merged; PR-W5 push edildi, CI bekliyor)
+- **Aktif Faz:** Faz 3 — Admin Web UI (PR-10/11/12/W1/W2/W3/W4/W5 ✅ merged; PR-W6 CI bekliyor)
 - **Tamamlanan Faz:** Faz 0 + Faz 1 + Faz 2 (server MVP) ✅ 2026-04-26
-- **Çift makine workflow:** ▶ Win backend + foundation + auth ✅. Mac PR-W3/W4 merged ✅, PR-W5 (inventory write) branch push edildi.
-- **Bloker (kısmi):** Alan decrypt + item sharing için server itemResponse'a `owner_dek_wrapped + wrap_nonce` eklenmeli. Amber UI uyarısı eklendi, Win'e iletildi.
-- **Bir sonraki adım:** PR-W5 CI green → merge → Win PR-W6 (websocket+polish) → Faz 3 DONE.
+- **Çift makine workflow:** ▶ Win backend + foundation + auth ✅. Mac tüm ekran PR'ları merged ✅. PR-W6 (realtime+polish) push edildi — Faz 3 son PR.
+- **Bir sonraki adım:** PR-W6 CI green → merge → **Faz 3 DONE** → Faz 4 (Tauri client).
 
 ## Faz Durumu
 
@@ -51,6 +50,51 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-04-27 (Mac) — Faz 3 PR-W6: Realtime + polish — WebSocket client + dark mode + responsive
+
+**Branch:** `feat/web-realtime-polish` — push edildi, CI bekliyor.
+
+**Faz 3'ün son PR'ı.** WebSocket client (exponential backoff reconnect), WsProvider, AppShell responsive (hamburger mobile + icon-only collapsed sidebar), dark mode toggle (zaten vardı, toggle button + persistence). Server'a query-param WS auth fallback eklendi (browser header seti yapamıyor).
+
+**Server eklenti (`ws_handler.go`):**
+
+Browser WebSocket API custom header gönderemiyor. `?access_token=TOKEN` query-param fallback eklendi (3 satır, `Authorization: Bearer` öncelikli, backward-compat).
+
+**Web WS client (`src/api/ws.ts`):**
+
+```
+WsClient(accessToken)
+  → new WebSocket('/api/v1/ws?access_token=TOKEN', ['envanter.v1'])
+  → onopen → status: connected
+  → onmessage → handleEvent(ev) → queryClient.invalidateQueries(...)
+  → onclose → scheduleReconnect(exponential backoff, 1s→30s cap)
+  → destroy() → cleanup
+```
+
+Event → cache invalidation mapping:
+- `folder.*` → `queryKeys.folders.all` + `queryKeys.folders.detail(id)`
+- `item.*` → `queryKeys.items.all` + `queryKeys.items.detail(id)`
+
+**WsProvider (`src/components/ws-provider.tsx`):**
+
+React Context ile `WsStatus` expose. `useAuthStore(s.accessToken)` değişince client create/destroy. `useWsStatus()` hook AppShell'de status dot için kullanılıyor.
+
+**AppShell güncellemeleri:**
+
+- WS status indicator: connected → gizli; reconnecting → spinner; offline → WifiOff icon
+- Responsive sidebar: `md:` breakpoint'te 56px (icon-only) / 224px toggle; mobile'de fixed overlay + hamburger menu (`Menu` icon)
+- `sidebarCollapsed` ui store'da zaten persist ediliyordu, sadece UI bağlandı
+- A11y: `role="navigation"`, `aria-label` tüm icon button'lara, nav `NavLink`'lere `aria-label`
+
+**Test (10 yeni test, 2 dosya):**
+
+| Dosya | Test sayısı |
+|-------|-------------|
+| `src/api/ws.test.ts` | 7 (connect, status transitions, backoff, destroy, malformed JSON) |
+| `src/components/ws-provider.test.tsx` | 3 (render, initial status, status update) |
+
+Lokal: `tsc -b` ✅, `eslint --max-warnings 0` ✅, `vite build` ✅, 128/134 test (6 pre-existing Node22).
 
 ### 2026-04-27 (Mac) — Faz 3 PR-W5: Inventory write — folder/item CRUD + E2E encryption + share UI
 
