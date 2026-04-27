@@ -104,9 +104,10 @@ jobs:
           node-version: "20"
 
       - name: Install
-        # Using `install` (not `ci`) until package-lock.json lands —
-        # foundation PR (PR-W1) bootstraps the deps; lock will be
-        # committed by the first machine that runs npm install locally.
+        # Run from repo root so npm workspace install resolves all packages
+        # (shared/pkg, web, client) and fetches the correct platform binary
+        # for lightningcss (linux-x64-gnu in CI, darwin-arm64 locally).
+        working-directory: '.'
         run: npm install --no-audit --no-fund
 
       - name: Type check
