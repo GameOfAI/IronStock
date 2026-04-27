@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-04-27 (Faz 3 PR-W1/W2 merged, Mac PR-W3 push edildi review/merge bekliyor)
+Son güncelleme: 2026-04-27 (Faz 3 PR-W1/W2/W3 merged, Mac PR-W4 push edildi review/merge bekliyor)
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 
@@ -109,14 +109,16 @@ Mac sorularından doğan ufak server PR'ı (Q4: KEK türetme için keypair fetch
 - [x] Username mapping: useUsers cache → userMap, "Sistem"/"silinmiş kullanıcı" fallback (ADR-0009 §5)
 - [x] shadcn primitives: badge, dropdown-menu, checkbox, collapsible, popover, tooltip, alert-dialog
 
-#### 🔜 PR-W4: Inventory read — `feat/web-inventory-read` (**Mac**)
+#### ✅ PR-W4: Inventory read — `feat/web-inventory-read` (**Mac**) — review/merge bekliyor
 
-- [ ] Folder tree component (sol sidebar, recursive expand/collapse)
-- [ ] Item list (orta panel): tablo + folder filter + search box (HMAC blind index)
-- [ ] Item detail panel (sağ): metadata + fields (decrypted display)
-- [ ] Empty/loading states
-- [ ] Permission badges per item (read/write)
-- [ ] Unit tests (tree expand state, list filtering)
+- [x] Folder tree component (sol sidebar, recursive expand/collapse, lazy load per level)
+- [x] Item list (orta panel): tablo + folder-scoped + debounced search (HMAC blind index, exact match)
+- [x] Item detail panel (sağ): metadata + field listesi (catalog'dan label/key/type)
+- [x] Empty/loading states (her panelde)
+- [x] Permission badges per item (read/write — compact W/R + full label)
+- [x] Unit tests — 34 test, 7 dosya
+- [x] URL state pattern: `?folder=&item=&q=` (PR-W3 ile tutarlı)
+- [⏸] **Field decrypt** — PR-W5'te. Server itemResponse'a `owner_dek_wrapped + wrap_nonce` eklenmesi gerekiyor; UI'da amber info kutusu ile kullanıcıya açıklandı.
 
 #### 🔜 PR-W5: Inventory write — `feat/web-inventory-write` (**Mac**)
 
