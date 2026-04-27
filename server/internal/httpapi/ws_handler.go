@@ -34,17 +34,21 @@ type WSHandlers struct {
 // NOT close the connection automatically (would force browser reconnect
 // every 15min). Faz 5 follow-up: periodic re-auth check.
 func (h *WSHandlers) Connect(w http.ResponseWriter, r *http.Request) {
+	// Resolve token: Authorization header (native/server-to-server) or
+	// ?access_token= query param (browser WebSocket — can't set headers).
+	var token string
 	authz := r.Header.Get("Authorization")
 	const prefix = "Bearer "
-	if !(len(authz) > len(prefix) && authz[:len(prefix)] == prefix) {
-		// Browser fallback (?access_token=... via Sec-WebSocket-Protocol)
-		// is left for Faz 3 web client decision; for now we only accept
-		// the Authorization header.
+	if len(authz) > len(prefix) && authz[:len(prefix)] == prefix {
+		token = authz[len(prefix):]
+	} else if qt := r.URL.Query().Get("access_token"); qt != "" {
+		token = qt
+	} else {
 		writeError(w, h.Logger, http.StatusUnauthorized, ErrCodeUnauthorized,
-			"Authorization header eksik.", errors.New("no bearer"))
+			"Token eksik (Authorization header veya ?access_token= gerekli).",
+			errors.New("no bearer"))
 		return
 	}
-	token := authz[len(prefix):]
 
 	claims, err := h.Service.JWT.Parse(token, auth.PurposeAccess)
 	if err != nil {

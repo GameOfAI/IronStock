@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Navigate, Outlet, Route, Routes, useNavigate } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 
@@ -9,6 +9,7 @@ import { ThemeProvider } from '@/components/layout/theme-provider';
 import { AppShell } from '@/components/layout/app-shell';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthGate, RoleGate } from '@/routes/auth-gate';
+import { WsProvider } from '@/components/ws-provider';
 
 import LoginPage from '@/pages/login';
 import TOTPSetupPage from '@/pages/totp-setup';
@@ -68,8 +69,9 @@ export default function App() {
             <Route path="/totp/setup" element={<TOTPSetupPage />} />
             <Route path="/recover" element={<RecoverPage />} />
 
-            {/* Authenticated */}
+            {/* Authenticated — WsProvider starts WebSocket after login */}
             <Route element={<AuthGate />}>
+              <Route element={<WsProvider><Outlet /></WsProvider>}>
               <Route element={<AppShell />}>
                 <Route index element={<Navigate to="/inventory" replace />} />
                 <Route path="/inventory/*" element={<InventoryPage />} />
@@ -79,6 +81,7 @@ export default function App() {
                   <Route path="/admin/users" element={<AdminUsersPage />} />
                   <Route path="/admin/audit-log" element={<AdminAuditLogPage />} />
                 </Route>
+              </Route>
               </Route>
             </Route>
 
