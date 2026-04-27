@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-04-27 (Faz 3 PR-10/11/12 merged, PR-W1 hazır, PR-W2 sırada)
+Son güncelleme: 2026-04-27 (Faz 3 PR-W1 merged, PR-W2 hazır, Mac PR-W3 unlock yaklaşıyor)
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 
@@ -82,15 +82,20 @@ Mac sorularından doğan ufak server PR'ı (Q4: KEK türetme için keypair fetch
 - [x] CI yeni `web` job: type-check + lint + test + build (`npm install`; lock ileride)
 - [x] ~27 yeni Vitest test case (cn, token-storage, errors, client, auth store)
 
-#### 🔜 PR-W2: Auth screens — `feat/web-auth` (Win)
+#### ✅ PR-W2: Auth screens — `feat/web-auth` (REVIEW BEKLIYOR)
 
-- [ ] Login form (`/login`): username + master_password + totp_code (single submit)
-- [ ] TOTP setup wizard (`/totp/setup`): QR code render + secret backup + verify
-- [ ] Recovery init (`/recover`): username + recovery code → tmp_token
-- [ ] Recovery complete: new master pwd + new keypair gen (client-side X25519) + submit
-- [ ] Change password modal (Settings) — current pwd + new pwd + client-side priv re-wrap
-- [ ] Auto-logout on refresh failure
-- [ ] Unit tests (form validation, token flow)
+- [x] `lib/crypto.ts`: hash-wasm Argon2id KEK derive + WebCrypto AES-GCM wrap/unwrap + X25519 keygen + base64 helpers
+- [x] `api/auth.ts`: 8 mutation hook (login/logout/logoutAll/changePwd/totpInit/totpVerify/recoverInit/recoverComplete)
+- [x] `api/me.ts`: fetchMyKeypair (raw) + useMyKeypairMutation
+- [x] Login flow: substep state machine (authenticating → fetching_keypair → deriving_key → unlocking → setSession → navigate)
+- [x] TOTP setup wizard: enroll → verify → recovery_codes (3 phase, "ONCE" warning)
+- [x] Recovery wizard: init → warn (item_shares kayıp uyarısı) → complete (yeni X25519 + KEK + priv encrypt) → codes (4 phase)
+- [x] Change-password dialog: priv re-wrap (public_key SABIT — item_shares korunur) + clear + navigate /login
+- [x] AppShell: KeyRound icon → ChangePasswordDialog + Logout server POST + best-effort
+- [x] App.tsx route'lar: /login + /totp/setup + /recover (public)
+- [x] ~9 yeni Vitest test case (crypto roundtrip + tamper detection)
+- [x] **Karar değişikliği:** ADR-0009 `argon2-browser` yerine `hash-wasm` (Vite uyumluluğu, modern API). ADR §3 spirit korunuyor (WASM Argon2id).
+- [x] Lokal validation atlandı (Win'de Node yok), CI'a güveniyoruz
 
 #### 🔜 PR-W3: Admin screens — `feat/web-admin` (**Mac**)
 

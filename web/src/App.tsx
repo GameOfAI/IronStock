@@ -11,6 +11,8 @@ import { Toaster } from '@/components/ui/toaster';
 import { AuthGate, RoleGate } from '@/routes/auth-gate';
 
 import LoginPage from '@/pages/login';
+import TOTPSetupPage from '@/pages/totp-setup';
+import RecoverPage from '@/pages/recover';
 import InventoryPage from '@/pages/inventory';
 import AdminUsersPage, { AdminAuditLogPage } from '@/pages/admin';
 import NotFoundPage from '@/pages/not-found';
@@ -63,6 +65,8 @@ export default function App() {
           <Routes>
             {/* Public */}
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/totp/setup" element={<TOTPSetupPage />} />
+            <Route path="/recover" element={<RecoverPage />} />
 
             {/* Authenticated */}
             <Route element={<AuthGate />}>

@@ -13,11 +13,14 @@
  * admin / inventory sub-menus dynamically based on roles.
  */
 
-import { NavLink, Outlet } from 'react-router-dom';
-import { Folder, Shield, FileText, LogOut, Sun, Moon, Monitor } from 'lucide-react';
+import * as React from 'react';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Folder, Shield, FileText, LogOut, Sun, Moon, Monitor, KeyRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ChangePasswordDialog } from '@/components/change-password-dialog';
 import { useAuthStore, selectIsAdmin } from '@/store/auth';
 import { useUIStore } from '@/store/ui';
+import { useLogoutMutation } from '@/api/auth';
 import { cn } from '@/lib/cn';
 
 function ThemeToggle() {
@@ -70,9 +73,23 @@ function NavItem({ to, icon: Icon, label }: NavItemProps) {
 }
 
 export function AppShell() {
+  const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const isAdmin = useAuthStore(selectIsAdmin);
   const clear = useAuthStore((s) => s.clear);
+  const logoutMut = useLogoutMutation();
+  const [pwOpen, setPwOpen] = React.useState(false);
+
+  async function handleLogout() {
+    // Best-effort server logout — even if it fails, wipe local state.
+    try {
+      await logoutMut.mutateAsync();
+    } catch {
+      // ignored — store.clear handles credential wipe regardless
+    }
+    clear();
+    navigate('/login', { replace: true });
+  }
 
   return (
     <div className="flex h-screen flex-col">
@@ -88,14 +105,26 @@ export function AppShell() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => clear()}
+            onClick={() => setPwOpen(true)}
+            title="Parola değiştir"
+            aria-label="Parola değiştir"
+          >
+            <KeyRound className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleLogout}
             title="Çıkış yap"
             aria-label="Çıkış"
+            disabled={logoutMut.isPending}
           >
             <LogOut className="h-4 w-4" />
           </Button>
         </div>
       </header>
+
+      <ChangePasswordDialog open={pwOpen} onOpenChange={setPwOpen} />
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
