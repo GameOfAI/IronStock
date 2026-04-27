@@ -16,7 +16,7 @@ describe('apiFetch', () => {
 
   it('setBaseUrl trims trailing slash', () => {
     setBaseUrl('https://test.local/');
-    expect(getBaseUrl()).toBe('https://test.local/');
+    expect(getBaseUrl()).toBe('https://test.local');
     setBaseUrl('https://test.local');
     expect(getBaseUrl()).toBe('https://test.local');
   });

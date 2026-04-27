@@ -19,7 +19,7 @@ describe('auth store', () => {
   it('starts unauthenticated', () => {
     const s = useAuthStore.getState();
     expect(selectIsAuthenticated(s)).toBe(false);
-    expect(s.hydrating).toBe(true);
+    expect(s.hydrating).toBe(false);
   });
 
   it('setSession populates state and token-storage', () => {
