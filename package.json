@@ -1,0 +1,12 @@
+{
+  "name": "envanter-monorepo",
+  "private": true,
+  "workspaces": [
+    "shared/pkg",
+    "web",
+    "client"
+  ],
+  "devDependencies": {
+    "jsdom": "^25.0.1"
+  }
+}

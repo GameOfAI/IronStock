@@ -1,0 +1,17 @@
+{
+  "name": "@envanter/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./crypto": "./src/crypto.ts",
+    "./api/types": "./src/api/types.ts",
+    "./api/errors": "./src/api/errors.ts"
+  },
+  "dependencies": {
+    "hash-wasm": "^4.11.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.3"
+  }
+}
