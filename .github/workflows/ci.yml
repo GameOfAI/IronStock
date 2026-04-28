@@ -308,6 +308,9 @@ jobs:
 
       - name: Build Tauri app (Windows x64)
         working-directory: client
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run tauri:build -- --target x86_64-pc-windows-msvc
 
       - name: Upload installer artifact
@@ -322,6 +325,96 @@ jobs:
             client/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
           retention-days: 30
           if-no-files-found: warn
+
+  # ---------------- Client (Tauri binary — macOS arm64 + x86_64) ----------------
+  # Universal DMG for Mac (arm64 + x86_64 via lipo).
+  # TAURI_SIGNING_PRIVATE_KEY + TAURI_SIGNING_PRIVATE_KEY_PASSWORD must be set
+  # as repo secrets for auto-updater signature. Generate with:
+  #   npx tauri signer generate -w ~/.tauri/ironstock.key
+  # then store the contents of ironstock.key as TAURI_SIGNING_PRIVATE_KEY.
+  client-tauri-mac:
+    name: Client (Tauri / macOS Universal)
+    runs-on: macos-latest
+    needs: [client]
+    if: |
+      (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
+      startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Set up Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Cache Rust build
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: client/src-tauri -> target
+
+      - name: Install npm deps
+        run: npm install --no-audit --no-fund
+
+      - name: Build Tauri app (macOS Universal)
+        working-directory: client
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npm run tauri:build -- --target universal-apple-darwin
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ironstock-mac-universal-${{ github.sha }}
+          path: |
+            client/src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+          retention-days: 30
+          if-no-files-found: warn
+
+  # ---------------- GitHub Release (v* tags only) ----------------
+  # Creates a GitHub Release with Win .msi and Mac .dmg artifacts.
+  # Runs after both Tauri build jobs succeed on a version tag.
+  release:
+    name: GitHub Release
+    runs-on: ubuntu-latest
+    needs: [client-tauri-win, client-tauri-mac]
+    permissions:
+      contents: write
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ironstock-win-x64-${{ github.sha }}
+          path: dist/win
+
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ironstock-mac-universal-${{ github.sha }}
+          path: dist/mac
+
+      - name: List artifacts
+        run: find dist/ -type f | sort
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: IronStock ${{ github.ref_name }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          generate_release_notes: true
+          files: |
+            dist/win/**/*.msi
+            dist/win/**/*.exe
+            dist/mac/**/*.dmg
 
   # ---------------- Pre-commit (multi-language hygiene) ----------------
   pre-commit:

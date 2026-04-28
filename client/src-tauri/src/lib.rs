@@ -11,6 +11,7 @@ pub fn run() {
     let inactivity_for_thread = Arc::clone(&inactivity);
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(inactivity)
         .setup(move |app| {
             tray::setup(app)?;
