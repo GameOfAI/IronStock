@@ -1,17 +1,19 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# secret.sealed.yaml: uncomment AFTER running `make seal-secret`.
-# See docs/ops/sealed-secrets.md for first-time setup instructions.
-# - secret.sealed.yaml
 resources:
 - namespace.yaml
 - configmap.yaml
+# secret.sealed.yaml: uncomment AFTER running `make seal-secret`.
+# See docs/ops/sealed-secrets.md for first-time setup instructions.
+# - secret.sealed.yaml
 - postgres.yaml
 - api.yaml
 - web.yaml
 - adminer.yaml
 - mailhog.yaml
+- ingress.yaml
+- network-policy.yaml
 
 # Image tags are updated by CI after each push to main/tag.
 # Do not edit newTag manually — use `kustomize edit set image` or

@@ -1,0 +1,44 @@
+# TODO: Replace `envanter.example.com` with your actual domain before applying.
+# cert-manager ClusterIssuer `letsencrypt-prod` must exist in the cluster.
+# Install nginx-ingress controller and cert-manager before applying this manifest:
+#   https://kubernetes.github.io/ingress-nginx/deploy/
+#   https://cert-manager.io/docs/installation/
+#
+# After domain update run:
+#   kubectl apply -f deploy/k8s/ingress.yaml
+#   kubectl -n envanter describe certificate envanter-tls   # check cert issuance
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: envanter
+  namespace: envanter
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    # WebSocket support: extend timeouts so /api/v1/ws long-polls don't drop.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "10"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - envanter.example.com
+      secretName: envanter-tls
+  rules:
+    - host: envanter.example.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: envanter-api
+                port:
+                  number: 8080
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: envanter-web
+                port:
+                  number: 80
