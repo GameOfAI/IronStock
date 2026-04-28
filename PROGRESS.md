@@ -4,10 +4,10 @@ Son güncelleme: 2026-04-28
 
 ## Mevcut Durum
 
-- **Aktif Faz:** Faz 4 — Tauri Desktop Client (PR-C1 aktif: `feat/client-rust-foundation`)
+- **Aktif Faz:** Faz 4 — Tauri Desktop Client (PR-C6 aktif: `feat/client-win-packaging`)
 - **Tamamlanan Faz:** Faz 0 + Faz 1 + Faz 2 (server MVP) ✅ + Faz 3 (Admin Web UI) ✅ 2026-04-27
-- **Son tamamlanan:** PR-C2/C3/C4/C5 (Mac) + PR-13/server-item-dek (Win) — tümü 2026-04-27 merged ✅
-- **Bir sonraki adım:** PR-C1 (feat/client-rust-foundation) — Windows Credential Store keyring + inaktiflik timer Rust + system tray.
+- **Son tamamlanan:** PR-C1 ✅ merged 2026-04-28 (keyring + inaktiflik timer + tray, tüm CI ✅)
+- **Bir sonraki adım:** PR-C6 (feat/client-win-packaging) — Windows MSI/NSIS binary + CI Windows runner.
 
 ## Faz Durumu
 
@@ -17,7 +17,7 @@ Son güncelleme: 2026-04-28
 | 1 — Veri modeli + kripto tasarımı | DONE | 2026-04-24 | 2026-04-24 | ER (17 tablo) + ADR 0004/0005/0006/0007 + auth-flow + 5 migration + OpenAPI + code gen |
 | 2 — Server MVP | DONE | 2026-04-24 | 2026-04-26 | PR-1...PR-9 ✅ merged. 10 auth endpoint, folder/item CRUD, RBAC 3 katmanlı, E2E hibrit, 174 unit test, 17 migration. WebSocket → Faz 3, item_relationships + field/type admin → Faz 5 (parking). |
 | 3 — Admin Web UI | DONE | 2026-04-26 | 2026-04-27 | 9 PR (Win 6 + Mac 3). PR-10/11/12/W1/W2/W3/W4/W5/W6 tümü merged ✅. WS client + realtime cache invalidation + responsive sidebar + A11y + E2E crypto primitives + admin/inventory UI. |
-| 4 — Client MVP (Tauri) | ACTIVE | 2026-04-27 | — | PR-S1/C2/C3/C4/C5 ✅ merged + PR-13 (server DEK expose) ✅ merged. Sırada: PR-C1 (Rust keyring+tray), PR-C6 (Win binary). |
+| 4 — Client MVP (Tauri) | ACTIVE | 2026-04-27 | — | PR-S1/C2/C3/C4/C5/C1 ✅ merged + PR-13 ✅ merged. Sırada: PR-C6 (Win binary + CI). |
 | 5 — Production hardening | PARTIAL | 2026-04-25 | — | Container + GHCR + k8s + ArgoCD + DB migration init container + native cross-compile multi-arch + secret rotation tamam. Sealed Secrets, Helm, observability, Ingress+TLS hâlâ TODO |
 
 Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tamamlandı · `VERIFY` doğrulama bekliyor · `BLOCKED` bloke · `TODO` beklemede
@@ -50,6 +50,20 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-04-28 (Win) — Faz 4 PR-C6: Windows binary + packaging + CI
+
+**Branch:** `feat/client-win-packaging`
+
+**PR-C1 ✅ merged** (keyring + inaktiflik + tray, tüm CI yeşil).
+
+**PR-C6 kapsamı:**
+
+- `client/src-tauri/icons/`: 32x32, 128x128, 128x128@2x, icon.png (512), icon.ico — PowerShell + System.Drawing ile oluşturuldu, repo'ya commit edildi
+- `tauri.conf.json`: `productName` → "IronStock", `icon` alanı dolduruldu, NSIS `installMode=currentUser` eklendi
+- `client/package.json`: `tauri:build:win` script eklendi
+- `.github/workflows/ci.yml`: `client-tauri-win` job — `windows-latest` + `dtolnay/rust-toolchain@stable` (x86_64-pc-windows-msvc) + `swatinem/rust-cache` + `npm run tauri:build -- --target x86_64-pc-windows-msvc`; main/tag push'ta artifact upload
+- Code signing: TODO Faz 5 (self-signed → Faz 4 son hedefi değil)
 
 ### 2026-04-28 (Win) — Faz 4 PR-C1: Rust keyring + inaktiflik timer + system tray
 
