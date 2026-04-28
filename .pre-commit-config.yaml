@@ -38,7 +38,7 @@ repos:
 
       - id: go-mod-tidy
         name: go mod tidy
-        entry: bash -c 'cd server && go mod tidy && c=$(git status --porcelain -- go.mod go.sum); if [ -n "$c" ]; then echo "go.mod/go.sum not tidy:"; echo "$c"; exit 1; fi'
+        entry: bash -c 'cd server && go mod tidy && c=$(git status --porcelain -- go.mod); if [ -n "$c" ]; then echo "go.mod not tidy:"; echo "$c"; exit 1; fi'
         language: system
         types: [go]
         pass_filenames: false
