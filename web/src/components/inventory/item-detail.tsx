@@ -11,6 +11,7 @@ import type { FieldDefinition, ItemType } from '@/api/types';
 import { useItem } from '@/api/items';
 import { PermissionBadge } from './permission-badge';
 import { ItemFieldRow } from './item-field-row';
+import { ItemAttachmentPanel } from './item-attachment-panel';
 import { RelativeTime } from '@/components/common/relative-time';
 
 interface ItemDetailProps {
@@ -149,6 +150,11 @@ export function ItemDetail({ itemId, fieldDefinitions, itemTypes }: ItemDetailPr
           </span>
         </p>
       </section>
+
+      <ItemAttachmentPanel
+        itemId={item.id}
+        canWrite={item.permission === 'write'}
+      />
     </div>
   );
 }

@@ -35,4 +35,9 @@ export type {
   ItemTypesResponse,
   UserPublicKeyResponse,
   Permission,
+  Attachment,
+  AttachmentListResponse,
+  AttachmentInitRequest,
+  AttachmentInitResponse,
+  AttachmentDownloadURLResponse,
 } from '@envanter/shared/api/types';

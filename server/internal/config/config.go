@@ -44,6 +44,13 @@ type Config struct {
 	// enrollment / recovery). Provided via ENVANTER_JWT_SECRET, raw bytes; >= 32 bytes
 	// required for HS256 security (RFC 7518 §3.2).
 	JWTSecret []byte
+
+	// MinIO / S3-compatible object storage (PR-A2: item attachments)
+	MinioEndpoint  string // ENVANTER_MINIO_ENDPOINT (default "minio:9000")
+	MinioAccessKey string // ENVANTER_MINIO_ACCESS_KEY
+	MinioSecretKey string // ENVANTER_MINIO_SECRET_KEY
+	MinioUseSSL    bool   // ENVANTER_MINIO_USE_SSL (default false)
+	MinioBucket    string // ENVANTER_MINIO_BUCKET (default "envanter")
 }
 
 // Load reads config from environment, applies defaults, and validates.
@@ -63,6 +70,11 @@ func Load() (*Config, error) {
 		DBHealthCheckInterval: envDurationOr("ENVANTER_DB_HEALTH_CHECK_INTERVAL", 30*time.Second),
 		MasterKey:             masterKey,
 		JWTSecret:             []byte(os.Getenv("ENVANTER_JWT_SECRET")),
+		MinioEndpoint:         envOr("ENVANTER_MINIO_ENDPOINT", "minio:9000"),
+		MinioAccessKey:        os.Getenv("ENVANTER_MINIO_ACCESS_KEY"),
+		MinioSecretKey:        os.Getenv("ENVANTER_MINIO_SECRET_KEY"),
+		MinioUseSSL:           envBoolOr("ENVANTER_MINIO_USE_SSL", false),
+		MinioBucket:           envOr("ENVANTER_MINIO_BUCKET", "envanter"),
 	}
 	if err := cfg.Validate(); err != nil {
 		return nil, err
@@ -157,6 +169,15 @@ func envDurationOr(key string, def time.Duration) time.Duration {
 	if v := os.Getenv(key); v != "" {
 		if d, err := time.ParseDuration(v); err == nil {
 			return d
+		}
+	}
+	return def
+}
+
+func envBoolOr(key string, def bool) bool {
+	if v := os.Getenv(key); v != "" {
+		if b, err := strconv.ParseBool(v); err == nil {
+			return b
 		}
 	}
 	return def

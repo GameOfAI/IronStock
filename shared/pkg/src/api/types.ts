@@ -298,3 +298,41 @@ export interface MyKeypairResponse {
   version: number;
   rotated_at?: string | null;
 }
+
+// --- Attachments (PR-A2) ---
+
+export interface Attachment {
+  id: string;
+  item_id: string;
+  file_name: string;
+  content_type: string;
+  size_bytes: number;
+  is_encrypted: boolean;
+  file_nonce?: string | null;
+  upload_confirmed: boolean;
+  created_by: string;
+  created_at: string;
+}
+
+export interface AttachmentListResponse {
+  attachments: Attachment[];
+}
+
+export interface AttachmentInitRequest {
+  file_name: string;
+  content_type: string;
+  size_bytes: number;
+  is_encrypted: boolean;
+  file_nonce?: string;
+}
+
+export interface AttachmentInitResponse {
+  attachment_id: string;
+  upload_url: string;
+  expires_at: string;
+}
+
+export interface AttachmentDownloadURLResponse {
+  url: string;
+  expires_at: string;
+}
