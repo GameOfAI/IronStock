@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-04-28 (Faz 4 ACTIVE — PR-S1/C2/C3/C4/C5 ✅ + PR-13 ✅ merged; PR-C1 [~] devam ediyor)
+Son güncelleme: 2026-04-28 (Faz 4 ACTIVE — PR-S1/C2/C3/C4/C5/C1 ✅ + PR-13 ✅ merged; PR-C6 [~] devam ediyor)
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 
@@ -471,12 +471,13 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 - [x] `login.tsx` — kekStore after setSession
 - [x] `app-shell.tsx` — handleLock/handleLogout → kekDelete before clear
 
-#### [ ] PR-C6: Windows binary + packaging — `feat/client-win-packaging`
+#### [~] PR-C6: Windows binary + packaging — `feat/client-win-packaging`
 
-- [ ] `tauri build --target x86_64-pc-windows-msvc`
-- [ ] MSI installer config (Tauri bundler)
-- [ ] Code signing (self-signed başlangıç)
-- [ ] GitHub Actions: `client` CI job Windows runner'da
+- [x] App ikonları: `icons/32x32.png`, `128x128.png`, `128x128@2x.png`, `icon.png`, `icon.ico`
+- [x] `tauri.conf.json` — productName=IronStock, icon paths, NSIS currentUser config
+- [x] `client/package.json` — `tauri:build:win` script
+- [x] `.github/workflows/ci.yml` — `client-tauri-win` job (windows-latest + msvc + rust-cache + artifact upload)
+- [ ] Code signing — Faz 5'e ertelendi (self-signed sertifika kurulumu)
 
 ### Server PR'ları (Win — web ile uyum)
 

@@ -244,6 +244,52 @@ jobs:
           cache-from: type=gha,scope=web
           cache-to: type=gha,mode=max,scope=web
 
+  # ---------------- Client (Tauri binary — Windows x64) ----------------
+  # Rust + MSVC hedef derleme + NSIS installer üretimi.
+  # Rust cache (swatinem/rust-cache) ile ilk ~15dk → sonraki ~5dk.
+  # Artifact: main push ve v* tag'lerde 30 gün saklanır; PR'larda sadece build validate.
+  client-tauri-win:
+    name: Client (Tauri / Win x64)
+    runs-on: windows-latest
+    needs: [client]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Set up Rust (stable-msvc)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache Rust build
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: client/src-tauri -> target
+
+      - name: Install npm deps
+        run: npm install --no-audit --no-fund
+
+      - name: Build Tauri app (Windows x64)
+        working-directory: client
+        run: npm run tauri:build -- --target x86_64-pc-windows-msvc
+
+      - name: Upload installer artifact
+        if: |
+          github.event_name == 'push' &&
+          (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+        uses: actions/upload-artifact@v4
+        with:
+          name: ironstock-win-x64-${{ github.sha }}
+          path: |
+            client/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+            client/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
+          retention-days: 30
+          if-no-files-found: warn
+
   # ---------------- Pre-commit (multi-language hygiene) ----------------
   pre-commit:
     name: Pre-commit hooks

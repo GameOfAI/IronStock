@@ -1,7 +1,7 @@
 use tauri::{
     menu::{MenuBuilder, MenuItemBuilder},
     tray::TrayIconBuilder,
-    Manager,
+    Emitter, Manager,
 };
 
 /// Sistem tepsisi ikonunu ve menüsünü kurar.
@@ -18,10 +18,12 @@ pub fn setup<R: tauri::Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
         .item(&quit_item)
         .build()?;
 
-    // Uygulama ikonu varsa onu kullan, yoksa minimal RGBA fallback.
+    // default_window_icon() returns a borrowed Image<'_> tied to `app`.
+    // TrayIconBuilder requires Image<'static>, so we copy rgba bytes into
+    // an owned Image<'static> via new_owned().
     let icon = app
         .default_window_icon()
-        .cloned()
+        .map(|i| tauri::image::Image::new_owned(i.rgba().to_vec(), i.width(), i.height()))
         .unwrap_or_else(make_fallback_icon);
 
     TrayIconBuilder::new()
