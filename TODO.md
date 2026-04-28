@@ -502,7 +502,10 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 | PR-K2 | `feat/k8s-sealed-secrets` | Sealed Secrets CRD + secret.yaml → SealedSecret | Yüksek | [ ] |
 | PR-K3 | `feat/k8s-network` | Ingress + cert-manager + NetworkPolicy | Yüksek | [ ] |
 | PR-K4 | `feat/server-observability` | Go `/metrics` endpoint (Prometheus) + ServiceMonitor + Grafana dashboard JSON | Orta | [ ] |
-| PR-K5 | `feat/server-vault` | `server/internal/vault` package + item endpoint passthrough + audit | Orta | [ ] |
+| PR-K5 | `feat/k8s-minio` | MinIO k8s StatefulSet + docker-compose servisi + secret + StorageBackend interface | Orta | [ ] |
+| PR-A1 | `feat/item-description` | `items.description` migration + server endpoint + web/client UI (textarea) | Orta | [ ] |
+| PR-A2 | `feat/item-attachments` | `item_attachments` migration + presigned URL API + upload/download UI + E2E şifreleme (PEM/PFX) | Orta | [ ] |
+| PR-K6 | `feat/server-vault` | `server/internal/vault` package + item endpoint passthrough + audit | Düşük | [ ] |
 | PR-P1 | `feat/client-packaging-2` | Tauri auto-updater config + Mac dmg CI job | Orta | [ ] |
 | PR-V1 | `feat/release-v1` | Production readiness checklist + version bump + v1.0.0 tag | Son | [ ] |
 
@@ -546,6 +549,34 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 - [ ] `GET /metrics` endpoint (no auth — scrape-only, internal)
 - [ ] `deploy/k8s/servicemonitor.yaml` — Prometheus Operator ServiceMonitor CRD
 - [ ] `deploy/grafana/dashboard.json` — HTTP rate, latency p50/p95, DB conns, auth failures panel
+
+#### [ ] PR-K5: MinIO — `feat/k8s-minio`
+
+- [ ] `deploy/k8s/minio.yaml` — StatefulSet + Service + PVC (10Gi)
+- [ ] `deploy/compose/docker-compose.yml` — MinIO servisi (local dev)
+- [ ] `secret.yaml.example` — `MINIO_ROOT_USER` + `MINIO_ROOT_PASSWORD` key'leri
+- [ ] `server/internal/storage/` — `StorageBackend` interface + `MinioBackend` (minio-go/v7)
+- [ ] kustomization.yaml — minio.yaml ekle
+
+#### [ ] PR-A1: Item description — `feat/item-description`
+
+- [ ] `server/migrations/00018_item_description.sql` — `items.description TEXT` sütunu
+- [ ] Server: `itemResponse` + `createItemRequest` + `updateItemRequest`'a `description` alanı
+- [ ] Web: item detail panelinde textarea gösterimi + edit formuna ekleme
+- [ ] Client: item detail + edit form güncelleme
+
+#### [ ] PR-A2: Item attachments — `feat/item-attachments`
+
+- [ ] `server/migrations/00019_item_attachments.sql` — `item_attachments` tablosu
+- [ ] `server/internal/storage/` MinioBackend tamamlandı (PR-K5'e bağımlı)
+- [ ] `POST /api/v1/items/:id/attachments` — presigned PUT URL üret (5dk TTL)
+- [ ] `GET /api/v1/items/:id/attachments` — liste (meta, content yok)
+- [ ] `GET /api/v1/items/:id/attachments/:att_id/download` — presigned GET URL
+- [ ] `DELETE /api/v1/items/:id/attachments/:att_id`
+- [ ] Şifreleme: PEM/PFX/private key → client-side AES-GCM encrypt öncesi upload; PDF/Word → server-side envelope
+- [ ] Web: dosya seçici (drag & drop), upload progress, download butonu, dosya listesi
+- [ ] Client (Tauri): native dosya seçici (`tauri::dialog::FileDialogBuilder`), download → `save_file`
+- [ ] Maksimum boyut: 25MB per dosya, 100MB per item toplam
 
 **Hâlâ yapılacak (misc):**
 - [ ] Distroless image (server `alpine` → `gcr.io/distroless/static-debian12`) — Faz 5 sonuna
