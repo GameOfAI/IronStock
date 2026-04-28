@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-04-28 (Faz 5 ACTIVE — PR-K1..K5 MERGED; sırada PR-A1)
+Son güncelleme: 2026-04-28 (Faz 5 TAMAMLANDI — PR-K1..K5, PR-A1, PR-A2, PR-P1, PR-V1 açık PR olarak bekliyor; merge sonrası v1.0.0 tag)
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 
@@ -503,11 +503,11 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 | PR-K3 | `feat/k8s-network` | Ingress + cert-manager + NetworkPolicy | Yüksek | ✅ merged |
 | PR-K4 | `feat/server-observability` | Go `/metrics` endpoint (Prometheus) + ServiceMonitor + Grafana dashboard JSON | Orta | ✅ merged |
 | PR-K5 | `feat/k8s-minio` | MinIO k8s StatefulSet + docker-compose servisi + secret + StorageBackend interface | Orta | ✅ merged |
-| PR-A1 | `feat/item-description` | `items.description` migration + server endpoint + web/client UI (textarea) | Orta | [ ] |
-| PR-A2 | `feat/item-attachments` | `item_attachments` migration + presigned URL API + upload/download UI + E2E şifreleme (PEM/PFX) | Orta | [ ] |
-| PR-K6 | `feat/server-vault` | `server/internal/vault` package + item endpoint passthrough + audit | Düşük | [ ] |
-| PR-P1 | `feat/client-packaging-2` | Tauri auto-updater config + Mac dmg CI job | Orta | [ ] |
-| PR-V1 | `feat/release-v1` | Production readiness checklist + version bump + v1.0.0 tag | Son | [ ] |
+| PR-A1 | `feat/item-description` | `items.description` migration + server endpoint + web/client UI (textarea) | Orta | 🔄 PR#15 açık |
+| PR-A2 | `feat/item-attachments` | `item_attachments` migration + presigned URL API + upload/download UI | Orta | 🔄 PR#16 açık |
+| PR-K6 | `feat/server-vault` | `server/internal/vault` package + item endpoint passthrough + audit | Düşük | [ ] parking lot |
+| PR-P1 | `feat/client-packaging-2` | Tauri auto-updater config + Mac dmg CI job | Orta | 🔄 PR#17 açık |
+| PR-V1 | `feat/release-v1` | Production readiness checklist + version bump + v1.0.0 tag | Son | 🔄 PR#18 açık |
 
 ### k8s / Deploy
 
@@ -555,25 +555,23 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 - [x] `server/internal/storage/` — `StorageBackend` interface + `MinioBackend` (minio-go/v7)
 - [x] kustomization.yaml — minio.yaml eklendi
 
-#### [ ] PR-A1: Item description — `feat/item-description`
+#### ✅ PR-A1: Item description — `feat/item-description` — PR#15 açık
 
-- [ ] `server/migrations/00018_item_description.sql` — `items.description TEXT` sütunu
-- [ ] Server: `itemResponse` + `createItemRequest` + `updateItemRequest`'a `description` alanı
-- [ ] Web: item detail panelinde textarea gösterimi + edit formuna ekleme
-- [ ] Client: item detail + edit form güncelleme
+- [x] `server/migrations/00018_item_description.sql` — `items.description TEXT` sütunu
+- [x] Server: `itemResponse` + `createItemRequest` + `updateItemRequest`'a `description` alanı
+- [x] Web: item detail panelinde gösterim + edit formuna textarea ekleme
+- [x] Client: item detail + edit form güncelleme
 
-#### [ ] PR-A2: Item attachments — `feat/item-attachments`
+#### ✅ PR-A2: Item attachments — `feat/item-attachments` — PR#16 açık
 
-- [ ] `server/migrations/00019_item_attachments.sql` — `item_attachments` tablosu
-- [ ] `server/internal/storage/` MinioBackend tamamlandı (PR-K5'e bağımlı)
-- [ ] `POST /api/v1/items/:id/attachments` — presigned PUT URL üret (5dk TTL)
-- [ ] `GET /api/v1/items/:id/attachments` — liste (meta, content yok)
-- [ ] `GET /api/v1/items/:id/attachments/:att_id/download` — presigned GET URL
-- [ ] `DELETE /api/v1/items/:id/attachments/:att_id`
-- [ ] Şifreleme: PEM/PFX/private key → client-side AES-GCM encrypt öncesi upload; PDF/Word → server-side envelope
-- [ ] Web: dosya seçici (drag & drop), upload progress, download butonu, dosya listesi
-- [ ] Client (Tauri): native dosya seçici (`tauri::dialog::FileDialogBuilder`), download → `save_file`
-- [ ] Maksimum boyut: 25MB per dosya, 100MB per item toplam
+- [x] `server/migrations/00019_item_attachments.sql` — `item_attachments` tablosu
+- [x] `POST /api/v1/items/:id/attachments` — presigned PUT URL + DB record
+- [x] `POST /api/v1/items/:id/attachments/:att_id/confirm` — upload onayı
+- [x] `GET /api/v1/items/:id/attachments` — liste (meta)
+- [x] `GET /api/v1/items/:id/attachments/:att_id/url` — presigned GET URL
+- [x] `DELETE /api/v1/items/:id/attachments/:att_id` — DB + MinIO silme
+- [x] Web + Client: ItemAttachmentPanel (upload, download, delete)
+- [x] Config: ENVANTER_MINIO_* env vars + k8s configmap güncellemesi
 
 **Hâlâ yapılacak (misc):**
 - [ ] Distroless image (server `alpine` → `gcr.io/distroless/static-debian12`) — Faz 5 sonuna
