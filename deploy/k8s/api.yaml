@@ -83,7 +83,8 @@ spec:
   selector:
     app: envanter-api
   ports:
-    - port: 8080
+    - name: http
+      port: 8080
       targetPort: 8080
 ---
 apiVersion: policy/v1
