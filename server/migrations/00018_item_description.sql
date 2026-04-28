@@ -6,6 +6,7 @@
 -- NULL means "no description" (existing rows keep NULL after migration).
 
 ALTER TABLE items ADD COLUMN description TEXT;
+-- +goose StatementEnd
 
 -- +goose Down
 -- +goose StatementBegin

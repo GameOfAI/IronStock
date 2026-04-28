@@ -130,7 +130,7 @@ describe('ItemFormModal — edit', () => {
     expect(mutateAsync).toHaveBeenCalledWith({ name: 'new-name' });
   });
 
-  it('shows amber warning about field editing limitation', () => {
+  it('shows description field in edit mode', () => {
     useCreate.mockReturnValue(makeMutationStub());
     useUpdate.mockReturnValue(makeMutationStub());
     const editItem = {
@@ -138,6 +138,7 @@ describe('ItemFormModal — edit', () => {
       folder_id: 'f-1',
       item_type_id: 1,
       name: 'item',
+      description: 'existing note',
       fields: [],
       created_by: 'u-1',
       created_at: '2024-01-01',
@@ -145,6 +146,6 @@ describe('ItemFormModal — edit', () => {
       permission: 'write' as const,
     };
     renderModal({ editItem });
-    expect(screen.getByText(/alan değerleri şu an düzenlenemiyor/i)).toBeInTheDocument();
+    expect(screen.getByDisplayValue('existing note')).toBeInTheDocument();
   });
 });
