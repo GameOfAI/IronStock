@@ -4,10 +4,10 @@ Son güncelleme: 2026-04-28
 
 ## Mevcut Durum
 
-- **Aktif Faz:** Faz 5 — Production Hardening (PR-K1..K5 merged ✅; sırada PR-A1 item-description)
-- **Tamamlanan Faz:** Faz 0 + 1 + 2 + 3 + 4 ✅ (tümü kapalı)
-- **Son tamamlanan:** PR-K5 (MinIO) merged ✅ 2026-04-28
-- **Bir sonraki adım:** PR-A1 (item description) → PR-A2 (attachments) → PR-P1 (packaging) → PR-V1 (v1.0.0)
+- **Aktif Faz:** — (Tüm fazlar tamamlandı ✅)
+- **Tamamlanan Faz:** Faz 0 + 1 + 2 + 3 + 4 + 5 ✅
+- **Son tamamlanan:** PR-V1 — v1.0.0 released ✅ 2026-04-28
+- **Proje durumu:** MVP tamamlandı. Sıradaki çalışmalar Parking Lot / Faz 6+ kapsamında (Vault, distroless, backup/restore, code signing).
 
 ## Faz Durumu
 
@@ -18,7 +18,7 @@ Son güncelleme: 2026-04-28
 | 2 — Server MVP | DONE | 2026-04-24 | 2026-04-26 | PR-1...PR-9 ✅ merged. 10 auth endpoint, folder/item CRUD, RBAC 3 katmanlı, E2E hibrit, 174 unit test, 17 migration. WebSocket → Faz 3, item_relationships + field/type admin → Faz 5 (parking). |
 | 3 — Admin Web UI | DONE | 2026-04-26 | 2026-04-27 | 9 PR (Win 6 + Mac 3). PR-10/11/12/W1/W2/W3/W4/W5/W6 tümü merged ✅. WS client + realtime cache invalidation + responsive sidebar + A11y + E2E crypto primitives + admin/inventory UI. |
 | 4 — Client MVP (Tauri) | DONE | 2026-04-27 | 2026-04-28 | PR-S1/C2/C3/C4/C5/C1 ✅ merged + PR-13 ✅ merged. PR-C6 (Win binary CI) PR#7 open — CI onayı sonrası tam kapanır. |
-| 5 — Production hardening | ACTIVE | 2026-04-28 | — | PR-K1..K5 merged ✅. k8s hardening, Sealed Secrets, Ingress+TLS+NetworkPolicy, Prometheus+Grafana, MinIO tamam. Sırada: PR-A1 (description), PR-A2 (attachments), PR-P1 (packaging), PR-V1 (v1.0.0). |
+| 5 — Production hardening | DONE | 2026-04-28 | 2026-04-28 | PR-K1..K5 + PR-A1 + PR-A2 + PR-P1 + PR-V1 tümü merged ✅. k8s hardening, Sealed Secrets, Ingress+TLS, Prometheus+Grafana, MinIO, attachments, packaging. v1.0.0 released. |
 
 Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tamamlandı · `VERIFY` doğrulama bekliyor · `BLOCKED` bloke · `TODO` beklemede
 
@@ -50,6 +50,50 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-04-28 (Win) — Faz 5 kapandı: PR-A1/A2/P1/V1 merged — v1.0.0 🎉
+
+**Tüm açık PR'lar merge edildi. Proje MVP tamamlandı.**
+
+**PR-A2 conflict çözümü:**
+`feat/item-attachments` branch'ında `client/src/components/inventory/item-detail.tsx` conflict vardı. PR-A1 description bölümü, PR-A2 branch'ı PR-A1 öncesi oluşturulduğu için eksikti. `git rebase origin/main` ile description bloğu korunarak çözüldü.
+
+**PR-A1: Item description — merged (PR #15)**
+
+| Dosya | Değişiklik |
+|-------|-----------|
+| `server/migrations/00018_item_description.sql` | `items.description TEXT` sütunu (nullable, goose up/down) |
+| `server/internal/httpapi/item_handlers.go` | `itemResponse` + create/update request'e `description` alanı |
+| `shared/pkg/src/api/types.ts` | `ItemResponse.description?: string` |
+| `web/src/components/inventory/{item-detail,item-form-modal}.tsx` | Textarea gösterim + edit form |
+| `client/src/components/inventory/{item-detail,item-form-modal}.tsx` | Tauri client (aynı) |
+| `web/src/test/setup.ts` | jsdom 25 + vitest 2 worker localStorage shim fix |
+
+**PR-A2: Item attachments — merged (PR #16)**
+
+| Dosya | Değişiklik |
+|-------|-----------|
+| `server/migrations/00019_item_attachments.sql` | `item_attachments` tablosu |
+| `server/internal/httpapi/item_attachment_handlers.go` | `POST .../attachments` (presigned PUT) + confirm + liste + presigned GET + DELETE |
+| `deploy/k8s/configmap.yaml` | `ENVANTER_MINIO_ENDPOINT` + `ENVANTER_MINIO_BUCKET` |
+| `deploy/k8s/secret.yaml.example` | `ENVANTER_MINIO_ACCESS_KEY` + `ENVANTER_MINIO_SECRET_KEY` |
+| `server/internal/config/config.go` + `server/cmd/api/main.go` | MinIO config wire |
+| `web/src/` + `client/src/` | `ItemAttachmentPanel` — upload/download/delete UI |
+
+**PR-P1: Tauri packaging + macOS DMG CI — merged (PR #17)**
+
+| Dosya | Değişiklik |
+|-------|-----------|
+| `client/src-tauri/tauri.conf.json` | Auto-updater endpoint + signature config |
+| `client/src-tauri/capabilities/default.json` | `core:default` + updater capabilities |
+| `client/src-tauri/Cargo.toml` + `src/lib.rs` | `tauri-plugin-updater = "2"` register |
+| `.github/workflows/ci.yml` | `client-tauri-macos` job (universal binary) + `github-release` job |
+
+**PR-V1: v1.0.0 release — merged (PR #18)**
+
+- `client/package.json`, `Cargo.toml`, `tauri.conf.json`, `shared/pkg/package.json`, `web/package.json` → tümü `1.0.0`
+
+---
 
 ### 2026-04-28 (Win) — Faz 5 başladı: PR-K1 k8s hardening
 

@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-04-28 (Faz 5 TAMAMLANDI — PR-K1..K5, PR-A1, PR-A2, PR-P1, PR-V1 açık PR olarak bekliyor; merge sonrası v1.0.0 tag)
+Son güncelleme: 2026-04-28 (**Faz 5 TAMAMLANDI ✅** — PR-K1..K5 + PR-A1 + PR-A2 + PR-P1 + PR-V1 tümü merged. v1.0.0 released. Proje MVP tamamlandı.)
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 
@@ -492,7 +492,7 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 - [⏸] Gerçek X25519 sharing → PR-13 sonrası (web share modal amber banner)
 - [⏸] Rust keyring entegrasyonu → PR-C1 (Win) sonrası
 
-## Aktif: Faz 5 — Production hardening
+## ✅ Tamamlandı: Faz 5 — Production hardening (2026-04-28)
 
 **PR Planı:**
 
@@ -503,11 +503,11 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 | PR-K3 | `feat/k8s-network` | Ingress + cert-manager + NetworkPolicy | Yüksek | ✅ merged |
 | PR-K4 | `feat/server-observability` | Go `/metrics` endpoint (Prometheus) + ServiceMonitor + Grafana dashboard JSON | Orta | ✅ merged |
 | PR-K5 | `feat/k8s-minio` | MinIO k8s StatefulSet + docker-compose servisi + secret + StorageBackend interface | Orta | ✅ merged |
-| PR-A1 | `feat/item-description` | `items.description` migration + server endpoint + web/client UI (textarea) | Orta | 🔄 PR#15 açık |
-| PR-A2 | `feat/item-attachments` | `item_attachments` migration + presigned URL API + upload/download UI | Orta | 🔄 PR#16 açık |
-| PR-K6 | `feat/server-vault` | `server/internal/vault` package + item endpoint passthrough + audit | Düşük | [ ] parking lot |
-| PR-P1 | `feat/client-packaging-2` | Tauri auto-updater config + Mac dmg CI job | Orta | 🔄 PR#17 açık |
-| PR-V1 | `feat/release-v1` | Production readiness checklist + version bump + v1.0.0 tag | Son | 🔄 PR#18 açık |
+| PR-A1 | `feat/item-description` | `items.description` migration + server endpoint + web/client UI (textarea) | Orta | ✅ merged |
+| PR-A2 | `feat/item-attachments` | `item_attachments` migration + presigned URL API + upload/download UI | Orta | ✅ merged |
+| PR-K6 | `feat/server-vault` | `server/internal/vault` package + item endpoint passthrough + audit | Düşük | ⏸ parking lot |
+| PR-P1 | `feat/client-packaging-2` | Tauri auto-updater config + macOS Universal DMG CI | Orta | ✅ merged |
+| PR-V1 | `feat/release-v1` | Production readiness checklist + version bump + v1.0.0 tag | Son | ✅ merged |
 
 ### k8s / Deploy
 
@@ -555,14 +555,14 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 - [x] `server/internal/storage/` — `StorageBackend` interface + `MinioBackend` (minio-go/v7)
 - [x] kustomization.yaml — minio.yaml eklendi
 
-#### ✅ PR-A1: Item description — `feat/item-description` — PR#15 açık
+#### ✅ PR-A1: Item description — `feat/item-description` — merged 2026-04-28 (PR#15)
 
 - [x] `server/migrations/00018_item_description.sql` — `items.description TEXT` sütunu
 - [x] Server: `itemResponse` + `createItemRequest` + `updateItemRequest`'a `description` alanı
 - [x] Web: item detail panelinde gösterim + edit formuna textarea ekleme
 - [x] Client: item detail + edit form güncelleme
 
-#### ✅ PR-A2: Item attachments — `feat/item-attachments` — PR#16 açık
+#### ✅ PR-A2: Item attachments — `feat/item-attachments` — merged 2026-04-28 (PR#16)
 
 - [x] `server/migrations/00019_item_attachments.sql` — `item_attachments` tablosu
 - [x] `POST /api/v1/items/:id/attachments` — presigned PUT URL + DB record
@@ -573,14 +573,27 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 - [x] Web + Client: ItemAttachmentPanel (upload, download, delete)
 - [x] Config: ENVANTER_MINIO_* env vars + k8s configmap güncellemesi
 
-**Hâlâ yapılacak (misc):**
-- [ ] Distroless image (server `alpine` → `gcr.io/distroless/static-debian12`) — Faz 5 sonuna
-- [ ] Managed DB değerlendirmesi (Cloud SQL / RDS / on-prem HA cluster) — Faz 5 sonuna
-- [ ] nginx `readOnlyRootFilesystem: true` — emptyDir volume + custom config gerektirir
+#### ✅ PR-P1: Client packaging 2 — `feat/client-packaging-2` — merged 2026-04-28 (PR#17)
+
+- [x] `tauri.conf.json` — auto-updater endpoint + signature config
+- [x] `client/src-tauri/capabilities/default.json` — updater capabilities
+- [x] `ci.yml` — `client-tauri-macos` job (macos-latest, universal binary: aarch64+x86_64)
+- [x] `ci.yml` — `github-release` job (tag push → GitHub Release + Win NSIS + Mac DMG asset)
+
+#### ✅ PR-V1: Release v1.0.0 — `feat/release-v1` — merged 2026-04-28 (PR#18)
+
+- [x] `client/package.json`, `client/src-tauri/Cargo.toml`, `client/src-tauri/tauri.conf.json` → `1.0.0`
+- [x] `shared/pkg/package.json`, `web/package.json` → `1.0.0`
+
+**Post-v1.0.0 / Faz 6+ genel:**
+- [ ] Distroless image (server `alpine` → `gcr.io/distroless/static-debian12`)
+- [ ] Managed DB değerlendirmesi (Cloud SQL / RDS / on-prem HA cluster)
+- [ ] nginx `readOnlyRootFilesystem: true` — emptyDir volume + custom config
+- [ ] Win MSI code signing
 
 ### Observability
-- [ ] Prometheus metrics (custom + runtime)
-- [ ] Grafana dashboard template
+- [x] Prometheus metrics (custom + runtime) — PR-K4
+- [x] Grafana dashboard template — PR-K4
 - [ ] Structured logging (slog) + log aggregation uyumu
 
 ### Ops
@@ -588,20 +601,15 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 - [ ] KMS entegrasyonu (master_keys rotation batch job)
 
 ### External Secret Backends (ADR-0007)
-- [ ] `server/internal/vault` — HTTP client + k8s AppRole auth
+- [ ] `server/internal/vault` — HTTP client + k8s AppRole auth (PR-K6, parking lot)
 - [ ] Item detail endpoint genişletme: `external_source` doluysa Vault passthrough
 - [ ] Audit log integration — her Vault fetch `item.external_fetch` olarak log'lanır
 - [ ] Web + client UI: "Vault-backed item oluştur" formu + key_mapping editor
 - [ ] Bonus: Dynamic secrets flow (`POST /items/:id/dynamic-cred` → Vault'tan 15dk'lık cred)
 
-### Packaging
-- [ ] Win MSI packaging + code signing
-- [ ] Mac .dmg packaging + notarization
-- [ ] Tauri auto-updater (built-in vs self-hosted — Faz 4'te karar verilir)
-
 ### Release
-- [ ] Production readiness checklist
-- [ ] v1.0.0 release
+- [x] Production readiness checklist — PR-V1
+- [x] v1.0.0 release — 2026-04-28 ✅
 
 ---
 
