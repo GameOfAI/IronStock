@@ -116,7 +116,6 @@ func (h *AttachmentHandlers) InitUpload(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var attID string
-	storageKey := fmt.Sprintf("items/%s/attachments/%s", itemID, "PLACEHOLDER")
 
 	const insertSQL = `
 		INSERT INTO item_attachments (
@@ -139,7 +138,7 @@ func (h *AttachmentHandlers) InitUpload(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	storageKey = fmt.Sprintf("items/%s/attachments/%s", itemID, attID)
+	storageKey := fmt.Sprintf("items/%s/attachments/%s", itemID, attID)
 
 	const updateKeySQL = `UPDATE item_attachments SET storage_key = $1 WHERE id = $2::uuid`
 	if _, err := h.Service.DB.Exec(ctx, updateKeySQL, storageKey, attID); err != nil {
