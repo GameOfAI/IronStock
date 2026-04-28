@@ -2,19 +2,19 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-  - namespace.yaml
-  - configmap.yaml
-  - postgres.yaml
-  - api.yaml
-  - web.yaml
-  - adminer.yaml
-  - mailhog.yaml
+- namespace.yaml
+- configmap.yaml
+- postgres.yaml
+- api.yaml
+- web.yaml
+- adminer.yaml
+- mailhog.yaml
 
 # Image tags are updated by CI after each push to main/tag.
 # Do not edit newTag manually — use `kustomize edit set image` or
 # let the CI docker job commit the change automatically.
 images:
-  - name: ghcr.io/gameofai/envanter-api
-    newTag: latest
-  - name: ghcr.io/gameofai/envanter-web
-    newTag: latest
+- name: ghcr.io/gameofai/envanter-api
+  newTag: main-e335f54
+- name: ghcr.io/gameofai/envanter-web
+  newTag: main-e335f54
