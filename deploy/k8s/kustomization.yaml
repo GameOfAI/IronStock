@@ -1,12 +1,12 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-resources:
-- namespace.yaml
-- configmap.yaml
 # secret.sealed.yaml: uncomment AFTER running `make seal-secret`.
 # See docs/ops/sealed-secrets.md for first-time setup instructions.
 # - secret.sealed.yaml
+resources:
+- namespace.yaml
+- configmap.yaml
 - postgres.yaml
 - api.yaml
 - web.yaml
@@ -18,6 +18,6 @@ resources:
 # let the CI docker job commit the change automatically.
 images:
 - name: ghcr.io/gameofai/envanter-api
-  newTag: main-e335f54
+  newTag: main-c04d4a8
 - name: ghcr.io/gameofai/envanter-web
-  newTag: main-e335f54
+  newTag: main-c04d4a8
