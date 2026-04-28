@@ -151,10 +151,16 @@ export interface ItemCreateRequest {
   folder_id: string;
   item_type_id: number;
   name: string;
+  description?: string;
   fields: ItemFieldInput[];
   owner_dek_wrapped: string; // base64, X25519 sealed-box
   owner_wrap_nonce: string; // base64, 12B
   external_source?: Record<string, unknown> | null;
+}
+
+export interface ItemUpdateRequest {
+  name: string;
+  description?: string;
 }
 
 export interface Item {
@@ -162,6 +168,7 @@ export interface Item {
   folder_id: string;
   item_type_id: number;
   name: string;
+  description?: string;
   fields?: ItemFieldOutput[];
   created_by: string;
   created_at: string;

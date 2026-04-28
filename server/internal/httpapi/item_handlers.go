@@ -61,6 +61,7 @@ type itemRequest struct {
 	FolderID        string           `json:"folder_id"`
 	ItemTypeID      int16            `json:"item_type_id"`
 	Name            string           `json:"name"`
+	Description     *string          `json:"description,omitempty"`
 	Fields          []itemFieldInput `json:"fields"`
 	OwnerDEKWrapped []byte           `json:"owner_dek_wrapped"` // X25519 sealed-box
 	OwnerWrapNonce  []byte           `json:"owner_wrap_nonce"`  // 12B (matches schema)
@@ -76,6 +77,7 @@ type itemResponse struct {
 	FolderID        string              `json:"folder_id"`
 	ItemTypeID      int16               `json:"item_type_id"`
 	Name            string              `json:"name"`
+	Description     *string             `json:"description,omitempty"`
 	Fields          []itemFieldOutput   `json:"fields"`
 	CreatedBy       string              `json:"created_by"`
 	CreatedAt       string              `json:"created_at"`
@@ -183,12 +185,14 @@ func (h *ItemHandlers) Create(w http.ResponseWriter, r *http.Request) {
 		    id, folder_id, item_type_id,
 		    name_enc, name_nonce, name_search,
 		    server_dek_wrapped, master_key_id,
+		    description,
 		    external_source, created_by
 		) VALUES (
 		    $1::uuid, $2::uuid, $3,
 		    $4, $5, $6,
 		    $7, $8,
-		    $9, $10::uuid
+		    $9,
+		    $10, $11::uuid
 		)
 		RETURNING created_at::text, updated_at::text
 	`
@@ -197,6 +201,7 @@ func (h *ItemHandlers) Create(w http.ResponseWriter, r *http.Request) {
 		req.ID, req.FolderID, req.ItemTypeID,
 		nameEnc, nameNonce, nameSearch,
 		serverDEKWrapped, h.Service.MasterKey.ID,
+		req.Description,
 		nullableJSON(req.ExternalSource), claims.Subject,
 	).Scan(&createdAt, &updatedAt)
 	if err != nil {
@@ -261,6 +266,7 @@ func (h *ItemHandlers) Create(w http.ResponseWriter, r *http.Request) {
 		FolderID:        req.FolderID,
 		ItemTypeID:      req.ItemTypeID,
 		Name:            req.Name,
+		Description:     req.Description,
 		Fields:          fieldInputsToOutputs(req.Fields),
 		CreatedBy:       claims.Subject,
 		CreatedAt:       createdAt,
@@ -537,10 +543,11 @@ func (h *ItemHandlers) Update(w http.ResponseWriter, r *http.Request) {
 		SET folder_id = $2::uuid,
 		    name_enc = $3,
 		    name_nonce = $4,
-		    name_search = $5
+		    name_search = $5,
+		    description = $6
 		WHERE id = $1::uuid
 	`
-	if _, err := tx.Exec(ctx, updateItemSQL, id, folderArg, nameEnc, nameNonce, nameSearch); err != nil {
+	if _, err := tx.Exec(ctx, updateItemSQL, id, folderArg, nameEnc, nameNonce, nameSearch, req.Description); err != nil {
 		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
 			"Item güncellenemedi.", err)
 		return
@@ -649,6 +656,7 @@ type itemRow struct {
 	ItemTypeID       int16
 	NameEnc          []byte
 	ServerDEKWrapped []byte
+	Description      *string
 	CreatedBy        string
 	CreatedAt        string
 	UpdatedAt        string
@@ -658,6 +666,7 @@ func fetchItemForUpdate(ctx context.Context, db auth.DBExec, id string) (itemRow
 	const sqlText = `
 		SELECT id::text, folder_id::text, item_type_id,
 		       name_enc, server_dek_wrapped,
+		       description,
 		       created_by::text, created_at::text, updated_at::text
 		FROM items WHERE id = $1::uuid LIMIT 1
 	`
@@ -665,6 +674,7 @@ func fetchItemForUpdate(ctx context.Context, db auth.DBExec, id string) (itemRow
 	err := db.QueryRow(ctx, sqlText, id).Scan(
 		&row.ID, &row.FolderID, &row.ItemTypeID,
 		&row.NameEnc, &row.ServerDEKWrapped,
+		&row.Description,
 		&row.CreatedBy, &row.CreatedAt, &row.UpdatedAt,
 	)
 	return row, err
@@ -695,6 +705,7 @@ func fetchItemFull(ctx context.Context, db auth.DBExec, svc *auth.Service, id, u
 		FolderID:        row.FolderID,
 		ItemTypeID:      row.ItemTypeID,
 		Name:            name,
+		Description:     row.Description,
 		Fields:          fields,
 		CreatedBy:       row.CreatedBy,
 		CreatedAt:       row.CreatedAt,

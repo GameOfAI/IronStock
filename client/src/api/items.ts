@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from './client';
 import { queryKeys } from './query';
-import type { Item, ItemCreateRequest, ItemListResponse } from './types';
+import type { Item, ItemCreateRequest, ItemUpdateRequest, ItemListResponse } from './types';
 
 export function useItems(folderId: string | null, q?: string) {
   return useQuery({
@@ -36,7 +36,7 @@ export function useCreateItemMutation(folderId: string) {
 export function useUpdateItemMutation(id: string, folderId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (req: { name: string }) =>
+    mutationFn: (req: ItemUpdateRequest) =>
       apiFetch<void>(`/api/v1/items/${id}`, { method: 'PUT', body: req }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.items.detail(id) });
