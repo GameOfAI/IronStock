@@ -15,6 +15,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"golang.org/x/time/rate"
+
+	"envanter.app/server/internal/metrics"
 )
 
 // DBPinger is the minimum DB interface needed for /readyz.
@@ -56,6 +58,8 @@ func NewRouter(d Deps) http.Handler {
 	r.Use(slogRequestLogger(d.Logger))
 	// 5. Recoverer — catches panics, logs + 500 instead of crashing
 	r.Use(middleware.Recoverer)
+	// 6. Prometheus request instrumentation (duration + count by route pattern)
+	r.Use(metrics.Middleware)
 
 	// NOTE: Timeout middleware is NOT applied globally here — it wraps
 	// responses with http.TimeoutHandler which breaks Hijack (the WS
@@ -63,10 +67,12 @@ func NewRouter(d Deps) http.Handler {
 	// for endpoints that should be subject to it.
 	timeoutMW := middleware.Timeout(30 * time.Second)
 
-	// Health routes (unauthenticated, NOT timeout-wrapped — short anyway)
+	// Health + metrics routes (unauthenticated, NOT timeout-wrapped)
 	h := &handlers{deps: d}
 	r.Get("/healthz", h.Healthz)
 	r.Get("/readyz", h.Readyz)
+	// /metrics is internal-only; restricted at the network layer (NetworkPolicy).
+	r.Get("/metrics", metrics.Handler().ServeHTTP)
 
 	// WebSocket route mounted BEFORE timeout-wrapped groups; the long-lived
 	// connection must not be wrapped by http.TimeoutHandler.

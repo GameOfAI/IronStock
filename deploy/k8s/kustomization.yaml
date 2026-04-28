@@ -14,6 +14,8 @@ resources:
 - mailhog.yaml
 - ingress.yaml
 - network-policy.yaml
+# servicemonitor.yaml: uncomment when prometheus-operator (kube-prometheus-stack) is installed.
+# - servicemonitor.yaml
 
 # Image tags are updated by CI after each push to main/tag.
 # Do not edit newTag manually — use `kustomize edit set image` or
