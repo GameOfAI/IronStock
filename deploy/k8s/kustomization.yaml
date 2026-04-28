@@ -14,6 +14,7 @@ resources:
 - mailhog.yaml
 - ingress.yaml
 - network-policy.yaml
+- minio.yaml
 # servicemonitor.yaml: uncomment when prometheus-operator (kube-prometheus-stack) is installed.
 # - servicemonitor.yaml
 
