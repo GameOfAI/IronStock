@@ -1,6 +1,6 @@
 [package]
 name = "envanter-client"
-version = "0.1.0"
+version = "1.0.0"
 description = "Envanter desktop client"
 authors = ["Envanter App Contributors"]
 edition = "2021"
