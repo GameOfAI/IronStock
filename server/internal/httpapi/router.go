@@ -31,14 +31,15 @@ type DBPinger interface {
 // Auth, Folder, Item, WS are optional: when nil their routes are not mounted
 // (useful for foundation tests that don't exercise those flows).
 type Deps struct {
-	Logger  *slog.Logger
-	DB      DBPinger
-	Auth    *AuthHandlers
-	Folder  *FolderHandlers
-	Item    *ItemHandlers
-	Admin   *AdminHandlers
-	Catalog *CatalogHandlers
-	WS      *WSHandlers
+	Logger     *slog.Logger
+	DB         DBPinger
+	Auth       *AuthHandlers
+	Folder     *FolderHandlers
+	Item       *ItemHandlers
+	Attachment *AttachmentHandlers
+	Admin      *AdminHandlers
+	Catalog    *CatalogHandlers
+	WS         *WSHandlers
 }
 
 // NewRouter builds a chi router with the standard middleware stack.
@@ -139,6 +140,14 @@ func NewRouter(d Deps) http.Handler {
 			ir.Delete("/{id}", d.Item.Delete)
 			ir.Post("/{id}/shares", d.Item.Share)
 			ir.Delete("/{id}/shares/{user_id}", d.Item.Unshare)
+
+			if d.Attachment != nil {
+				ir.Get("/{id}/attachments", d.Attachment.List)
+				ir.Post("/{id}/attachments", d.Attachment.InitUpload)
+				ir.Post("/{id}/attachments/{att_id}/confirm", d.Attachment.ConfirmUpload)
+				ir.Get("/{id}/attachments/{att_id}/url", d.Attachment.GetDownloadURL)
+				ir.Delete("/{id}/attachments/{att_id}", d.Attachment.Delete)
+			}
 		})
 	}
 

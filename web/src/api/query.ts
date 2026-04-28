@@ -53,4 +53,7 @@ export const queryKeys = {
     users: (limit: number, offset: number) => ['admin', 'users', { limit, offset }] as const,
     auditLog: (filters: Record<string, unknown>) => ['admin', 'audit-log', filters] as const,
   },
+  attachments: {
+    byItem: (itemId: string) => ['attachments', { itemId }] as const,
+  },
 } as const;

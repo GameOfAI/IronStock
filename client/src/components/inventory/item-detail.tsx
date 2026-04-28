@@ -15,6 +15,7 @@ import { useItem } from '@/api/items';
 import { useAuthStore } from '@/store/auth';
 import { openDEKWithKEK, decryptField, fromBase64 } from '@/lib/crypto';
 import { PermissionBadge } from './permission-badge';
+import { ItemAttachmentPanel } from './item-attachment-panel';
 import { RelativeTime } from '@/components/common/relative-time';
 
 const CLIPBOARD_CLEAR_MS = 30_000;
@@ -288,6 +289,11 @@ export function ItemDetail({ itemId, fieldDefinitions, itemTypes }: ItemDetailPr
           </div>
         )}
       </section>
+
+      <ItemAttachmentPanel
+        itemId={item.id}
+        canWrite={item.permission === 'write'}
+      />
 
       {itemQuery.isFetching && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
