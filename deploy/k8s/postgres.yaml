@@ -26,6 +26,10 @@ spec:
       labels:
         app: postgres
     spec:
+      securityContext:
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
       containers:
         - name: postgres
           image: postgres:16-alpine
@@ -43,6 +47,15 @@ spec:
                   key: POSTGRES_PASSWORD
             - name: POSTGRES_INITDB_ARGS
               value: "--encoding=UTF8 --locale=C"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          securityContext:
+            allowPrivilegeEscalation: false
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/postgresql/data
@@ -51,6 +64,7 @@ spec:
               command: ["pg_isready", "-U", "envanter", "-d", "envanter"]
             initialDelaySeconds: 5
             periodSeconds: 5
+            failureThreshold: 5
       volumes:
         - name: postgres-data
           persistentVolumeClaim:

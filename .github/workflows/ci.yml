@@ -16,6 +16,9 @@ permissions:
   contents: read
   packages: write
 
+# Job-level permission overrides are used where elevated access is needed
+# (e.g. docker job writes back image tags to kustomization.yaml).
+
 jobs:
   # ---------------- Server (Go) ----------------
   server:
@@ -184,15 +187,23 @@ jobs:
   # ---------------- Docker Build & Push (GHCR) ----------------
   # Dockerfile uses --platform=$BUILDPLATFORM (native cross-compile, no QEMU).
   # Both main push and v* tag push build linux/amd64,linux/arm64 (~8dk total).
+  # After a main push, the job commits updated image tags back to
+  # deploy/k8s/kustomization.yaml so ArgoCD picks up the exact SHA.
   docker:
     name: Docker Build & Push
     runs-on: ubuntu-latest
     needs: [server]
+    permissions:
+      contents: write
+      packages: write
     if: |
       (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
       startsWith(github.ref, 'refs/tags/v')
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full clone so we can push back the kustomization tag update.
+          fetch-depth: 0
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -243,6 +254,28 @@ jobs:
           tags: ${{ steps.tags.outputs.web }}
           cache-from: type=gha,scope=web
           cache-to: type=gha,mode=max,scope=web
+
+      # Commit updated image tags to kustomization.yaml so ArgoCD
+      # deploys the exact SHA instead of relying on :latest pull.
+      # Runs only on main push (not tags — version tags are applied separately).
+      # [skip ci] prevents triggering another workflow run.
+      - name: Update k8s image tags in kustomization.yaml
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          TAG="main-${GITHUB_SHA::7}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
+          cd deploy/k8s
+          kustomize edit set image \
+            "ghcr.io/${OWNER}/envanter-api:${TAG}" \
+            "ghcr.io/${OWNER}/envanter-web:${TAG}"
+          cd ../..
+          git add deploy/k8s/kustomization.yaml
+          git diff --staged --quiet && exit 0
+          git commit -m "chore(deploy): bump api+web images to ${TAG} [skip ci]"
+          git push "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" HEAD:main
 
   # ---------------- Client (Tauri binary — Windows x64) ----------------
   # Rust + MSVC hedef derleme + NSIS installer üretimi.

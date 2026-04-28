@@ -2,3 +2,8 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: envanter
+  labels:
+    # Warn on pods that don't meet restricted PSS (non-blocking for now).
+    # Flip to "enforce" after all workloads pass the policy.
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: latest
