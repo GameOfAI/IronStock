@@ -1,13 +1,13 @@
 # İlerleyiş
 
-Son güncelleme: 2026-04-27
+Son güncelleme: 2026-04-28
 
 ## Mevcut Durum
 
-- **Aktif Faz:** Faz 4 — Tauri Desktop Client (PR-S1 ✅ merged; PR-C2 ✅ push edildi, CI bekliyor)
+- **Aktif Faz:** Faz 4 — Tauri Desktop Client (PR-C1 aktif: `feat/client-rust-foundation`)
 - **Tamamlanan Faz:** Faz 0 + Faz 1 + Faz 2 (server MVP) ✅ + Faz 3 (Admin Web UI) ✅ 2026-04-27
-- **Son tamamlanan:** PR-C2 (client-foundation) — branch push edildi, CI bekliyor. Sırada: PR-C3 (client-auth).
-- **Bir sonraki adım:** PR-C3 (feat/client-auth) — login formu, KEK derive, Zustand auth, TOTP wizard.
+- **Son tamamlanan:** PR-C2/C3/C4/C5 (Mac) + PR-13/server-item-dek (Win) — tümü 2026-04-27 merged ✅
+- **Bir sonraki adım:** PR-C1 (feat/client-rust-foundation) — Windows Credential Store keyring + inaktiflik timer Rust + system tray.
 
 ## Faz Durumu
 
@@ -17,7 +17,7 @@ Son güncelleme: 2026-04-27
 | 1 — Veri modeli + kripto tasarımı | DONE | 2026-04-24 | 2026-04-24 | ER (17 tablo) + ADR 0004/0005/0006/0007 + auth-flow + 5 migration + OpenAPI + code gen |
 | 2 — Server MVP | DONE | 2026-04-24 | 2026-04-26 | PR-1...PR-9 ✅ merged. 10 auth endpoint, folder/item CRUD, RBAC 3 katmanlı, E2E hibrit, 174 unit test, 17 migration. WebSocket → Faz 3, item_relationships + field/type admin → Faz 5 (parking). |
 | 3 — Admin Web UI | DONE | 2026-04-26 | 2026-04-27 | 9 PR (Win 6 + Mac 3). PR-10/11/12/W1/W2/W3/W4/W5/W6 tümü merged ✅. WS client + realtime cache invalidation + responsive sidebar + A11y + E2E crypto primitives + admin/inventory UI. |
-| 4 — Client MVP (Tauri) | ACTIVE | 2026-04-27 | — | PR-S1 (shared workspace) ✅ merged. Sırada: PR-C2 (client foundation), PR-C3 (auth), PR-C4 (inventory read), PR-C5 (crypto+E2E). |
+| 4 — Client MVP (Tauri) | ACTIVE | 2026-04-27 | — | PR-S1/C2/C3/C4/C5 ✅ merged + PR-13 (server DEK expose) ✅ merged. Sırada: PR-C1 (Rust keyring+tray), PR-C6 (Win binary). |
 | 5 — Production hardening | PARTIAL | 2026-04-25 | — | Container + GHCR + k8s + ArgoCD + DB migration init container + native cross-compile multi-arch + secret rotation tamam. Sealed Secrets, Helm, observability, Ingress+TLS hâlâ TODO |
 
 Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tamamlandı · `VERIFY` doğrulama bekliyor · `BLOCKED` bloke · `TODO` beklemede
@@ -50,6 +50,27 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-04-28 (Win) — Faz 4 PR-C1: Rust keyring + inaktiflik timer + system tray
+
+**Branch:** `feat/client-rust-foundation` — implement ediliyor.
+
+**Mac PR'ları sync:** PR-C2/C3/C4/C5 + PR-13 tümü 2026-04-27 merged. Repo GameOfAI/IronStock'a taşındı. Bu session'da Windows üzerinden devam edildi.
+
+**PR-C1 kapsamı:**
+
+- `Cargo.toml`: `keyring = "2"` + `tokio = { version = "1", features = ["time"] }` + `tauri tray-icon` feature
+- `src-tauri/src/commands.rs`: `kek_store` / `kek_load` / `kek_delete` (Windows Credential Manager / macOS Keychain) + `activity_ping` + `set_inactivity_timeout`
+- `src-tauri/src/inactivity.rs`: `InactivityState` (last_activity + timeout_secs Mutex) + `start()` background thread (30s poll, `inactivity_lock` event emit)
+- `src-tauri/src/tray.rs`: `TrayIconBuilder` — Göster / Kilitle / Çıkış menüsü; Kilitle → `inactivity_lock` event
+- `src-tauri/src/lib.rs`: modüller wire + `manage(InactivityState)` + `invoke_handler`
+- `src-tauri/capabilities/default.json`: Tauri 2 `core:default` capabilities
+- `client/src/lib/tauri.ts`: `isTauri()` guard + typed wrapper'lar (kekStore/Load/Delete, activityPing, listenInactivityLock)
+- `client/src/hooks/use-inactivity-lock.ts`: Tauri event path + browser fallback (setTimeout)
+- `client/src/pages/login.tsx`: `kekStore` after `setSession`
+- `client/src/components/layout/app-shell.tsx`: `handleLock` + `handleLogout` → `kekDelete` before clear
+
+**Tasarım kararı — lock semantiği:** Lock = `kek_delete` (keyring'den sil) + `clear()`. Tam re-login gerekir. Quick-unlock (keyring'den KEK yükle) PR-C1 sonrası ayrı PR.
 
 ### 2026-04-27 (Win) — Faz 4 PR-C2: Client foundation — Tailwind 4 + shadcn/ui + TanStack Query + Zustand + ConnectionGate + CI
 

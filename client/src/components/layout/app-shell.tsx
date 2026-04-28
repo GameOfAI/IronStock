@@ -24,6 +24,7 @@ import { useAuthStore } from '@/store/auth';
 import { useUIStore } from '@/store/ui';
 import { useLogoutMutation } from '@/api/auth';
 import { cn } from '@/lib/cn';
+import { kekDelete } from '@/lib/tauri';
 
 // --- Theme toggle ---
 
@@ -88,16 +89,17 @@ export function AppShell() {
   const logoutMut = useLogoutMutation();
   const [mobileOpen, setMobileOpen] = React.useState(false);
 
-  function handleLogout() {
-    // Best-effort: önce local state temizlenir, ardından server'a bildirim.
+  async function handleLogout() {
+    // KEK'i keyring'den sil, ardından local state temizle, server'a bildir.
+    if (user) await kekDelete(user.username);
     clear();
     navigate('/login', { replace: true });
     logoutMut.mutate();
   }
 
-  function handleLock() {
-    // PR-C1'de: Rust keyring'den KEK silinir, sadece privateKey memory temizlenir.
-    // MVP: tam clear + login'e yönlendir.
+  async function handleLock() {
+    // KEK'i keyring'den sil + memory temizle → tam re-login gerekir.
+    if (user) await kekDelete(user.username);
     clear();
     navigate('/login', { replace: true });
   }

@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-04-27 (Faz 3 ✅ TAMAMLANDI — Faz 4 ACTIVE, PR-S1 ✅ + PR-C2 ✅ push edildi)
+Son güncelleme: 2026-04-28 (Faz 4 ACTIVE — PR-S1/C2/C3/C4/C5 ✅ + PR-13 ✅ merged; PR-C1 [~] devam ediyor)
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 
@@ -434,38 +434,42 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 - [x] 21 test case (cn, token-storage, auth store, connection store, api/client)
 - [x] CI: `client` job eklendi (tsc + lint + test + vite build, Tauri binary derlenmez)
 
-#### [ ] PR-C3: Client auth — `feat/client-auth`
+#### ✅ PR-C3: Client auth — `feat/client-auth` — merged 2026-04-27
 
-- [ ] Login formu (username + master_password + TOTP)
-- [ ] KEK derive (Argon2id via `@envanter/shared/crypto`) + private_key decrypt
-- [ ] Auth state: Zustand (memory-only, Faz 4 MVP — Rust keyring PR-C1'e kadar)
-- [ ] Logout + auto-lock hook (inactivity timer)
-- [ ] TOTP setup wizard (yeni kullanıcılar için)
-- [ ] `@/api/client.ts` Bearer + refresh interceptor (web'den adapt)
+- [x] Login formu (username + master_password + TOTP)
+- [x] KEK derive (Argon2id via `@envanter/shared/crypto`) + private_key decrypt
+- [x] Auth state: Zustand (memory-only, Faz 4 MVP — Rust keyring PR-C1'e kadar)
+- [x] Logout + auto-lock hook (inactivity timer — JS side; PR-C1'de Rust'a taşınır)
+- [x] TOTP setup wizard (yeni kullanıcılar için)
+- [x] `@/api/client.ts` Bearer + refresh interceptor (web'den adapt)
 
-#### [ ] PR-C4: Client inventory read — `feat/client-inventory-read`
+#### ✅ PR-C4: Client inventory read — `feat/client-inventory-read` — merged 2026-04-27
 
-- [ ] Folder tree (sol panel)
-- [ ] Item listesi (orta panel, debounced search)
-- [ ] Item detail panel (sağ — alanlar amber "şifreli" placeholder)
-- [ ] WsClient + WsProvider (web'den taşı, `@envanter/shared` import)
-- [ ] TanStack Query: folder/item hook'ları (web `api/` adapt)
+- [x] Folder tree (sol panel, lazy load)
+- [x] Item listesi (orta panel, debounced search)
+- [x] Item detail panel (sağ — alanlar amber "şifreli" placeholder)
+- [x] WsClient + WsProvider (`@envanter/shared` import)
+- [x] TanStack Query: folder/item hook'ları
 
-#### [ ] PR-C5: Client E2E decrypt — `feat/client-crypto`
+#### ✅ PR-C5: Client E2E decrypt — `feat/client-crypto` — merged 2026-04-27
 
-- [ ] Field decrypt UI (DEK açma + alan gösterme)
-- [ ] Copy-to-clipboard auto-clear (30sn, Tauri clipboard API)
-- [ ] Password field toggle (Eye/EyeOff)
-- [ ] Item create form + E2E encrypt (web item-form-modal'den adapt)
+- [x] Field decrypt UI (DEK açma + alan gösterme)
+- [x] Copy-to-clipboard auto-clear (30sn)
+- [x] Password field toggle (Eye/EyeOff)
+- [x] Item create/edit/delete form + E2E encrypt
 
 ### Client PR'ları (Win — platform-specific)
 
-#### [ ] PR-C1: Rust keyring + inactivity lock + tray — `feat/client-rust-foundation`
+#### [~] PR-C1: Rust keyring + inactivity lock + tray — `feat/client-rust-foundation`
 
-- [ ] `tauri-plugin-keychain` (Mac) + Windows Credential Store → KEK persist
-- [ ] Inactivity timer Rust side (10dk default, configurable)
-- [ ] System tray icon (lock/unlock/quit)
-- [ ] Auto-lock → Zustand state clear
+- [x] `keyring = "2"` (Windows Credential Manager / macOS Keychain) → KEK persist
+- [x] Inactivity timer Rust side (30s poll, 10dk default, `set_inactivity_timeout` command)
+- [x] System tray icon (Göster / Kilitle / Çıkış menüsü)
+- [x] Auto-lock → `inactivity_lock` event → frontend clear()
+- [x] `src/lib/tauri.ts` — `isTauri()` guard + typed wrappers
+- [x] `use-inactivity-lock.ts` — Tauri event path + browser fallback
+- [x] `login.tsx` — kekStore after setSession
+- [x] `app-shell.tsx` — handleLock/handleLogout → kekDelete before clear
 
 #### [ ] PR-C6: Windows binary + packaging — `feat/client-win-packaging`
 
@@ -476,10 +480,10 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 
 ### Server PR'ları (Win — web ile uyum)
 
-#### [ ] PR-13: Server item DEK expose — `feat/server-item-dek`
+#### ✅ PR-13: Server item DEK expose — `feat/server-item-dek` — merged 2026-04-27
 
-- [ ] `itemResponse` → `owner_dek_wrapped + owner_wrap_nonce` alanları eklendi
-- [ ] Client decrypt + real X25519 sharing aktif olur (PR-W5 amber banner kalkar)
+- [x] `itemResponse` → `owner_dek_wrapped + owner_wrap_nonce` alanları eklendi
+- [x] Client decrypt + real X25519 sharing aktif oldu (amber banner kalktı)
 
 ### Ertelenen (Win PR'ı bekliyor)
 
