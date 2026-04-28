@@ -60,14 +60,11 @@ jobs:
       - name: Verify go mod tidy
         run: |
           go mod tidy
-          # Only check go.mod — go.sum is platform-specific (Linux CI adds
-          # entries for Linux-only packages like prometheus/procfs that
-          # Windows builds don't need). go.sum integrity is verified by
-          # Go's own checksum mechanism during download.
-          changed=$(git status --porcelain -- go.mod)
+          changed=$(git status --porcelain -- go.mod go.sum)
           if [ -n "$changed" ]; then
-            echo "go.mod not tidy. Run 'go mod tidy' locally and commit."
-            git --no-pager diff -- go.mod
+            echo "go.mod/go.sum not tidy. Run 'go mod tidy' locally and commit."
+            echo "$changed"
+            git --no-pager diff -- go.mod go.sum 2>/dev/null || true
             exit 1
           fi
 
