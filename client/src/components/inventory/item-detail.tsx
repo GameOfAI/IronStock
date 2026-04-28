@@ -256,10 +256,13 @@ export function ItemDetail({ itemId, fieldDefinitions, itemTypes }: ItemDetailPr
         </div>
       )}
 
-      {!canDecrypt && item.fields && item.fields.length > 0 && (
-        <p className="text-xs text-amber-600 dark:text-amber-400">
-          Alan değerleri henüz gösterilemiyor — sunucu DEK erişimi PR-13 sonrası aktif olur.
-        </p>
+      {item.description && (
+        <section aria-label="Açıklama">
+          <h3 className="mb-1.5 text-sm font-medium">Açıklama</h3>
+          <p className="whitespace-pre-wrap rounded-md border bg-muted/30 px-3 py-2 text-sm text-foreground">
+            {item.description}
+          </p>
+        </section>
       )}
 
       <section aria-label="Alanlar">

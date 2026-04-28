@@ -106,6 +106,15 @@ export function ItemDetail({ itemId, fieldDefinitions, itemTypes }: ItemDetailPr
         </dl>
       </header>
 
+      {item.description && (
+        <section aria-label="Açıklama">
+          <h3 className="mb-1.5 text-sm font-medium">Açıklama</h3>
+          <p className="whitespace-pre-wrap rounded-md border bg-muted/30 px-3 py-2 text-sm text-foreground">
+            {item.description}
+          </p>
+        </section>
+      )}
+
       <section aria-label="Alanlar">
         <div className="mb-2 flex items-center justify-between">
           <h3 className="text-sm font-medium">Alanlar</h3>

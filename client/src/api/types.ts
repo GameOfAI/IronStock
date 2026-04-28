@@ -21,6 +21,7 @@ export type {
   ItemFieldInput,
   ItemFieldOutput,
   ItemCreateRequest,
+  ItemUpdateRequest,
   ItemListResponse,
   ShareItemRequest,
   AdminUser,
