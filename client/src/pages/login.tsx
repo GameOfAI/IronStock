@@ -22,9 +22,10 @@ import { useToast } from '@/hooks/use-toast';
 import { useLoginMutation } from '@/api/auth';
 import { fetchMyKeypair } from '@/api/me';
 import { useAuthStore } from '@/store/auth';
-import { decryptPrivateKey, deriveKEK, fromBase64 } from '@/lib/crypto';
+import { decryptPrivateKey, deriveKEK, fromBase64, toBase64 } from '@/lib/crypto';
 import type { KEKParams } from '@/lib/crypto';
 import { ApiError } from '@/api/errors';
+import { kekStore } from '@/lib/tauri';
 
 type Substep = 'idle' | 'authenticating' | 'fetching_keypair' | 'deriving_key' | 'unlocking';
 
@@ -103,6 +104,9 @@ export default function LoginPage() {
         kek,
         privateKey,
       });
+
+      // KEK'i OS keyring'e kaydet (Tauri ortamında; browser'da no-op).
+      await kekStore(username.toLowerCase(), toBase64(kek));
 
       navigate(fromPath ?? '/inventory', { replace: true });
     } catch (err) {
