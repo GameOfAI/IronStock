@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-04-28 (Faz 5 ACTIVE — Faz 4 kapandı; PR-K1 [~] `feat/k8s-hardening`)
+Son güncelleme: 2026-04-28 (Faz 5 ACTIVE — PR-K1..K5 MERGED; sırada PR-A1)
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 
@@ -498,11 +498,11 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 
 | # | Branch | Kapsam | Öncelik | Durum |
 |---|--------|--------|---------| ------|
-| PR-K1 | `feat/k8s-hardening` | GHCR ref fix + Kustomize image versioning + resource limits + securityContext + PSS label + PDB | Kritik | [~] devam |
-| PR-K2 | `feat/k8s-sealed-secrets` | Sealed Secrets CRD + secret.yaml → SealedSecret | Yüksek | [ ] |
-| PR-K3 | `feat/k8s-network` | Ingress + cert-manager + NetworkPolicy | Yüksek | [ ] |
-| PR-K4 | `feat/server-observability` | Go `/metrics` endpoint (Prometheus) + ServiceMonitor + Grafana dashboard JSON | Orta | [ ] |
-| PR-K5 | `feat/k8s-minio` | MinIO k8s StatefulSet + docker-compose servisi + secret + StorageBackend interface | Orta | [ ] |
+| PR-K1 | `feat/k8s-hardening` | GHCR ref fix + Kustomize image versioning + resource limits + securityContext + PSS label + PDB | Kritik | ✅ merged |
+| PR-K2 | `feat/k8s-sealed-secrets` | Sealed Secrets CRD + secret.yaml → SealedSecret | Yüksek | ✅ merged |
+| PR-K3 | `feat/k8s-network` | Ingress + cert-manager + NetworkPolicy | Yüksek | ✅ merged |
+| PR-K4 | `feat/server-observability` | Go `/metrics` endpoint (Prometheus) + ServiceMonitor + Grafana dashboard JSON | Orta | ✅ merged |
+| PR-K5 | `feat/k8s-minio` | MinIO k8s StatefulSet + docker-compose servisi + secret + StorageBackend interface | Orta | ✅ merged |
 | PR-A1 | `feat/item-description` | `items.description` migration + server endpoint + web/client UI (textarea) | Orta | [ ] |
 | PR-A2 | `feat/item-attachments` | `item_attachments` migration + presigned URL API + upload/download UI + E2E şifreleme (PEM/PFX) | Orta | [ ] |
 | PR-K6 | `feat/server-vault` | `server/internal/vault` package + item endpoint passthrough + audit | Düşük | [ ] |
@@ -517,7 +517,7 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 - [x] Raw k8s manifests (namespace, configmap, secret, postgres+PVC, api, web, adminer, mailhog)
 - [x] ArgoCD Application (auto-sync, prune, self-heal)
 
-#### [~] PR-K1: k8s hardening batch-1 — `feat/k8s-hardening`
+#### ✅ PR-K1: k8s hardening batch-1 — `feat/k8s-hardening` — merged 2026-04-28
 
 - [x] GHCR ref düzeltildi (`bhaslaman` → `gameofai`) — api.yaml, web.yaml + init container + ArgoCD repoURL
 - [x] `deploy/k8s/kustomization.yaml` — Kustomize `images:` ile image tag yönetimi
@@ -527,36 +527,33 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 - [x] `postgres.yaml` — resource limits, securityContext (fsGroup+runAsUser 999)
 - [x] `ci.yml` — docker job `contents: write` + "Update k8s image tags" step (kustomize+git commit [skip ci])
 
-#### [ ] PR-K2: Sealed Secrets — `feat/k8s-sealed-secrets`
+#### ✅ PR-K2: Sealed Secrets — `feat/k8s-sealed-secrets` — merged 2026-04-28
 
-- [ ] Sealed Secrets controller kurulum dokümanı (`docs/ops/sealed-secrets.md`)
-- [ ] `secret.yaml` → `secret.sealed.yaml` (kubeseal ile şifrelenmiş SealedSecret)
-- [ ] `secret.yaml.example` güncelleme — beklenen key'ler
-- [ ] kustomization.yaml — `secret.sealed.yaml` ekle
-- [ ] CI: `kubeseal --dry-run --validate` step
+- [x] Sealed Secrets controller kurulum dokümanı (`docs/ops/sealed-secrets.md`)
+- [x] `secret.yaml` → `secret.sealed.yaml` (kubeseal ile şifrelenmiş SealedSecret)
+- [x] `secret.yaml.example` güncelleme — beklenen key'ler (MINIO dahil)
+- [x] Makefile: `sealed-secrets-install`, `sealed-secrets-fetch-cert`, `seal-secret` target'ları
+- [x] `deploy/k8s/pub-cert.pem` kaydedildi
 
-#### [ ] PR-K3: Ingress + TLS + NetworkPolicy — `feat/k8s-network`
+#### ✅ PR-K3: Ingress + TLS + NetworkPolicy — `feat/k8s-network` — merged 2026-04-28
 
-- [ ] `deploy/k8s/ingress.yaml` — cert-manager annotation + TLS secret ref
-- [ ] `web.yaml` Service: NodePort → ClusterIP (port 30830 retire)
-- [ ] `api.yaml` Service: ClusterIP zaten OK
-- [ ] `deploy/k8s/network-policy.yaml` — postgres: api-only, api: ingress+internal, web: ingress-only
-- [ ] kustomization.yaml — ingress.yaml + network-policy.yaml ekle
+- [x] `deploy/k8s/ingress.yaml` — cert-manager annotation + TLS secret ref
+- [x] `deploy/k8s/network-policy.yaml` — postgres: api-only, api: ingress+internal, web: ingress-only
+- [x] kustomization.yaml — ingress.yaml + network-policy.yaml eklendi
 
-#### [ ] PR-K4: Observability — `feat/server-observability`
+#### ✅ PR-K4: Observability — `feat/server-observability` — merged 2026-04-28
 
-- [ ] `server/internal/metrics/` — Prometheus registry + HTTP handler + custom counters (auth failures, item ops)
-- [ ] `GET /metrics` endpoint (no auth — scrape-only, internal)
-- [ ] `deploy/k8s/servicemonitor.yaml` — Prometheus Operator ServiceMonitor CRD
-- [ ] `deploy/grafana/dashboard.json` — HTTP rate, latency p50/p95, DB conns, auth failures panel
+- [x] `server/internal/metrics/` — Prometheus registry + HTTP handler + custom counters
+- [x] `GET /metrics` endpoint (no auth — scrape-only)
+- [x] `deploy/k8s/servicemonitor.yaml` — Prometheus Operator ServiceMonitor CRD
+- [x] `deploy/grafana/dashboard.json` — HTTP rate, latency p50/p95, DB conns, auth failures panel
 
-#### [ ] PR-K5: MinIO — `feat/k8s-minio`
+#### ✅ PR-K5: MinIO — `feat/k8s-minio` — merged 2026-04-28
 
-- [ ] `deploy/k8s/minio.yaml` — StatefulSet + Service + PVC (10Gi)
-- [ ] `deploy/compose/docker-compose.yml` — MinIO servisi (local dev)
-- [ ] `secret.yaml.example` — `MINIO_ROOT_USER` + `MINIO_ROOT_PASSWORD` key'leri
-- [ ] `server/internal/storage/` — `StorageBackend` interface + `MinioBackend` (minio-go/v7)
-- [ ] kustomization.yaml — minio.yaml ekle
+- [x] `deploy/k8s/minio.yaml` — StatefulSet + Service + PVC (10Gi)
+- [x] `secret.yaml.example` — `MINIO_ROOT_USER` + `MINIO_ROOT_PASSWORD` key'leri
+- [x] `server/internal/storage/` — `StorageBackend` interface + `MinioBackend` (minio-go/v7)
+- [x] kustomization.yaml — minio.yaml eklendi
 
 #### [ ] PR-A1: Item description — `feat/item-description`
 

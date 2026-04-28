@@ -4,10 +4,10 @@ Son güncelleme: 2026-04-28
 
 ## Mevcut Durum
 
-- **Aktif Faz:** Faz 5 — Production Hardening (PR-K1 devam ediyor: `feat/k8s-hardening`)
-- **Tamamlanan Faz:** Faz 0 + 1 + 2 + 3 ✅ + Faz 4 ✅ (PR-C1/C6 merged sonrası tam kapanacak; PR-C6 CI bekliyor)
-- **Son tamamlanan:** PR-C1 (Rust keyring+tray) merged ✅ 2026-04-28; PR-C6 (Win packaging) PR#7 açıldı 2026-04-28
-- **Bir sonraki adım:** PR-K1 merge (k8s hardening) → PR-K2 (Sealed Secrets) → PR-K3 (Ingress+TLS+NetworkPolicy)
+- **Aktif Faz:** Faz 5 — Production Hardening (PR-K1..K5 merged ✅; sırada PR-A1 item-description)
+- **Tamamlanan Faz:** Faz 0 + 1 + 2 + 3 + 4 ✅ (tümü kapalı)
+- **Son tamamlanan:** PR-K5 (MinIO) merged ✅ 2026-04-28
+- **Bir sonraki adım:** PR-A1 (item description) → PR-A2 (attachments) → PR-P1 (packaging) → PR-V1 (v1.0.0)
 
 ## Faz Durumu
 
@@ -18,7 +18,7 @@ Son güncelleme: 2026-04-28
 | 2 — Server MVP | DONE | 2026-04-24 | 2026-04-26 | PR-1...PR-9 ✅ merged. 10 auth endpoint, folder/item CRUD, RBAC 3 katmanlı, E2E hibrit, 174 unit test, 17 migration. WebSocket → Faz 3, item_relationships + field/type admin → Faz 5 (parking). |
 | 3 — Admin Web UI | DONE | 2026-04-26 | 2026-04-27 | 9 PR (Win 6 + Mac 3). PR-10/11/12/W1/W2/W3/W4/W5/W6 tümü merged ✅. WS client + realtime cache invalidation + responsive sidebar + A11y + E2E crypto primitives + admin/inventory UI. |
 | 4 — Client MVP (Tauri) | DONE | 2026-04-27 | 2026-04-28 | PR-S1/C2/C3/C4/C5/C1 ✅ merged + PR-13 ✅ merged. PR-C6 (Win binary CI) PR#7 open — CI onayı sonrası tam kapanır. |
-| 5 — Production hardening | ACTIVE | 2026-04-28 | — | Container + GHCR + k8s + ArgoCD + multi-arch tamam. Sırada: PR-K1 (k8s hardening), PR-K2 (Sealed Secrets), PR-K3 (Ingress+TLS), PR-K4 (Observability). |
+| 5 — Production hardening | ACTIVE | 2026-04-28 | — | PR-K1..K5 merged ✅. k8s hardening, Sealed Secrets, Ingress+TLS+NetworkPolicy, Prometheus+Grafana, MinIO tamam. Sırada: PR-A1 (description), PR-A2 (attachments), PR-P1 (packaging), PR-V1 (v1.0.0). |
 
 Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tamamlandı · `VERIFY` doğrulama bekliyor · `BLOCKED` bloke · `TODO` beklemede
 
