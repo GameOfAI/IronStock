@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use tauri::Manager;
+use tauri::Emitter;
 
 pub struct InactivityState {
     pub last_activity: Arc<Mutex<Instant>>,
