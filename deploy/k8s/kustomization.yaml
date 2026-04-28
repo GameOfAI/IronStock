@@ -4,6 +4,9 @@ kind: Kustomization
 resources:
 - namespace.yaml
 - configmap.yaml
+# secret.sealed.yaml: uncomment AFTER running `make seal-secret`.
+# See docs/ops/sealed-secrets.md for first-time setup instructions.
+# - secret.sealed.yaml
 - postgres.yaml
 - api.yaml
 - web.yaml
