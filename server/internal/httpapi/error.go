@@ -25,6 +25,7 @@ const (
 	ErrCodeAccountLocked     = "account_locked"
 	ErrCodeAccountPendingMFA = "account_pending_totp"
 	ErrCodeRateLimited       = "rate_limited"
+	ErrCodeNotFound          = "not_found"
 	ErrCodeConflict          = "conflict"
 	ErrCodeInternal          = "internal_error"
 )
