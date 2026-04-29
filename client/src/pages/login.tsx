@@ -160,8 +160,7 @@ export default function LoginPage() {
               <Label htmlFor="totp">TOTP Kodu</Label>
               <Input
                 id="totp"
-                inputMode="numeric"
-                pattern="[0-9]{6}"
+                type="text"
                 maxLength={8}
                 value={totpCode}
                 onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))}

@@ -14,6 +14,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
 	"golang.org/x/time/rate"
 
 	"envanter.app/server/internal/metrics"
@@ -47,6 +48,25 @@ type Deps struct {
 // Middleware order is significant — see comments inline.
 func NewRouter(d Deps) http.Handler {
 	r := chi.NewRouter()
+
+	// 0. CORS — must be first so preflight OPTIONS requests are answered before
+	//    any auth middleware can reject them. Allows Tauri desktop client
+	//    (tauri://localhost, http://localhost:1420 dev) and same-origin web UI.
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins: []string{
+			"tauri://localhost",
+			"http://localhost:1420",
+			"https://localhost:1420",
+			"http://localhost",
+			"https://localhost",
+		},
+		AllowOriginFunc:  func(_ *http.Request, _ string) bool { return true },
+		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Authorization", "Content-Type", "X-Request-Id"},
+		ExposedHeaders:   []string{"X-Request-Id"},
+		AllowCredentials: false,
+		MaxAge:           300,
+	}))
 
 	// 1. RequestID first — every subsequent log line + response carries it
 	r.Use(middleware.RequestID)
