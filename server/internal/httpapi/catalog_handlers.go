@@ -240,7 +240,8 @@ func (h *CatalogHandlers) GetMyKeypair(w http.ResponseWriter, r *http.Request) {
 		LIMIT 1
 	`
 	var pubKey, privEnc, kekSalt []byte
-	var kekParamsRaw, rotatedAtRaw string
+	var kekParamsRaw string
+	var rotatedAtRaw *string
 	var version int16
 	err := h.Service.DB.QueryRow(r.Context(), sqlText, claims.Subject).Scan(
 		&pubKey, &privEnc, &kekSalt, &kekParamsRaw, &version, &rotatedAtRaw,
@@ -263,9 +264,8 @@ func (h *CatalogHandlers) GetMyKeypair(w http.ResponseWriter, r *http.Request) {
 		KEKParams:     json.RawMessage(kekParamsRaw),
 		Version:       version,
 	}
-	if rotatedAtRaw != "" {
-		ra := rotatedAtRaw
-		resp.RotatedAt = &ra
+	if rotatedAtRaw != nil {
+		resp.RotatedAt = rotatedAtRaw
 	}
 	writeJSON(w, http.StatusOK, resp)
 }
