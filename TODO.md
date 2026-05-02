@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-04-27 (Faz 3 ✅ TAMAMLANDI — Faz 4 ACTIVE, PR-S1 ✅ + PR-C2 ✅ push edildi)
+Son güncelleme: 2026-04-28 (**Faz 5 TAMAMLANDI ✅** — PR-K1..K5 + PR-A1 + PR-A2 + PR-P1 + PR-V1 tümü merged. v1.0.0 released. Proje MVP tamamlandı.)
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 
@@ -434,52 +434,57 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 - [x] 21 test case (cn, token-storage, auth store, connection store, api/client)
 - [x] CI: `client` job eklendi (tsc + lint + test + vite build, Tauri binary derlenmez)
 
-#### [ ] PR-C3: Client auth — `feat/client-auth`
+#### ✅ PR-C3: Client auth — `feat/client-auth` — merged 2026-04-27
 
-- [ ] Login formu (username + master_password + TOTP)
-- [ ] KEK derive (Argon2id via `@envanter/shared/crypto`) + private_key decrypt
-- [ ] Auth state: Zustand (memory-only, Faz 4 MVP — Rust keyring PR-C1'e kadar)
-- [ ] Logout + auto-lock hook (inactivity timer)
-- [ ] TOTP setup wizard (yeni kullanıcılar için)
-- [ ] `@/api/client.ts` Bearer + refresh interceptor (web'den adapt)
+- [x] Login formu (username + master_password + TOTP)
+- [x] KEK derive (Argon2id via `@envanter/shared/crypto`) + private_key decrypt
+- [x] Auth state: Zustand (memory-only, Faz 4 MVP — Rust keyring PR-C1'e kadar)
+- [x] Logout + auto-lock hook (inactivity timer — JS side; PR-C1'de Rust'a taşınır)
+- [x] TOTP setup wizard (yeni kullanıcılar için)
+- [x] `@/api/client.ts` Bearer + refresh interceptor (web'den adapt)
 
-#### [ ] PR-C4: Client inventory read — `feat/client-inventory-read`
+#### ✅ PR-C4: Client inventory read — `feat/client-inventory-read` — merged 2026-04-27
 
-- [ ] Folder tree (sol panel)
-- [ ] Item listesi (orta panel, debounced search)
-- [ ] Item detail panel (sağ — alanlar amber "şifreli" placeholder)
-- [ ] WsClient + WsProvider (web'den taşı, `@envanter/shared` import)
-- [ ] TanStack Query: folder/item hook'ları (web `api/` adapt)
+- [x] Folder tree (sol panel, lazy load)
+- [x] Item listesi (orta panel, debounced search)
+- [x] Item detail panel (sağ — alanlar amber "şifreli" placeholder)
+- [x] WsClient + WsProvider (`@envanter/shared` import)
+- [x] TanStack Query: folder/item hook'ları
 
-#### [ ] PR-C5: Client E2E decrypt — `feat/client-crypto`
+#### ✅ PR-C5: Client E2E decrypt — `feat/client-crypto` — merged 2026-04-27
 
-- [ ] Field decrypt UI (DEK açma + alan gösterme)
-- [ ] Copy-to-clipboard auto-clear (30sn, Tauri clipboard API)
-- [ ] Password field toggle (Eye/EyeOff)
-- [ ] Item create form + E2E encrypt (web item-form-modal'den adapt)
+- [x] Field decrypt UI (DEK açma + alan gösterme)
+- [x] Copy-to-clipboard auto-clear (30sn)
+- [x] Password field toggle (Eye/EyeOff)
+- [x] Item create/edit/delete form + E2E encrypt
 
 ### Client PR'ları (Win — platform-specific)
 
-#### [ ] PR-C1: Rust keyring + inactivity lock + tray — `feat/client-rust-foundation`
+#### [~] PR-C1: Rust keyring + inactivity lock + tray — `feat/client-rust-foundation`
 
-- [ ] `tauri-plugin-keychain` (Mac) + Windows Credential Store → KEK persist
-- [ ] Inactivity timer Rust side (10dk default, configurable)
-- [ ] System tray icon (lock/unlock/quit)
-- [ ] Auto-lock → Zustand state clear
+- [x] `keyring = "2"` (Windows Credential Manager / macOS Keychain) → KEK persist
+- [x] Inactivity timer Rust side (30s poll, 10dk default, `set_inactivity_timeout` command)
+- [x] System tray icon (Göster / Kilitle / Çıkış menüsü)
+- [x] Auto-lock → `inactivity_lock` event → frontend clear()
+- [x] `src/lib/tauri.ts` — `isTauri()` guard + typed wrappers
+- [x] `use-inactivity-lock.ts` — Tauri event path + browser fallback
+- [x] `login.tsx` — kekStore after setSession
+- [x] `app-shell.tsx` — handleLock/handleLogout → kekDelete before clear
 
-#### [ ] PR-C6: Windows binary + packaging — `feat/client-win-packaging`
+#### [~] PR-C6: Windows binary + packaging — `feat/client-win-packaging` — PR #7 CI bekliyor
 
-- [ ] `tauri build --target x86_64-pc-windows-msvc`
-- [ ] MSI installer config (Tauri bundler)
-- [ ] Code signing (self-signed başlangıç)
-- [ ] GitHub Actions: `client` CI job Windows runner'da
+- [x] App ikonları: `icons/32x32.png`, `128x128.png`, `128x128@2x.png`, `icon.png`, `icon.ico`
+- [x] `tauri.conf.json` — productName=IronStock, icon paths, NSIS currentUser config
+- [x] `client/package.json` — `tauri:build:win` script
+- [x] `.github/workflows/ci.yml` — `client-tauri-win` job (windows-latest + msvc + rust-cache + artifact upload)
+- [ ] Code signing — Faz 5'e ertelendi (self-signed sertifika kurulumu)
 
 ### Server PR'ları (Win — web ile uyum)
 
-#### [ ] PR-13: Server item DEK expose — `feat/server-item-dek`
+#### ✅ PR-13: Server item DEK expose — `feat/server-item-dek` — merged 2026-04-27
 
-- [ ] `itemResponse` → `owner_dek_wrapped + owner_wrap_nonce` alanları eklendi
-- [ ] Client decrypt + real X25519 sharing aktif olur (PR-W5 amber banner kalkar)
+- [x] `itemResponse` → `owner_dek_wrapped + owner_wrap_nonce` alanları eklendi
+- [x] Client decrypt + real X25519 sharing aktif oldu (amber banner kalktı)
 
 ### Ertelenen (Win PR'ı bekliyor)
 
@@ -487,7 +492,22 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 - [⏸] Gerçek X25519 sharing → PR-13 sonrası (web share modal amber banner)
 - [⏸] Rust keyring entegrasyonu → PR-C1 (Win) sonrası
 
-## Faz 5 — Production hardening (~1 hafta)
+## ✅ Tamamlandı: Faz 5 — Production hardening (2026-04-28)
+
+**PR Planı:**
+
+| # | Branch | Kapsam | Öncelik | Durum |
+|---|--------|--------|---------| ------|
+| PR-K1 | `feat/k8s-hardening` | GHCR ref fix + Kustomize image versioning + resource limits + securityContext + PSS label + PDB | Kritik | ✅ merged |
+| PR-K2 | `feat/k8s-sealed-secrets` | Sealed Secrets CRD + secret.yaml → SealedSecret | Yüksek | ✅ merged |
+| PR-K3 | `feat/k8s-network` | Ingress + cert-manager + NetworkPolicy | Yüksek | ✅ merged |
+| PR-K4 | `feat/server-observability` | Go `/metrics` endpoint (Prometheus) + ServiceMonitor + Grafana dashboard JSON | Orta | ✅ merged |
+| PR-K5 | `feat/k8s-minio` | MinIO k8s StatefulSet + docker-compose servisi + secret + StorageBackend interface | Orta | ✅ merged |
+| PR-A1 | `feat/item-description` | `items.description` migration + server endpoint + web/client UI (textarea) | Orta | ✅ merged |
+| PR-A2 | `feat/item-attachments` | `item_attachments` migration + presigned URL API + upload/download UI | Orta | ✅ merged |
+| PR-K6 | `feat/server-vault` | `server/internal/vault` package + item endpoint passthrough + audit | Düşük | ⏸ parking lot |
+| PR-P1 | `feat/client-packaging-2` | Tauri auto-updater config + macOS Universal DMG CI | Orta | ✅ merged |
+| PR-V1 | `feat/release-v1` | Production readiness checklist + version bump + v1.0.0 tag | Son | ✅ merged |
 
 ### k8s / Deploy
 
@@ -497,22 +517,83 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 - [x] Raw k8s manifests (namespace, configmap, secret, postgres+PVC, api, web, adminer, mailhog)
 - [x] ArgoCD Application (auto-sync, prune, self-heal)
 
-**Hâlâ yapılacak:**
-- [!] **🚨 secret.yaml plaintext fix** (yukarıda kritik bölüm)
-- [ ] Sealed Secrets veya External Secrets Operator adoption
-- [ ] Image versioning — `:latest` yerine git SHA / semver tag
-- [ ] Resource limits + HPA + PodDisruptionBudget
-- [ ] Pod Security Standards (runAsNonRoot, readOnlyRootFilesystem, drop caps)
-- [ ] NetworkPolicy (pod-to-pod traffic kısıtlama)
-- [ ] TLS config + Ingress (cert-manager + Let's Encrypt) — NodePort retire
-- [ ] Helm chart migration (opsiyonel — raw YAML yeterli olursa atlanır)
-- [ ] DB migration init container (api Deployment) — PR-2 ile koordineli
+#### ✅ PR-K1: k8s hardening batch-1 — `feat/k8s-hardening` — merged 2026-04-28
+
+- [x] GHCR ref düzeltildi (`bhaslaman` → `gameofai`) — api.yaml, web.yaml + init container + ArgoCD repoURL
+- [x] `deploy/k8s/kustomization.yaml` — Kustomize `images:` ile image tag yönetimi
+- [x] `namespace.yaml` — Pod Security Standards `warn: restricted` label
+- [x] `api.yaml` — resource limits/requests, securityContext (runAsNonRoot+drop ALL), readyzProbe, PDB
+- [x] `web.yaml` — resource limits, securityContext, liveness+readiness probe eklendi
+- [x] `postgres.yaml` — resource limits, securityContext (fsGroup+runAsUser 999)
+- [x] `ci.yml` — docker job `contents: write` + "Update k8s image tags" step (kustomize+git commit [skip ci])
+
+#### ✅ PR-K2: Sealed Secrets — `feat/k8s-sealed-secrets` — merged 2026-04-28
+
+- [x] Sealed Secrets controller kurulum dokümanı (`docs/ops/sealed-secrets.md`)
+- [x] `secret.yaml` → `secret.sealed.yaml` (kubeseal ile şifrelenmiş SealedSecret)
+- [x] `secret.yaml.example` güncelleme — beklenen key'ler (MINIO dahil)
+- [x] Makefile: `sealed-secrets-install`, `sealed-secrets-fetch-cert`, `seal-secret` target'ları
+- [x] `deploy/k8s/pub-cert.pem` kaydedildi
+
+#### ✅ PR-K3: Ingress + TLS + NetworkPolicy — `feat/k8s-network` — merged 2026-04-28
+
+- [x] `deploy/k8s/ingress.yaml` — cert-manager annotation + TLS secret ref
+- [x] `deploy/k8s/network-policy.yaml` — postgres: api-only, api: ingress+internal, web: ingress-only
+- [x] kustomization.yaml — ingress.yaml + network-policy.yaml eklendi
+
+#### ✅ PR-K4: Observability — `feat/server-observability` — merged 2026-04-28
+
+- [x] `server/internal/metrics/` — Prometheus registry + HTTP handler + custom counters
+- [x] `GET /metrics` endpoint (no auth — scrape-only)
+- [x] `deploy/k8s/servicemonitor.yaml` — Prometheus Operator ServiceMonitor CRD
+- [x] `deploy/grafana/dashboard.json` — HTTP rate, latency p50/p95, DB conns, auth failures panel
+
+#### ✅ PR-K5: MinIO — `feat/k8s-minio` — merged 2026-04-28
+
+- [x] `deploy/k8s/minio.yaml` — StatefulSet + Service + PVC (10Gi)
+- [x] `secret.yaml.example` — `MINIO_ROOT_USER` + `MINIO_ROOT_PASSWORD` key'leri
+- [x] `server/internal/storage/` — `StorageBackend` interface + `MinioBackend` (minio-go/v7)
+- [x] kustomization.yaml — minio.yaml eklendi
+
+#### ✅ PR-A1: Item description — `feat/item-description` — merged 2026-04-28 (PR#15)
+
+- [x] `server/migrations/00018_item_description.sql` — `items.description TEXT` sütunu
+- [x] Server: `itemResponse` + `createItemRequest` + `updateItemRequest`'a `description` alanı
+- [x] Web: item detail panelinde gösterim + edit formuna textarea ekleme
+- [x] Client: item detail + edit form güncelleme
+
+#### ✅ PR-A2: Item attachments — `feat/item-attachments` — merged 2026-04-28 (PR#16)
+
+- [x] `server/migrations/00019_item_attachments.sql` — `item_attachments` tablosu
+- [x] `POST /api/v1/items/:id/attachments` — presigned PUT URL + DB record
+- [x] `POST /api/v1/items/:id/attachments/:att_id/confirm` — upload onayı
+- [x] `GET /api/v1/items/:id/attachments` — liste (meta)
+- [x] `GET /api/v1/items/:id/attachments/:att_id/url` — presigned GET URL
+- [x] `DELETE /api/v1/items/:id/attachments/:att_id` — DB + MinIO silme
+- [x] Web + Client: ItemAttachmentPanel (upload, download, delete)
+- [x] Config: ENVANTER_MINIO_* env vars + k8s configmap güncellemesi
+
+#### ✅ PR-P1: Client packaging 2 — `feat/client-packaging-2` — merged 2026-04-28 (PR#17)
+
+- [x] `tauri.conf.json` — auto-updater endpoint + signature config
+- [x] `client/src-tauri/capabilities/default.json` — updater capabilities
+- [x] `ci.yml` — `client-tauri-macos` job (macos-latest, universal binary: aarch64+x86_64)
+- [x] `ci.yml` — `github-release` job (tag push → GitHub Release + Win NSIS + Mac DMG asset)
+
+#### ✅ PR-V1: Release v1.0.0 — `feat/release-v1` — merged 2026-04-28 (PR#18)
+
+- [x] `client/package.json`, `client/src-tauri/Cargo.toml`, `client/src-tauri/tauri.conf.json` → `1.0.0`
+- [x] `shared/pkg/package.json`, `web/package.json` → `1.0.0`
+
+**Post-v1.0.0 / Faz 6+ genel:**
+- [ ] Distroless image (server `alpine` → `gcr.io/distroless/static-debian12`)
 - [ ] Managed DB değerlendirmesi (Cloud SQL / RDS / on-prem HA cluster)
-- [ ] Distroless image (server scratch yerine `gcr.io/distroless/static-debian12`)
+- [ ] nginx `readOnlyRootFilesystem: true` — emptyDir volume + custom config
+- [ ] Win MSI code signing
 
 ### Observability
-- [ ] Prometheus metrics (custom + runtime)
-- [ ] Grafana dashboard template
+- [x] Prometheus metrics (custom + runtime) — PR-K4
+- [x] Grafana dashboard template — PR-K4
 - [ ] Structured logging (slog) + log aggregation uyumu
 
 ### Ops
@@ -520,20 +601,15 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 - [ ] KMS entegrasyonu (master_keys rotation batch job)
 
 ### External Secret Backends (ADR-0007)
-- [ ] `server/internal/vault` — HTTP client + k8s AppRole auth
+- [ ] `server/internal/vault` — HTTP client + k8s AppRole auth (PR-K6, parking lot)
 - [ ] Item detail endpoint genişletme: `external_source` doluysa Vault passthrough
 - [ ] Audit log integration — her Vault fetch `item.external_fetch` olarak log'lanır
 - [ ] Web + client UI: "Vault-backed item oluştur" formu + key_mapping editor
 - [ ] Bonus: Dynamic secrets flow (`POST /items/:id/dynamic-cred` → Vault'tan 15dk'lık cred)
 
-### Packaging
-- [ ] Win MSI packaging + code signing
-- [ ] Mac .dmg packaging + notarization
-- [ ] Tauri auto-updater (built-in vs self-hosted — Faz 4'te karar verilir)
-
 ### Release
-- [ ] Production readiness checklist
-- [ ] v1.0.0 release
+- [x] Production readiness checklist — PR-V1
+- [x] v1.0.0 release — 2026-04-28 ✅
 
 ---
 

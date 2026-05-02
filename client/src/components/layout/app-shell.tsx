@@ -22,8 +22,9 @@ import { Folder, LogOut, Sun, Moon, Monitor, Menu, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/auth';
 import { useUIStore } from '@/store/ui';
-import { clearAllTokens } from '@/api/token-storage';
+import { useLogoutMutation } from '@/api/auth';
 import { cn } from '@/lib/cn';
+import { kekDelete } from '@/lib/tauri';
 
 // --- Theme toggle ---
 
@@ -85,20 +86,20 @@ export function AppShell() {
   const clear = useAuthStore((s) => s.clear);
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
+  const logoutMut = useLogoutMutation();
   const [mobileOpen, setMobileOpen] = React.useState(false);
 
-  function handleLogout() {
-    // Best-effort server logout — client önce state'i temizler.
-    // PR-C3'te gerçek logout API mutation eklenir.
-    clearAllTokens();
+  async function handleLogout() {
+    // KEK'i keyring'den sil, ardından local state temizle, server'a bildir.
+    if (user) await kekDelete(user.username);
     clear();
     navigate('/login', { replace: true });
+    logoutMut.mutate();
   }
 
-  function handleLock() {
-    // PR-C1'de: Rust keyring'den KEK silinir, sadece privateKey memory temizlenir.
-    // Şimdilik tam logout.
-    clearAllTokens();
+  async function handleLock() {
+    // KEK'i keyring'den sil + memory temizle → tam re-login gerekir.
+    if (user) await kekDelete(user.username);
     clear();
     navigate('/login', { replace: true });
   }
@@ -126,7 +127,7 @@ export function AppShell() {
           >
             <Menu className="h-5 w-5" />
           </Button>
-          <span className="text-sm font-semibold">Envanter</span>
+          <span className="text-sm font-semibold">IronStock</span>
           <span className="hidden text-xs text-muted-foreground sm:inline">v0.4</span>
         </div>
 

@@ -1,4 +1,5 @@
 import type { ApiErrorResponse } from './types.ts';
+export type { ApiErrorResponse };
 
 /**
  * ApiError — typed exception thrown by the fetch wrapper on non-2xx

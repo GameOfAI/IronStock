@@ -61,6 +61,7 @@ type itemRequest struct {
 	FolderID        string           `json:"folder_id"`
 	ItemTypeID      int16            `json:"item_type_id"`
 	Name            string           `json:"name"`
+	Description     *string          `json:"description,omitempty"`
 	Fields          []itemFieldInput `json:"fields"`
 	OwnerDEKWrapped []byte           `json:"owner_dek_wrapped"` // X25519 sealed-box
 	OwnerWrapNonce  []byte           `json:"owner_wrap_nonce"`  // 12B (matches schema)
@@ -69,16 +70,21 @@ type itemRequest struct {
 
 // itemResponse is the API representation. name is decrypted for the caller;
 // fields are returned as-is (still client-encrypted).
+// owner_dek_wrapped / owner_wrap_nonce are the caller's row from item_shares
+// (populated on GET /items/:id; omitted on LIST to keep payloads lean).
 type itemResponse struct {
-	ID         string              `json:"id"`
-	FolderID   string              `json:"folder_id"`
-	ItemTypeID int16               `json:"item_type_id"`
-	Name       string              `json:"name"`
-	Fields     []itemFieldOutput   `json:"fields"`
-	CreatedBy  string              `json:"created_by"`
-	CreatedAt  string              `json:"created_at"`
-	UpdatedAt  string              `json:"updated_at"`
-	Permission auth.ItemPermission `json:"permission"`
+	ID              string              `json:"id"`
+	FolderID        string              `json:"folder_id"`
+	ItemTypeID      int16               `json:"item_type_id"`
+	Name            string              `json:"name"`
+	Description     *string             `json:"description,omitempty"`
+	Fields          []itemFieldOutput   `json:"fields"`
+	CreatedBy       string              `json:"created_by"`
+	CreatedAt       string              `json:"created_at"`
+	UpdatedAt       string              `json:"updated_at"`
+	Permission      auth.ItemPermission `json:"permission"`
+	OwnerDEKWrapped []byte              `json:"owner_dek_wrapped,omitempty"`
+	OwnerWrapNonce  []byte              `json:"owner_wrap_nonce,omitempty"`
 }
 
 type itemFieldOutput struct {
@@ -179,12 +185,14 @@ func (h *ItemHandlers) Create(w http.ResponseWriter, r *http.Request) {
 		    id, folder_id, item_type_id,
 		    name_enc, name_nonce, name_search,
 		    server_dek_wrapped, master_key_id,
+		    description,
 		    external_source, created_by
 		) VALUES (
 		    $1::uuid, $2::uuid, $3,
 		    $4, $5, $6,
 		    $7, $8,
-		    $9, $10::uuid
+		    $9,
+		    $10, $11::uuid
 		)
 		RETURNING created_at::text, updated_at::text
 	`
@@ -193,6 +201,7 @@ func (h *ItemHandlers) Create(w http.ResponseWriter, r *http.Request) {
 		req.ID, req.FolderID, req.ItemTypeID,
 		nameEnc, nameNonce, nameSearch,
 		serverDEKWrapped, h.Service.MasterKey.ID,
+		req.Description,
 		nullableJSON(req.ExternalSource), claims.Subject,
 	).Scan(&createdAt, &updatedAt)
 	if err != nil {
@@ -253,15 +262,18 @@ func (h *ItemHandlers) Create(w http.ResponseWriter, r *http.Request) {
 	h.publishEvent(ws.EventItemCreated, req.ID, claims.Subject)
 
 	writeJSON(w, http.StatusCreated, itemResponse{
-		ID:         req.ID,
-		FolderID:   req.FolderID,
-		ItemTypeID: req.ItemTypeID,
-		Name:       req.Name,
-		Fields:     fieldInputsToOutputs(req.Fields),
-		CreatedBy:  claims.Subject,
-		CreatedAt:  createdAt,
-		UpdatedAt:  updatedAt,
-		Permission: auth.ItemPermWrite,
+		ID:              req.ID,
+		FolderID:        req.FolderID,
+		ItemTypeID:      req.ItemTypeID,
+		Name:            req.Name,
+		Description:     req.Description,
+		Fields:          fieldInputsToOutputs(req.Fields),
+		CreatedBy:       claims.Subject,
+		CreatedAt:       createdAt,
+		UpdatedAt:       updatedAt,
+		Permission:      auth.ItemPermWrite,
+		OwnerDEKWrapped: req.OwnerDEKWrapped,
+		OwnerWrapNonce:  req.OwnerWrapNonce,
 	})
 }
 
@@ -300,7 +312,7 @@ func (h *ItemHandlers) Get(w http.ResponseWriter, r *http.Request) {
 		perm = p
 	}
 
-	item, err := fetchItemFull(ctx, h.Service.DB, h.Service, id)
+	item, err := fetchItemFull(ctx, h.Service.DB, h.Service, id, claims.Subject)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, h.Logger, http.StatusNotFound, ErrCodeBadRequest,
@@ -531,10 +543,11 @@ func (h *ItemHandlers) Update(w http.ResponseWriter, r *http.Request) {
 		SET folder_id = $2::uuid,
 		    name_enc = $3,
 		    name_nonce = $4,
-		    name_search = $5
+		    name_search = $5,
+		    description = $6
 		WHERE id = $1::uuid
 	`
-	if _, err := tx.Exec(ctx, updateItemSQL, id, folderArg, nameEnc, nameNonce, nameSearch); err != nil {
+	if _, err := tx.Exec(ctx, updateItemSQL, id, folderArg, nameEnc, nameNonce, nameSearch, req.Description); err != nil {
 		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
 			"Item güncellenemedi.", err)
 		return
@@ -643,6 +656,7 @@ type itemRow struct {
 	ItemTypeID       int16
 	NameEnc          []byte
 	ServerDEKWrapped []byte
+	Description      *string
 	CreatedBy        string
 	CreatedAt        string
 	UpdatedAt        string
@@ -652,6 +666,7 @@ func fetchItemForUpdate(ctx context.Context, db auth.DBExec, id string) (itemRow
 	const sqlText = `
 		SELECT id::text, folder_id::text, item_type_id,
 		       name_enc, server_dek_wrapped,
+		       description,
 		       created_by::text, created_at::text, updated_at::text
 		FROM items WHERE id = $1::uuid LIMIT 1
 	`
@@ -659,13 +674,16 @@ func fetchItemForUpdate(ctx context.Context, db auth.DBExec, id string) (itemRow
 	err := db.QueryRow(ctx, sqlText, id).Scan(
 		&row.ID, &row.FolderID, &row.ItemTypeID,
 		&row.NameEnc, &row.ServerDEKWrapped,
+		&row.Description,
 		&row.CreatedBy, &row.CreatedAt, &row.UpdatedAt,
 	)
 	return row, err
 }
 
-// fetchItemFull returns the item + decrypted name + fields.
-func fetchItemFull(ctx context.Context, db auth.DBExec, svc *auth.Service, id string) (itemResponse, error) {
+// fetchItemFull returns the item + decrypted name + fields + caller's DEK wrap.
+// userID is used to look up the caller's e2e_dek_wrapped row in item_shares.
+// When the row is absent (e.g. admin with no share), DEK fields are omitted.
+func fetchItemFull(ctx context.Context, db auth.DBExec, svc *auth.Service, id, userID string) (itemResponse, error) {
 	row, err := fetchItemForUpdate(ctx, db, id)
 	if err != nil {
 		return itemResponse{}, err
@@ -678,16 +696,41 @@ func fetchItemFull(ctx context.Context, db auth.DBExec, svc *auth.Service, id st
 	if err != nil {
 		return itemResponse{}, err
 	}
+	dekWrapped, wrapNonce, err := fetchCallerDEK(ctx, db, id, userID)
+	if err != nil {
+		return itemResponse{}, err
+	}
 	return itemResponse{
-		ID:         row.ID,
-		FolderID:   row.FolderID,
-		ItemTypeID: row.ItemTypeID,
-		Name:       name,
-		Fields:     fields,
-		CreatedBy:  row.CreatedBy,
-		CreatedAt:  row.CreatedAt,
-		UpdatedAt:  row.UpdatedAt,
+		ID:              row.ID,
+		FolderID:        row.FolderID,
+		ItemTypeID:      row.ItemTypeID,
+		Name:            name,
+		Description:     row.Description,
+		Fields:          fields,
+		CreatedBy:       row.CreatedBy,
+		CreatedAt:       row.CreatedAt,
+		UpdatedAt:       row.UpdatedAt,
+		OwnerDEKWrapped: dekWrapped,
+		OwnerWrapNonce:  wrapNonce,
 	}, nil
+}
+
+// fetchCallerDEK returns the caller's e2e_dek_wrapped + wrap_nonce from
+// item_shares. Returns nil slices (no error) when no share row exists for the
+// caller (admin bypass path).
+func fetchCallerDEK(ctx context.Context, db auth.DBExec, itemID, userID string) ([]byte, []byte, error) {
+	const sqlText = `
+		SELECT e2e_dek_wrapped, wrap_nonce
+		FROM item_shares
+		WHERE item_id = $1::uuid AND user_id = $2::uuid
+		LIMIT 1
+	`
+	var dek, nonce []byte
+	err := db.QueryRow(ctx, sqlText, itemID, userID).Scan(&dek, &nonce)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil, nil
+	}
+	return dek, nonce, err
 }
 
 func fetchItemFields(ctx context.Context, db auth.DBExec, itemID string) ([]itemFieldOutput, error) {

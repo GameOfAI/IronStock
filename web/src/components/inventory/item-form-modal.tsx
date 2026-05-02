@@ -80,6 +80,7 @@ export function ItemFormModal({
   const isEdit = Boolean(editItem);
 
   const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const [itemTypeId, setItemTypeId] = useState<string>('');
   const [fields, dispatchFields] = useReducer(fieldReducer, {});
   const [error, setError] = useState<string | null>(null);
@@ -97,9 +98,11 @@ export function ItemFormModal({
     if (!open) return;
     if (editItem) {
       setName(editItem.name);
+      setDescription(editItem.description ?? '');
       setItemTypeId(String(editItem.item_type_id));
     } else {
       setName('');
+      setDescription('');
       setItemTypeId(itemTypes[0] ? String(itemTypes[0].id) : '');
     }
     setError(null);
@@ -121,7 +124,10 @@ export function ItemFormModal({
 
     try {
       if (isEdit && editItem) {
-        await updateMutation.mutateAsync({ name: trimmed });
+        await updateMutation.mutateAsync({
+          name: trimmed,
+          description: description.trim() || undefined,
+        });
       } else {
         if (!privateKey || !user) {
           setError('Şifreleme için oturum anahtarı bulunamadı. Lütfen yeniden giriş yapın.');
@@ -162,6 +168,7 @@ export function ItemFormModal({
           folder_id: folderId,
           item_type_id: Number(itemTypeId),
           name: trimmed,
+          description: description.trim() || undefined,
           fields: encryptedFields,
           owner_dek_wrapped: toBase64(ownerDEKWrapped),
           owner_wrap_nonce: toBase64(wrapNonce),
@@ -193,6 +200,19 @@ export function ItemFormModal({
               placeholder="Item adı"
               autoFocus
               disabled={isPending}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="item-description">Açıklama <span className="text-muted-foreground">(opsiyonel)</span></Label>
+            <textarea
+              id="item-description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Notlar, bağlam, kullanım bilgisi…"
+              disabled={isPending}
+              rows={3}
+              className="flex w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
 
@@ -233,12 +253,6 @@ export function ItemFormModal({
             </div>
           )}
 
-          {isEdit && (
-            <p className="text-xs text-amber-600 dark:text-amber-400">
-              Alan değerleri şu an düzenlenemiyor — sunucu DEK erişimi PR-W5 sonrasında ekleniyor.
-              Yalnızca item adı değiştirilebilir.
-            </p>
-          )}
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 

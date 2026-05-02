@@ -1,0 +1,28 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# secret.sealed.yaml: uncomment AFTER running `make seal-secret`.
+# See docs/ops/sealed-secrets.md for first-time setup instructions.
+# - secret.sealed.yaml
+resources:
+- namespace.yaml
+- configmap.yaml
+- postgres.yaml
+- api.yaml
+- web.yaml
+- adminer.yaml
+- mailhog.yaml
+- ingress.yaml
+- network-policy.yaml
+- minio.yaml
+# servicemonitor.yaml: uncomment when prometheus-operator (kube-prometheus-stack) is installed.
+# - servicemonitor.yaml
+
+# Image tags are updated by CI after each push to main/tag.
+# Do not edit newTag manually — use `kustomize edit set image` or
+# let the CI docker job commit the change automatically.
+images:
+- name: ghcr.io/gameofai/envanter-api
+  newTag: main-300d0ae
+- name: ghcr.io/gameofai/envanter-web
+  newTag: main-300d0ae

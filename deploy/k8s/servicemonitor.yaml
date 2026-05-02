@@ -1,0 +1,22 @@
+# Prometheus Operator ServiceMonitor — scrapes envanter-api /metrics every 30s.
+# Requires prometheus-operator (kube-prometheus-stack) installed in the cluster.
+# Install: https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack
+#
+# The ServiceMonitor selector must match the Prometheus CR's serviceMonitorSelector.
+# Default kube-prometheus-stack uses: matchLabels: {release: kube-prometheus-stack}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: envanter-api
+  namespace: envanter
+  labels:
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app: envanter-api
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s

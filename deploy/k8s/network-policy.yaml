@@ -1,0 +1,87 @@
+# NetworkPolicy — envanter namespace
+#
+# Strategy: per-pod ingress restriction (no global default-deny).
+# A NetworkPolicy selecting a pod automatically denies all other ingress
+# to that pod, so explicit default-deny is not required.
+#
+# ingress-nginx namespace is selected by its auto-label
+# (kubernetes.io/metadata.name added to all namespaces since k8s 1.21).
+# If your cluster is < 1.21, label the namespace manually:
+#   kubectl label ns ingress-nginx kubernetes.io/metadata.name=ingress-nginx
+
+# --- PostgreSQL: only accessible from API pods ---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-allow-api
+  namespace: envanter
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: envanter-api
+      ports:
+        - protocol: TCP
+          port: 5432
+---
+# --- API: accessible from ingress-nginx (external) and same namespace (internal) ---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-allow-ingress
+  namespace: envanter
+spec:
+  podSelector:
+    matchLabels:
+      app: envanter-api
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+    # Allow intra-namespace traffic (future services, health checks, etc.)
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8080
+    # Allow Prometheus scraping from monitoring namespace (kube-prometheus-stack)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# --- Web: only accessible from ingress-nginx ---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: web-allow-ingress
+  namespace: envanter
+spec:
+  podSelector:
+    matchLabels:
+      app: envanter-web
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 80

@@ -37,4 +37,7 @@ export const queryKeys = {
     itemTypes: ['catalog', 'item-types'] as const,
     userPublicKey: (id: string) => ['catalog', 'users', id, 'public-key'] as const,
   },
+  attachments: {
+    byItem: (itemId: string) => ['attachments', { itemId }] as const,
+  },
 } as const;

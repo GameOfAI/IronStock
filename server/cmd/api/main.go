@@ -22,6 +22,7 @@ import (
 	"envanter.app/server/internal/db"
 	"envanter.app/server/internal/httpapi"
 	"envanter.app/server/internal/logging"
+	"envanter.app/server/internal/storage"
 	"envanter.app/server/internal/ws"
 )
 
@@ -129,16 +130,44 @@ func run() error {
 		Logger:  logger,
 	}
 
+	// --- MinIO storage (optional — attachment routes disabled if not configured) ---
+	var attachmentHandlers *httpapi.AttachmentHandlers
+	if cfg.MinioAccessKey != "" && cfg.MinioSecretKey != "" {
+		minioBackend, err := storage.NewMinioBackend(
+			cfg.MinioEndpoint, cfg.MinioAccessKey, cfg.MinioSecretKey, cfg.MinioUseSSL,
+		)
+		if err != nil {
+			return fmt.Errorf("minio: %w", err)
+		}
+		if err := minioBackend.EnsureBucket(rootCtx, cfg.MinioBucket); err != nil {
+			logger.Warn("minio bucket ensure failed — attachments disabled",
+				slog.String("bucket", cfg.MinioBucket),
+				slog.String("error", err.Error()),
+			)
+		} else {
+			attachmentHandlers = &httpapi.AttachmentHandlers{
+				Service: authSvc,
+				Storage: minioBackend,
+				Bucket:  cfg.MinioBucket,
+				Logger:  logger,
+			}
+			logger.Info("minio storage ready", slog.String("bucket", cfg.MinioBucket))
+		}
+	} else {
+		logger.Info("minio credentials not set — attachment endpoints disabled")
+	}
+
 	// --- HTTP layer ---
 	router := httpapi.NewRouter(httpapi.Deps{
-		Logger:  logger,
-		DB:      pool,
-		Auth:    authHandlers,
-		Folder:  folderHandlers,
-		Item:    itemHandlers,
-		Admin:   adminHandlers,
-		Catalog: catalogHandlers,
-		WS:      wsHandlers,
+		Logger:     logger,
+		DB:         pool,
+		Auth:       authHandlers,
+		Folder:     folderHandlers,
+		Item:       itemHandlers,
+		Attachment: attachmentHandlers,
+		Admin:      adminHandlers,
+		Catalog:    catalogHandlers,
+		WS:         wsHandlers,
 	})
 
 	srv := &http.Server{

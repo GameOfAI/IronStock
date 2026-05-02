@@ -14,7 +14,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
 	"golang.org/x/time/rate"
+
+	"envanter.app/server/internal/metrics"
 )
 
 // DBPinger is the minimum DB interface needed for /readyz.
@@ -29,14 +32,15 @@ type DBPinger interface {
 // Auth, Folder, Item, WS are optional: when nil their routes are not mounted
 // (useful for foundation tests that don't exercise those flows).
 type Deps struct {
-	Logger  *slog.Logger
-	DB      DBPinger
-	Auth    *AuthHandlers
-	Folder  *FolderHandlers
-	Item    *ItemHandlers
-	Admin   *AdminHandlers
-	Catalog *CatalogHandlers
-	WS      *WSHandlers
+	Logger     *slog.Logger
+	DB         DBPinger
+	Auth       *AuthHandlers
+	Folder     *FolderHandlers
+	Item       *ItemHandlers
+	Attachment *AttachmentHandlers
+	Admin      *AdminHandlers
+	Catalog    *CatalogHandlers
+	WS         *WSHandlers
 }
 
 // NewRouter builds a chi router with the standard middleware stack.
@@ -44,6 +48,25 @@ type Deps struct {
 // Middleware order is significant — see comments inline.
 func NewRouter(d Deps) http.Handler {
 	r := chi.NewRouter()
+
+	// 0. CORS — must be first so preflight OPTIONS requests are answered before
+	//    any auth middleware can reject them. Allows Tauri desktop client
+	//    (tauri://localhost, http://localhost:1420 dev) and same-origin web UI.
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins: []string{
+			"tauri://localhost",
+			"http://localhost:1420",
+			"https://localhost:1420",
+			"http://localhost",
+			"https://localhost",
+		},
+		AllowOriginFunc:  func(_ *http.Request, _ string) bool { return true },
+		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Authorization", "Content-Type", "X-Request-Id"},
+		ExposedHeaders:   []string{"X-Request-Id"},
+		AllowCredentials: false,
+		MaxAge:           300,
+	}))
 
 	// 1. RequestID first — every subsequent log line + response carries it
 	r.Use(middleware.RequestID)
@@ -56,6 +79,8 @@ func NewRouter(d Deps) http.Handler {
 	r.Use(slogRequestLogger(d.Logger))
 	// 5. Recoverer — catches panics, logs + 500 instead of crashing
 	r.Use(middleware.Recoverer)
+	// 6. Prometheus request instrumentation (duration + count by route pattern)
+	r.Use(metrics.Middleware)
 
 	// NOTE: Timeout middleware is NOT applied globally here — it wraps
 	// responses with http.TimeoutHandler which breaks Hijack (the WS
@@ -63,10 +88,12 @@ func NewRouter(d Deps) http.Handler {
 	// for endpoints that should be subject to it.
 	timeoutMW := middleware.Timeout(30 * time.Second)
 
-	// Health routes (unauthenticated, NOT timeout-wrapped — short anyway)
+	// Health + metrics routes (unauthenticated, NOT timeout-wrapped)
 	h := &handlers{deps: d}
 	r.Get("/healthz", h.Healthz)
 	r.Get("/readyz", h.Readyz)
+	// /metrics is internal-only; restricted at the network layer (NetworkPolicy).
+	r.Get("/metrics", metrics.Handler().ServeHTTP)
 
 	// WebSocket route mounted BEFORE timeout-wrapped groups; the long-lived
 	// connection must not be wrapped by http.TimeoutHandler.
@@ -133,6 +160,14 @@ func NewRouter(d Deps) http.Handler {
 			ir.Delete("/{id}", d.Item.Delete)
 			ir.Post("/{id}/shares", d.Item.Share)
 			ir.Delete("/{id}/shares/{user_id}", d.Item.Unshare)
+
+			if d.Attachment != nil {
+				ir.Get("/{id}/attachments", d.Attachment.List)
+				ir.Post("/{id}/attachments", d.Attachment.InitUpload)
+				ir.Post("/{id}/attachments/{att_id}/confirm", d.Attachment.ConfirmUpload)
+				ir.Get("/{id}/attachments/{att_id}/url", d.Attachment.GetDownloadURL)
+				ir.Delete("/{id}/attachments/{att_id}", d.Attachment.Delete)
+			}
 		})
 	}
 

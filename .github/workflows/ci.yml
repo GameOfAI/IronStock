@@ -16,6 +16,9 @@ permissions:
   contents: read
   packages: write
 
+# Job-level permission overrides are used where elevated access is needed
+# (e.g. docker job writes back image tags to kustomization.yaml).
+
 jobs:
   # ---------------- Server (Go) ----------------
   server:
@@ -184,15 +187,23 @@ jobs:
   # ---------------- Docker Build & Push (GHCR) ----------------
   # Dockerfile uses --platform=$BUILDPLATFORM (native cross-compile, no QEMU).
   # Both main push and v* tag push build linux/amd64,linux/arm64 (~8dk total).
+  # After a main push, the job commits updated image tags back to
+  # deploy/k8s/kustomization.yaml so ArgoCD picks up the exact SHA.
   docker:
     name: Docker Build & Push
     runs-on: ubuntu-latest
     needs: [server]
+    permissions:
+      contents: write
+      packages: write
     if: |
       (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
       startsWith(github.ref, 'refs/tags/v')
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full clone so we can push back the kustomization tag update.
+          fetch-depth: 0
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -212,14 +223,15 @@ jobs:
       - name: Determine tags
         id: tags
         run: |
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
             VERSION="${GITHUB_REF#refs/tags/}"
-            echo "api=ghcr.io/${{ github.repository_owner }}/envanter-api:${VERSION},ghcr.io/${{ github.repository_owner }}/envanter-api:latest" >> $GITHUB_OUTPUT
-            echo "web=ghcr.io/${{ github.repository_owner }}/envanter-web:${VERSION},ghcr.io/${{ github.repository_owner }}/envanter-web:latest" >> $GITHUB_OUTPUT
+            echo "api=ghcr.io/${OWNER}/envanter-api:${VERSION},ghcr.io/${OWNER}/envanter-api:latest" >> $GITHUB_OUTPUT
+            echo "web=ghcr.io/${OWNER}/envanter-web:${VERSION},ghcr.io/${OWNER}/envanter-web:latest" >> $GITHUB_OUTPUT
           else
             SHA="${GITHUB_SHA::7}"
-            echo "api=ghcr.io/${{ github.repository_owner }}/envanter-api:main-${SHA},ghcr.io/${{ github.repository_owner }}/envanter-api:latest" >> $GITHUB_OUTPUT
-            echo "web=ghcr.io/${{ github.repository_owner }}/envanter-web:main-${SHA},ghcr.io/${{ github.repository_owner }}/envanter-web:latest" >> $GITHUB_OUTPUT
+            echo "api=ghcr.io/${OWNER}/envanter-api:main-${SHA},ghcr.io/${OWNER}/envanter-api:latest" >> $GITHUB_OUTPUT
+            echo "web=ghcr.io/${OWNER}/envanter-web:main-${SHA},ghcr.io/${OWNER}/envanter-web:latest" >> $GITHUB_OUTPUT
           fi
 
       - name: Build & push API image
@@ -242,6 +254,167 @@ jobs:
           tags: ${{ steps.tags.outputs.web }}
           cache-from: type=gha,scope=web
           cache-to: type=gha,mode=max,scope=web
+
+      # Commit updated image tags to kustomization.yaml so ArgoCD
+      # deploys the exact SHA instead of relying on :latest pull.
+      # Runs only on main push (not tags — version tags are applied separately).
+      # [skip ci] prevents triggering another workflow run.
+      - name: Update k8s image tags in kustomization.yaml
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          TAG="main-${GITHUB_SHA::7}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
+          cd deploy/k8s
+          kustomize edit set image \
+            "ghcr.io/${OWNER}/envanter-api:${TAG}" \
+            "ghcr.io/${OWNER}/envanter-web:${TAG}"
+          cd ../..
+          git add deploy/k8s/kustomization.yaml
+          git diff --staged --quiet && exit 0
+          git commit -m "chore(deploy): bump api+web images to ${TAG} [skip ci]"
+          git push "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" HEAD:main
+
+  # ---------------- Client (Tauri binary — Windows x64) ----------------
+  # Rust + MSVC hedef derleme + NSIS installer üretimi.
+  # Rust cache (swatinem/rust-cache) ile ilk ~15dk → sonraki ~5dk.
+  # Artifact: main push ve v* tag'lerde 30 gün saklanır; PR'larda sadece build validate.
+  client-tauri-win:
+    name: Client (Tauri / Win x64)
+    runs-on: windows-latest
+    needs: [client]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Set up Rust (stable-msvc)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache Rust build
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: client/src-tauri -> target
+
+      - name: Install npm deps
+        run: npm install --no-audit --no-fund
+
+      - name: Build Tauri app (Windows x64)
+        working-directory: client
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npm run tauri:build -- --target x86_64-pc-windows-msvc
+
+      - name: Upload installer artifact
+        if: |
+          github.event_name == 'push' &&
+          (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+        uses: actions/upload-artifact@v4
+        with:
+          name: ironstock-win-x64-${{ github.sha }}
+          path: |
+            client/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+            client/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
+          retention-days: 30
+          if-no-files-found: warn
+
+  # ---------------- Client (Tauri binary — macOS arm64 + x86_64) ----------------
+  # Universal DMG for Mac (arm64 + x86_64 via lipo).
+  # TAURI_SIGNING_PRIVATE_KEY + TAURI_SIGNING_PRIVATE_KEY_PASSWORD must be set
+  # as repo secrets for auto-updater signature. Generate with:
+  #   npx tauri signer generate -w ~/.tauri/ironstock.key
+  # then store the contents of ironstock.key as TAURI_SIGNING_PRIVATE_KEY.
+  client-tauri-mac:
+    name: Client (Tauri / macOS Universal)
+    runs-on: macos-latest
+    needs: [client]
+    if: |
+      (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
+      startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Set up Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Cache Rust build
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: client/src-tauri -> target
+
+      - name: Install npm deps
+        run: npm install --no-audit --no-fund
+
+      - name: Build Tauri app (macOS Universal)
+        working-directory: client
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npm run tauri:build -- --target universal-apple-darwin
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ironstock-mac-universal-${{ github.sha }}
+          path: |
+            client/src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+          retention-days: 30
+          if-no-files-found: warn
+
+  # ---------------- GitHub Release (v* tags only) ----------------
+  # Creates a GitHub Release with Win .msi and Mac .dmg artifacts.
+  # Runs after both Tauri build jobs succeed on a version tag.
+  release:
+    name: GitHub Release
+    runs-on: ubuntu-latest
+    needs: [client-tauri-win, client-tauri-mac]
+    permissions:
+      contents: write
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ironstock-win-x64-${{ github.sha }}
+          path: dist/win
+
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ironstock-mac-universal-${{ github.sha }}
+          path: dist/mac
+
+      - name: List artifacts
+        run: find dist/ -type f | sort
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: IronStock ${{ github.ref_name }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          generate_release_notes: true
+          files: |
+            dist/win/**/*.msi
+            dist/win/**/*.exe
+            dist/mac/**/*.dmg
 
   # ---------------- Pre-commit (multi-language hygiene) ----------------
   pre-commit:

@@ -46,6 +46,8 @@ export interface LoginResponse {
   token_type: 'Bearer';
   user_id: string;
   roles: string[];
+  /** TOTP setup gerektiğinde döner; access_token yerine bu alanla /totp/setup'a yönlendir. */
+  tmp_token?: string;
 }
 
 export interface RefreshRequest {
@@ -149,10 +151,16 @@ export interface ItemCreateRequest {
   folder_id: string;
   item_type_id: number;
   name: string;
+  description?: string;
   fields: ItemFieldInput[];
   owner_dek_wrapped: string; // base64, X25519 sealed-box
   owner_wrap_nonce: string; // base64, 12B
   external_source?: Record<string, unknown> | null;
+}
+
+export interface ItemUpdateRequest {
+  name: string;
+  description?: string;
 }
 
 export interface Item {
@@ -160,11 +168,15 @@ export interface Item {
   folder_id: string;
   item_type_id: number;
   name: string;
+  description?: string;
   fields?: ItemFieldOutput[];
   created_by: string;
   created_at: string;
   updated_at: string;
   permission: Permission;
+  /** PR-13 sonrası sunucu tarafından doldurulur. Yoksa client decrypt edemez. */
+  owner_dek_wrapped?: string;
+  owner_wrap_nonce?: string;
 }
 
 export interface ItemListResponse {
@@ -285,4 +297,42 @@ export interface MyKeypairResponse {
   kek_params: Record<string, unknown>;
   version: number;
   rotated_at?: string | null;
+}
+
+// --- Attachments (PR-A2) ---
+
+export interface Attachment {
+  id: string;
+  item_id: string;
+  file_name: string;
+  content_type: string;
+  size_bytes: number;
+  is_encrypted: boolean;
+  file_nonce?: string | null;
+  upload_confirmed: boolean;
+  created_by: string;
+  created_at: string;
+}
+
+export interface AttachmentListResponse {
+  attachments: Attachment[];
+}
+
+export interface AttachmentInitRequest {
+  file_name: string;
+  content_type: string;
+  size_bytes: number;
+  is_encrypted: boolean;
+  file_nonce?: string;
+}
+
+export interface AttachmentInitResponse {
+  attachment_id: string;
+  upload_url: string;
+  expires_at: string;
+}
+
+export interface AttachmentDownloadURLResponse {
+  url: string;
+  expires_at: string;
 }

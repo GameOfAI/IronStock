@@ -6,6 +6,7 @@
 	migrate-up migrate-down migrate-status migrate-redo \
 	gen gen-sqlc gen-oapi-go gen-oapi-ts gen-check \
 	tools-install \
+	sealed-secrets-install sealed-secrets-fetch-cert seal-secret \
 	clean
 
 .DEFAULT_GOAL := help
@@ -122,6 +123,28 @@ tools-install: ## Go tool'larını kur (sqlc, oapi-codegen, goose, golangci-lint
 	go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.3.0
 	go install github.com/pressly/goose/v3/cmd/goose@v3.22.0
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.55.2
+
+# ---------- Sealed Secrets ----------
+sealed-secrets-install: ## Bitnami Sealed Secrets controller'ı cluster'a kur
+	kubectl apply -f https://github.com/bitnami-labs/sealed-secrets/releases/download/v0.26.0/controller.yaml
+	kubectl -n kube-system rollout status deploy/sealed-secrets-controller --timeout=60s
+
+sealed-secrets-fetch-cert: ## Controller public cert'ini çek → deploy/k8s/pub-cert.pem
+	kubeseal --fetch-cert \
+	  --controller-name=sealed-secrets-controller \
+	  --controller-namespace=kube-system \
+	  > deploy/k8s/pub-cert.pem
+	@echo "Cert kaydedildi: deploy/k8s/pub-cert.pem — git'e commit et"
+
+seal-secret: ## deploy/k8s/secret.yaml → secret.sealed.yaml (pub-cert.pem gerekli)
+	@test -f deploy/k8s/secret.yaml || \
+	  (echo "HATA: deploy/k8s/secret.yaml bulunamadı. secret.yaml.example'dan kopyala."; exit 1)
+	@test -f deploy/k8s/pub-cert.pem || \
+	  (echo "HATA: pub-cert.pem bulunamadı. make sealed-secrets-fetch-cert çalıştır."; exit 1)
+	kubeseal --cert deploy/k8s/pub-cert.pem --format yaml \
+	  < deploy/k8s/secret.yaml \
+	  > deploy/k8s/secret.sealed.yaml
+	@echo "Sealed secret oluşturuldu. kustomization.yaml'da uncomment et ve commit et."
 
 # ---------- Cleanup ----------
 clean: ## Build artifact'lerini temizle

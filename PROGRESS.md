@@ -1,13 +1,13 @@
 # İlerleyiş
 
-Son güncelleme: 2026-04-27
+Son güncelleme: 2026-04-28
 
 ## Mevcut Durum
 
-- **Aktif Faz:** Faz 4 — Tauri Desktop Client (PR-S1 ✅ merged; PR-C2 ✅ push edildi, CI bekliyor)
-- **Tamamlanan Faz:** Faz 0 + Faz 1 + Faz 2 (server MVP) ✅ + Faz 3 (Admin Web UI) ✅ 2026-04-27
-- **Son tamamlanan:** PR-C2 (client-foundation) — branch push edildi, CI bekliyor. Sırada: PR-C3 (client-auth).
-- **Bir sonraki adım:** PR-C3 (feat/client-auth) — login formu, KEK derive, Zustand auth, TOTP wizard.
+- **Aktif Faz:** — (Tüm fazlar tamamlandı ✅)
+- **Tamamlanan Faz:** Faz 0 + 1 + 2 + 3 + 4 + 5 ✅
+- **Son tamamlanan:** PR-V1 — v1.0.0 released ✅ 2026-04-28
+- **Proje durumu:** MVP tamamlandı. Sıradaki çalışmalar Parking Lot / Faz 6+ kapsamında (Vault, distroless, backup/restore, code signing).
 
 ## Faz Durumu
 
@@ -17,8 +17,8 @@ Son güncelleme: 2026-04-27
 | 1 — Veri modeli + kripto tasarımı | DONE | 2026-04-24 | 2026-04-24 | ER (17 tablo) + ADR 0004/0005/0006/0007 + auth-flow + 5 migration + OpenAPI + code gen |
 | 2 — Server MVP | DONE | 2026-04-24 | 2026-04-26 | PR-1...PR-9 ✅ merged. 10 auth endpoint, folder/item CRUD, RBAC 3 katmanlı, E2E hibrit, 174 unit test, 17 migration. WebSocket → Faz 3, item_relationships + field/type admin → Faz 5 (parking). |
 | 3 — Admin Web UI | DONE | 2026-04-26 | 2026-04-27 | 9 PR (Win 6 + Mac 3). PR-10/11/12/W1/W2/W3/W4/W5/W6 tümü merged ✅. WS client + realtime cache invalidation + responsive sidebar + A11y + E2E crypto primitives + admin/inventory UI. |
-| 4 — Client MVP (Tauri) | ACTIVE | 2026-04-27 | — | PR-S1 (shared workspace) ✅ merged. Sırada: PR-C2 (client foundation), PR-C3 (auth), PR-C4 (inventory read), PR-C5 (crypto+E2E). |
-| 5 — Production hardening | PARTIAL | 2026-04-25 | — | Container + GHCR + k8s + ArgoCD + DB migration init container + native cross-compile multi-arch + secret rotation tamam. Sealed Secrets, Helm, observability, Ingress+TLS hâlâ TODO |
+| 4 — Client MVP (Tauri) | DONE | 2026-04-27 | 2026-04-28 | PR-S1/C2/C3/C4/C5/C1 ✅ merged + PR-13 ✅ merged. PR-C6 (Win binary CI) PR#7 open — CI onayı sonrası tam kapanır. |
+| 5 — Production hardening | DONE | 2026-04-28 | 2026-04-28 | PR-K1..K5 + PR-A1 + PR-A2 + PR-P1 + PR-V1 tümü merged ✅. k8s hardening, Sealed Secrets, Ingress+TLS, Prometheus+Grafana, MinIO, attachments, packaging. v1.0.0 released. |
 
 Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tamamlandı · `VERIFY` doğrulama bekliyor · `BLOCKED` bloke · `TODO` beklemede
 
@@ -50,6 +50,101 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-04-28 (Win) — Faz 5 kapandı: PR-A1/A2/P1/V1 merged — v1.0.0 🎉
+
+**Tüm açık PR'lar merge edildi. Proje MVP tamamlandı.**
+
+**PR-A2 conflict çözümü:**
+`feat/item-attachments` branch'ında `client/src/components/inventory/item-detail.tsx` conflict vardı. PR-A1 description bölümü, PR-A2 branch'ı PR-A1 öncesi oluşturulduğu için eksikti. `git rebase origin/main` ile description bloğu korunarak çözüldü.
+
+**PR-A1: Item description — merged (PR #15)**
+
+| Dosya | Değişiklik |
+|-------|-----------|
+| `server/migrations/00018_item_description.sql` | `items.description TEXT` sütunu (nullable, goose up/down) |
+| `server/internal/httpapi/item_handlers.go` | `itemResponse` + create/update request'e `description` alanı |
+| `shared/pkg/src/api/types.ts` | `ItemResponse.description?: string` |
+| `web/src/components/inventory/{item-detail,item-form-modal}.tsx` | Textarea gösterim + edit form |
+| `client/src/components/inventory/{item-detail,item-form-modal}.tsx` | Tauri client (aynı) |
+| `web/src/test/setup.ts` | jsdom 25 + vitest 2 worker localStorage shim fix |
+
+**PR-A2: Item attachments — merged (PR #16)**
+
+| Dosya | Değişiklik |
+|-------|-----------|
+| `server/migrations/00019_item_attachments.sql` | `item_attachments` tablosu |
+| `server/internal/httpapi/item_attachment_handlers.go` | `POST .../attachments` (presigned PUT) + confirm + liste + presigned GET + DELETE |
+| `deploy/k8s/configmap.yaml` | `ENVANTER_MINIO_ENDPOINT` + `ENVANTER_MINIO_BUCKET` |
+| `deploy/k8s/secret.yaml.example` | `ENVANTER_MINIO_ACCESS_KEY` + `ENVANTER_MINIO_SECRET_KEY` |
+| `server/internal/config/config.go` + `server/cmd/api/main.go` | MinIO config wire |
+| `web/src/` + `client/src/` | `ItemAttachmentPanel` — upload/download/delete UI |
+
+**PR-P1: Tauri packaging + macOS DMG CI — merged (PR #17)**
+
+| Dosya | Değişiklik |
+|-------|-----------|
+| `client/src-tauri/tauri.conf.json` | Auto-updater endpoint + signature config |
+| `client/src-tauri/capabilities/default.json` | `core:default` + updater capabilities |
+| `client/src-tauri/Cargo.toml` + `src/lib.rs` | `tauri-plugin-updater = "2"` register |
+| `.github/workflows/ci.yml` | `client-tauri-macos` job (universal binary) + `github-release` job |
+
+**PR-V1: v1.0.0 release — merged (PR #18)**
+
+- `client/package.json`, `Cargo.toml`, `tauri.conf.json`, `shared/pkg/package.json`, `web/package.json` → tümü `1.0.0`
+
+---
+
+### 2026-04-28 (Win) — Faz 5 başladı: PR-K1 k8s hardening
+
+**Branch:** `feat/k8s-hardening` — devam ediyor.
+
+**Faz 4 kapandı:** PR-C1 (Rust keyring+tray) merged ✅, PR-C6 (Win packaging, PR#7) CI bekliyor.
+
+**PR-K1 kapsamı (k8s hardening batch-1):**
+
+| Dosya | Değişiklik |
+|-------|-----------|
+| `deploy/k8s/namespace.yaml` | Pod Security Standards warn label eklendi (`restricted`) |
+| `deploy/k8s/api.yaml` | GHCR ref düzeltildi (`bhaslaman` → `gameofai`), resource limits, securityContext (runAsNonRoot, drop ALL), readyzProbe düzeltildi, PodDisruptionBudget eklendi |
+| `deploy/k8s/web.yaml` | GHCR ref düzeltildi, resource limits, securityContext, liveness+readiness probe eklendi |
+| `deploy/k8s/postgres.yaml` | Resource limits, securityContext (fsGroup 999, runAsUser 999) |
+| `deploy/k8s/argocd-app.yaml` | Repo URL güncellendi (`bhaslaman/Envanter_App` → `GameOfAI/IronStock`) |
+| `deploy/k8s/kustomization.yaml` | YENİ: Kustomize config, `images:` section ile image tag yönetimi |
+| `.github/workflows/ci.yml` | docker job: `permissions.contents: write` + "Update k8s image tags" adımı (kustomize edit + git commit + push [skip ci]) |
+
+**Sıradaki:** PR-K2 (Sealed Secrets adoption) → PR-K3 (Ingress + TLS + NetworkPolicy) → PR-K4 (Prometheus metrics)
+
+### 2026-04-28 (Win) — Faz 4 PR-C6: Windows binary + packaging + CI
+
+**Branch:** `feat/client-win-packaging` — PR #7 açıldı, CI çalışıyor.
+
+- `client/src-tauri/icons/`: 32x32, 128x128, 128x128@2x, icon.png (512), icon.ico oluşturuldu
+- `tauri.conf.json`: productName=IronStock, icon paths, NSIS currentUser config
+- `client/package.json`: `tauri:build:win` script eklendi
+- `.github/workflows/ci.yml`: `client-tauri-win` job (windows-latest + Rust MSVC + swatinem cache + artifact upload)
+- Code signing: Faz 5'e ertelendi
+
+### 2026-04-28 (Win) — Faz 4 PR-C1: Rust keyring + inaktiflik timer + system tray
+
+**Branch:** `feat/client-rust-foundation` — implement ediliyor.
+
+**Mac PR'ları sync:** PR-C2/C3/C4/C5 + PR-13 tümü 2026-04-27 merged. Repo GameOfAI/IronStock'a taşındı. Bu session'da Windows üzerinden devam edildi.
+
+**PR-C1 kapsamı:**
+
+- `Cargo.toml`: `keyring = "2"` + `tokio = { version = "1", features = ["time"] }` + `tauri tray-icon` feature
+- `src-tauri/src/commands.rs`: `kek_store` / `kek_load` / `kek_delete` (Windows Credential Manager / macOS Keychain) + `activity_ping` + `set_inactivity_timeout`
+- `src-tauri/src/inactivity.rs`: `InactivityState` (last_activity + timeout_secs Mutex) + `start()` background thread (30s poll, `inactivity_lock` event emit)
+- `src-tauri/src/tray.rs`: `TrayIconBuilder` — Göster / Kilitle / Çıkış menüsü; Kilitle → `inactivity_lock` event
+- `src-tauri/src/lib.rs`: modüller wire + `manage(InactivityState)` + `invoke_handler`
+- `src-tauri/capabilities/default.json`: Tauri 2 `core:default` capabilities
+- `client/src/lib/tauri.ts`: `isTauri()` guard + typed wrapper'lar (kekStore/Load/Delete, activityPing, listenInactivityLock)
+- `client/src/hooks/use-inactivity-lock.ts`: Tauri event path + browser fallback (setTimeout)
+- `client/src/pages/login.tsx`: `kekStore` after `setSession`
+- `client/src/components/layout/app-shell.tsx`: `handleLock` + `handleLogout` → `kekDelete` before clear
+
+**Tasarım kararı — lock semantiği:** Lock = `kek_delete` (keyring'den sil) + `clear()`. Tam re-login gerekir. Quick-unlock (keyring'den KEK yükle) PR-C1 sonrası ayrı PR.
 
 ### 2026-04-27 (Win) — Faz 4 PR-C2: Client foundation — Tailwind 4 + shadcn/ui + TanStack Query + Zustand + ConnectionGate + CI
 

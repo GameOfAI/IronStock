@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/bhaslaman/Envanter_App.git
+    repoURL: https://github.com/GameOfAI/IronStock.git
     targetRevision: main
     path: deploy/k8s
   destination:
