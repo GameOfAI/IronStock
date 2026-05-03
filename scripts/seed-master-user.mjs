@@ -11,6 +11,7 @@
 import { webcrypto } from 'node:crypto';
 import pkg from 'pg';
 import { hash } from 'argon2-wasm';
+import speakeasy from 'speakeasy';
 const { Client } = pkg;
 
 // Node 20'de globalThis.crypto yoksa ata
@@ -19,6 +20,7 @@ if (!globalThis.crypto) globalThis.crypto = webcrypto;
 const USERNAME = process.argv[2] ?? 'master';
 const PASSWORD = process.argv[3] ?? 'Master123456!';
 const EMAIL = `${USERNAME}@ironstock.local`;
+const MASTER_KEY = process.env.ENVANTER_MASTER_KEY || 'Vb0/UxR3MObGNxhzEZ2xLX35nDSkiwAoPek5GBdm40I=';
 
 // ── Crypto Helpers ────────────────────────────────────────────────────────────
 
@@ -49,7 +51,13 @@ async function hashPassword(password) {
   return {
     hash: hashBuf,
     salt: salt,
-    params: { algorithm: 'argon2id', memory: 19456, time: 2, parallelism: 1 }
+    params: {
+      algorithm: 'argon2id',
+      memory: 19456,
+      time: 2,
+      parallelism: 1,
+      salt_b64: toB64(salt)
+    }
   };
 }
 
@@ -63,6 +71,33 @@ async function generateX25519Keypair() {
   return {
     publicKey: toB64(new Uint8Array(pubRaw)),
     privateKey: toB64(privRaw)
+  };
+}
+
+/** TOTP secret'ı master key ile şifrele (AES-256-GCM) */
+async function encryptTOTPSecret(secret, masterKeyB64, userId) {
+  // Master key'i çöz
+  const masterKey = fromB64(masterKeyB64);
+  const keyObj = await crypto.subtle.importKey('raw', masterKey, 'AES-GCM', false, ['encrypt']);
+
+  // Nonce (12 byte IV) ve encrypted output'u hazırla
+  const nonce = crypto.getRandomValues(new Uint8Array(12));
+  const aad = new TextEncoder().encode(`totp_secrets:${userId}:secret_enc`);
+
+  const encrypted = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv: nonce },
+    keyObj,
+    secret
+  );
+
+  // TOTP secret blob: nonce (12) + encrypted_data
+  const blob = new Uint8Array(nonce.length + encrypted.byteLength);
+  blob.set(nonce);
+  blob.set(new Uint8Array(encrypted), nonce.length);
+
+  return {
+    blob: toB64(blob),
+    nonce: toB64(nonce)
   };
 }
 
@@ -93,7 +128,7 @@ async function main() {
       `INSERT INTO users (username, email, password_hash, argon2_params, status)
        VALUES ($1, $2, $3, $4, 'active')
        RETURNING id`,
-      [USERNAME, EMAIL, Buffer.from(passwordHash), JSON.stringify(params)]
+      [USERNAME, EMAIL, passwordHash, JSON.stringify(params)]
     );
     const userId = userRes.rows[0].id;
     console.log(`    ✅ User oluşturuldu — ID: ${userId}\n`);
@@ -109,6 +144,32 @@ async function main() {
       [userId, Buffer.from(fromB64(publicKey)), Buffer.from(fromB64(privateKey)), kekSalt, JSON.stringify({ algorithm: 'argon2id' })]
     );
     console.log('    ✅ Keypair kaydedildi\n');
+
+    // 3.5 TOTP secret oluştur ve şifrele
+    // Development: sabit secret kullan böylece TOTP kod tahmin edilebilir
+    // Secret: "JBSWY3DPEBLW64TMMQ======" (base64)
+    console.log('3.5/4 TOTP secret oluşturuluyor...');
+    const totpSecret = Buffer.from('JBSWY3DPEBLW64TMMQ======', 'base64');
+    const { blob: encryptedBlob, nonce } = await encryptTOTPSecret(totpSecret, MASTER_KEY, userId);
+
+    // Master key version'ı veritabanından al
+    const mkRes = await client.query('SELECT id FROM master_keys WHERE active = true LIMIT 1');
+    const masterKeyId = mkRes.rows[0]?.id || 1;
+
+    await client.query(
+      `INSERT INTO totp_secrets (user_id, secret_enc, nonce, master_key_id, verified, verified_at)
+       VALUES ($1, $2, $3, $4, true, now())`,
+      [userId, Buffer.from(fromB64(encryptedBlob)), Buffer.from(fromB64(nonce)), masterKeyId]
+    );
+
+    // TOTP code'u generate et
+    const totpCode = speakeasy.totp({
+      secret: Buffer.from(totpSecret),
+      encoding: 'base64',
+      time: Math.floor(Date.now() / 1000)
+    });
+    console.log('    ✅ TOTP secret kaydedildi\n');
+    console.log(`    📱 Şu anki TOTP kodu: ${totpCode}\n`);
 
     // 4. Admin + write rollerini ekle
     console.log('4/4 Roller atanıyor...');
@@ -126,7 +187,7 @@ async function main() {
     console.log('═══════════════════════════════════════');
     console.log(`   Kullanıcı adı: ${USERNAME}`);
     console.log(`   Parola:        ${PASSWORD}`);
-    console.log(`   OTP:           DISABLED`);
+    console.log(`   TOTP Kodu:     ${totpCode}`);
     console.log('═══════════════════════════════════════\n');
 
   } catch (error) {
