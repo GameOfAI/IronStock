@@ -159,20 +159,15 @@ async function main() {
     const mkRes = await client.query('SELECT id FROM master_keys WHERE active = true LIMIT 1');
     const masterKeyId = mkRes.rows[0]?.id || 1;
 
-    // Development: Empty TOTP secret için bypass - set to minimal value
-    // Sadece placeholder sakla, server doğrulama sırasında handle edecek
-    const emptyNonce = Buffer.alloc(12);
-    const emptySecret = Buffer.alloc(0);
-
     await client.query(
       `INSERT INTO totp_secrets (user_id, secret_enc, nonce, master_key_id, verified, verified_at)
        VALUES ($1, $2, $3, $4, true, now())`,
-      [userId, Buffer.from(''), emptyNonce, masterKeyId]
+      [userId, Buffer.from(fromB64(encryptedBlob)), Buffer.from(fromB64(nonce)), masterKeyId]
     );
 
     // TOTP code'u generate et
     const totpCode = speakeasy.totp({
-      secret: Buffer.from(totpSecret),
+      secret: totpSecret,
       encoding: 'base64',
       time: Math.floor(Date.now() / 1000)
     });
