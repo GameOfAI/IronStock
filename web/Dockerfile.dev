@@ -1,0 +1,25 @@
+# Dev Dockerfile for web
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy root package files
+COPY package.json package-lock.json ./
+
+# Copy shared package
+COPY shared/pkg ./shared/pkg
+
+# Copy web package
+COPY web/package.json web/package-lock.json ./web/
+
+# Install dependencies
+RUN npm install
+
+# Copy web source
+COPY web/ ./web/
+
+# Expose dev server port
+EXPOSE 5173
+
+# Run dev server
+CMD ["npm", "run", "dev", "--prefix", "web"]

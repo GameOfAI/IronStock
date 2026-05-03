@@ -12,6 +12,7 @@ import { AuthGate, RoleGate } from '@/routes/auth-gate';
 import { WsProvider } from '@/components/ws-provider';
 
 import LoginPage from '@/pages/login';
+import RegisterPage from '@/pages/register';
 import TOTPSetupPage from '@/pages/totp-setup';
 import RecoverPage from '@/pages/recover';
 import InventoryPage from '@/pages/inventory';
@@ -66,6 +67,7 @@ export default function App() {
           <Routes>
             {/* Public */}
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
             <Route path="/totp/setup" element={<TOTPSetupPage />} />
             <Route path="/recover" element={<RecoverPage />} />
 
