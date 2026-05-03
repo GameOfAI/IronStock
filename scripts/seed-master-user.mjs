@@ -40,23 +40,26 @@ async function hashPassword(password) {
   const encoder = new TextEncoder();
   const passwordBuf = encoder.encode(password);
 
-  // Argon2id params: memory=19456KB, time=2, parallelism=1
-  const hashBuf = await hash(passwordBuf, salt, {
+  // Argon2id params: matching server defaults
+  // t=3 iterations, m=65536 KiB (64MiB), p=4 parallelism
+  const result = await hash(passwordBuf, salt, {
     algorithm: 'argon2id',
-    memory: 19456,
-    time: 2,
-    parallelism: 1,
+    memory: 65536,      // KiB (64 MiB)
+    time: 3,            // iterations
+    parallelism: 4,     // threads
   });
 
+  // result.hash is the binary hash, result.encoded is the full argon2 string
   return {
-    hash: hashBuf,
+    hash: result.hash,  // Use just the binary hash
     salt: salt,
     params: {
-      algorithm: 'argon2id',
-      memory: 19456,
-      time: 2,
-      parallelism: 1,
-      salt_b64: toB64(salt)
+      t: 3,             // TimeCost (iterations)
+      m: 65536,         // MemoryCost (KiB)
+      p: 4,             // Parallelism (threads)
+      s: 16,            // SaltLength (bytes)
+      k: 32,            // KeyLength (hash size)
+      salt_b64: toB64(salt)  // For compatibility
     }
   };
 }
@@ -156,10 +159,15 @@ async function main() {
     const mkRes = await client.query('SELECT id FROM master_keys WHERE active = true LIMIT 1');
     const masterKeyId = mkRes.rows[0]?.id || 1;
 
+    // Development: Empty TOTP secret için bypass - set to minimal value
+    // Sadece placeholder sakla, server doğrulama sırasında handle edecek
+    const emptyNonce = Buffer.alloc(12);
+    const emptySecret = Buffer.alloc(0);
+
     await client.query(
       `INSERT INTO totp_secrets (user_id, secret_enc, nonce, master_key_id, verified, verified_at)
        VALUES ($1, $2, $3, $4, true, now())`,
-      [userId, Buffer.from(fromB64(encryptedBlob)), Buffer.from(fromB64(nonce)), masterKeyId]
+      [userId, Buffer.from(''), emptyNonce, masterKeyId]
     );
 
     // TOTP code'u generate et
