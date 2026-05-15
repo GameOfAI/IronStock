@@ -39,36 +39,38 @@ export function useItem(id: string | null) {
   });
 }
 
-export function useCreateItemMutation(folderId: string) {
+export function useCreateItemMutation(_folderId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (req: ItemCreateRequest) =>
       apiFetch<Item>('/api/v1/items', { method: 'POST', body: req }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.items.byFolder(folderId) });
+      // items.all kullanıyoruz — byFolder(id) ile byFolder(id, '') gibi
+      // farklı `q` değerleri içeren cache key'lerin hepsini invalidate eder.
+      qc.invalidateQueries({ queryKey: queryKeys.items.all });
     },
   });
 }
 
-export function useUpdateItemMutation(id: string, folderId: string) {
+export function useUpdateItemMutation(id: string, _folderId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (req: ItemUpdateRequest) =>
       apiFetch<void>(`/api/v1/items/${id}`, { method: 'PUT', body: req }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.items.detail(id) });
-      qc.invalidateQueries({ queryKey: queryKeys.items.byFolder(folderId) });
+      qc.invalidateQueries({ queryKey: queryKeys.items.all });
     },
   });
 }
 
-export function useDeleteItemMutation(folderId: string) {
+export function useDeleteItemMutation(_folderId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
       apiFetch<void>(`/api/v1/items/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.items.byFolder(folderId) });
+      qc.invalidateQueries({ queryKey: queryKeys.items.all });
     },
   });
 }

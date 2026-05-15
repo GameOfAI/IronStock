@@ -91,12 +91,41 @@ export const useAuthStore = create<AuthState>()(
       setBootstrapSession({ user, accessToken, refreshToken }) {
         syncAccessToStorage(accessToken);
         syncRefreshToStorage(refreshToken);
+        // Persist a per-user bootstrap key in localStorage so items created in
+        // one session remain decryptable across reloads / re-logins. Without
+        // this, every bootstrap login mints a fresh random key and previously
+        // created items become un-decryptable.
+        //
+        // Trade-off: any code with localStorage access can read this key.
+        // Bootstrap is explicitly for early/IAM use — full E2E security is
+        // only available via the normal (TOTP) login path with KEK-derived
+        // private keys.
+        const storageKey = `envanter-bootstrap-pk:${user.id}`;
+        let privateKey: Uint8Array;
+        const stored = localStorage.getItem(storageKey);
+        if (stored && stored.length > 0) {
+          try {
+            const bin = atob(stored);
+            privateKey = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) privateKey[i] = bin.charCodeAt(i);
+          } catch {
+            privateKey = crypto.getRandomValues(new Uint8Array(32));
+            let bin = '';
+            for (let i = 0; i < privateKey.length; i++) bin += String.fromCharCode(privateKey[i]);
+            localStorage.setItem(storageKey, btoa(bin));
+          }
+        } else {
+          privateKey = crypto.getRandomValues(new Uint8Array(32));
+          let bin = '';
+          for (let i = 0; i < privateKey.length; i++) bin += String.fromCharCode(privateKey[i]);
+          localStorage.setItem(storageKey, btoa(bin));
+        }
         set(
           {
             user,
             accessToken,
             kek: null,
-            privateKey: null,
+            privateKey,
             hydrating: false,
             isBootstrap: true,
           },

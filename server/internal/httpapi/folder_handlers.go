@@ -523,25 +523,25 @@ func fetchFolderList(
 	if parent == "" {
 		sqlText = `
 			SELECT
-			    COALESCE(array_agg(id::text          ORDER BY position, name_search), '{}'),
-			    COALESCE(array_agg(parent_id::text   ORDER BY position, name_search), '{}'),
-			    COALESCE(array_agg(name_enc          ORDER BY position, name_search), '{}'),
-			    COALESCE(array_agg(position          ORDER BY position, name_search), '{}'),
-			    COALESCE(array_agg(created_by::text  ORDER BY position, name_search), '{}'),
-			    COALESCE(array_agg(created_at::text  ORDER BY position, name_search), '{}'),
-			    COALESCE(array_agg(updated_at::text  ORDER BY position, name_search), '{}')
+			    COALESCE(array_agg(id::text                        ORDER BY position, name_search), '{}'),
+			    COALESCE(array_agg(COALESCE(parent_id::text, '')   ORDER BY position, name_search), '{}'),
+			    COALESCE(array_agg(name_enc                        ORDER BY position, name_search), '{}'),
+			    COALESCE(array_agg(position                        ORDER BY position, name_search), '{}'),
+			    COALESCE(array_agg(created_by::text                ORDER BY position, name_search), '{}'),
+			    COALESCE(array_agg(created_at::text                ORDER BY position, name_search), '{}'),
+			    COALESCE(array_agg(updated_at::text                ORDER BY position, name_search), '{}')
 			FROM folders WHERE parent_id IS NULL
 		`
 	} else {
 		sqlText = `
 			SELECT
-			    COALESCE(array_agg(id::text          ORDER BY position, name_search), '{}'),
-			    COALESCE(array_agg(parent_id::text   ORDER BY position, name_search), '{}'),
-			    COALESCE(array_agg(name_enc          ORDER BY position, name_search), '{}'),
-			    COALESCE(array_agg(position          ORDER BY position, name_search), '{}'),
-			    COALESCE(array_agg(created_by::text  ORDER BY position, name_search), '{}'),
-			    COALESCE(array_agg(created_at::text  ORDER BY position, name_search), '{}'),
-			    COALESCE(array_agg(updated_at::text  ORDER BY position, name_search), '{}')
+			    COALESCE(array_agg(id::text                        ORDER BY position, name_search), '{}'),
+			    COALESCE(array_agg(COALESCE(parent_id::text, '')   ORDER BY position, name_search), '{}'),
+			    COALESCE(array_agg(name_enc                        ORDER BY position, name_search), '{}'),
+			    COALESCE(array_agg(position                        ORDER BY position, name_search), '{}'),
+			    COALESCE(array_agg(created_by::text                ORDER BY position, name_search), '{}'),
+			    COALESCE(array_agg(created_at::text                ORDER BY position, name_search), '{}'),
+			    COALESCE(array_agg(updated_at::text                ORDER BY position, name_search), '{}')
 			FROM folders WHERE parent_id = $1::uuid
 		`
 		args = append(args, parent)

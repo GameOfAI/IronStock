@@ -18,9 +18,11 @@ interface Props {
   editFolder?: { id: string; name: string; parent_id?: string | null };
   /** Pre-fill parent when creating inside a folder. */
   parentId?: string | null;
+  /** True when creating a sub-folder inside an existing folder. */
+  isSubFolder?: boolean;
 }
 
-export function FolderFormModal({ open, onOpenChange, editFolder, parentId }: Props) {
+export function FolderFormModal({ open, onOpenChange, editFolder, parentId, isSubFolder }: Props) {
   const [name, setName] = useState('');
 
   const createMutation = useCreateFolderMutation();
@@ -31,7 +33,12 @@ export function FolderFormModal({ open, onOpenChange, editFolder, parentId }: Pr
   const error = createMutation.error ?? updateMutation.error;
 
   useEffect(() => {
-    if (open) setName(editFolder?.name ?? '');
+    if (!open) return;
+    setName(editFolder?.name ?? '');
+    // Reset stale errors from previous calls so the modal opens clean.
+    createMutation.reset();
+    updateMutation.reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editFolder]);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -60,11 +67,15 @@ export function FolderFormModal({ open, onOpenChange, editFolder, parentId }: Pr
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{isEdit ? 'Klasörü Yeniden Adlandır' : 'Yeni Klasör'}</DialogTitle>
+          <DialogTitle>
+            {isEdit ? 'Klasörü Yeniden Adlandır' : isSubFolder ? 'Yeni Alt Klasör' : 'Yeni Kök Klasör'}
+          </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="folder-name">Klasör Adı</Label>
+            <Label htmlFor="folder-name">
+              Klasör Adı <span className="text-destructive">*</span>
+            </Label>
             <Input
               id="folder-name"
               value={name}

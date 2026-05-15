@@ -1,14 +1,17 @@
 /**
  * ItemDetail — sağ panel, seçili item'ın metadata + field listesi.
  *
- * Read-only: değerler şifreli (PR-W5'te decrypt). Üst metadata + alt
- * field listesi. Empty state: "Item seçin".
+ * Read-write: privateKey varsa DEK ve field değerleri client-side çözülür.
+ * Şifre/Root Password/Username görünürlüğü ItemFieldRow'da göz toggle ile.
  */
 
+import { useEffect, useMemo, useState } from 'react';
 import { Info, Loader2, MousePointerClick, Package } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { FieldDefinition, ItemType } from '@/api/types';
 import { useItem } from '@/api/items';
+import { useAuthStore } from '@/store/auth';
+import { fromBase64, openDEKWithKEK, decryptField } from '@/lib/crypto';
 import { PermissionBadge } from './permission-badge';
 import { ItemFieldRow } from './item-field-row';
 import { ItemAttachmentPanel } from './item-attachment-panel';
@@ -30,8 +33,69 @@ function buildFieldDefMap(defs: FieldDefinition[]): Map<number, FieldDefinition>
   return map;
 }
 
+type DecryptionState =
+  | { status: 'idle' }
+  | { status: 'pending' }
+  | { status: 'success'; values: Map<number, string> }
+  | { status: 'error'; message: string };
+
 export function ItemDetail({ itemId, fieldDefinitions, itemTypes }: ItemDetailProps) {
   const itemQuery = useItem(itemId);
+  const privateKey = useAuthStore((s) => s.privateKey);
+  const [decryption, setDecryption] = useState<DecryptionState>({ status: 'idle' });
+
+  const item = itemQuery.data;
+
+  // Per-field decryption when item + privateKey are ready.
+  useEffect(() => {
+    if (!item || !privateKey) {
+      setDecryption({ status: 'idle' });
+      return;
+    }
+    if (!item.owner_dek_wrapped || !item.owner_wrap_nonce) {
+      setDecryption({ status: 'error', message: 'Owner DEK eksik (sunucu döndürmedi).' });
+      return;
+    }
+
+    let cancelled = false;
+    setDecryption({ status: 'pending' });
+
+    (async () => {
+      try {
+        const wrapped = fromBase64(item.owner_dek_wrapped!);
+        const wrapNonce = fromBase64(item.owner_wrap_nonce!);
+        const dek = await openDEKWithKEK(wrapped, wrapNonce, privateKey);
+
+        const out = new Map<number, string>();
+        for (const f of item.fields ?? []) {
+          if (!f.value_enc || !f.value_nonce) continue;
+          try {
+            const valueEnc = fromBase64(f.value_enc);
+            const valueNonce = fromBase64(f.value_nonce);
+            const plain = await decryptField(valueEnc, valueNonce, dek);
+            out.set(f.field_definition_id, plain);
+          } catch {
+            // skip un-decryptable field, others may still work
+          }
+        }
+        if (!cancelled) setDecryption({ status: 'success', values: out });
+      } catch (err) {
+        if (!cancelled) {
+          setDecryption({
+            status: 'error',
+            message:
+              err instanceof Error ? err.message : 'Şifre çözme başarısız.',
+          });
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [item, privateKey]);
+
+  const fieldDefMap = useMemo(() => buildFieldDefMap(fieldDefinitions), [fieldDefinitions]);
 
   if (!itemId) {
     return (
@@ -54,7 +118,7 @@ export function ItemDetail({ itemId, fieldDefinitions, itemTypes }: ItemDetailPr
     );
   }
 
-  if (itemQuery.isError || !itemQuery.data) {
+  if (itemQuery.isError || !item) {
     return (
       <div className="p-4 text-sm text-red-600">
         Item okunamadı.{' '}
@@ -69,9 +133,9 @@ export function ItemDetail({ itemId, fieldDefinitions, itemTypes }: ItemDetailPr
     );
   }
 
-  const item = itemQuery.data;
-  const fieldDefMap = buildFieldDefMap(fieldDefinitions);
   const fields = (item.fields ?? []).slice().sort((a, b) => a.position - b.position);
+  const decryptedValues =
+    decryption.status === 'success' ? decryption.values : null;
 
   return (
     <div className="space-y-5 p-4">
@@ -131,24 +195,29 @@ export function ItemDetail({ itemId, fieldDefinitions, itemTypes }: ItemDetailPr
                   key={`${f.field_definition_id}-${idx}`}
                   field={f}
                   definition={fieldDefMap.get(f.field_definition_id)}
+                  decryptedValue={decryptedValues?.get(f.field_definition_id) ?? null}
+                  decryptionStatus={decryption.status}
                 />
               ))}
             </div>
           </div>
         )}
-        <p className="mt-3 flex items-start gap-2 rounded-md bg-amber-50 p-3 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-          <span>
-            Alan değerleri uçtan uca şifreli. Değerleri görüntülemek için
-            düzenleme modu (PR-W5) gereklidir.
-            {itemQuery.isFetching ? (
-              <span className="ml-2 inline-flex items-center gap-1">
-                <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
-                Tazeleniyor…
-              </span>
-            ) : null}
-          </span>
-        </p>
+        {decryption.status === 'error' && (
+          <p className="mt-3 flex items-start gap-2 rounded-md bg-amber-50 p-3 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span>
+              Alanlar şu oturumda çözülemiyor: {decryption.message}. Item bu
+              tarayıcı oturumunda oluşturulmadıysa kalıcı oturum anahtarı
+              gerekir.
+            </span>
+          </p>
+        )}
+        {decryption.status === 'pending' && (
+          <p className="mt-3 inline-flex items-center gap-2 text-xs text-muted-foreground">
+            <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+            Alan değerleri çözülüyor…
+          </p>
+        )}
       </section>
 
       <ItemAttachmentPanel
