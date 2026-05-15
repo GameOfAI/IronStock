@@ -14,7 +14,8 @@ const useCreate = foldersApi.useCreateFolderMutation as ReturnType<typeof vi.fn>
 const useUpdate = foldersApi.useUpdateFolderMutation as ReturnType<typeof vi.fn>;
 
 function makeMutationStub(mutateAsync = vi.fn().mockResolvedValue({})) {
-  return { mutateAsync, isPending: false, error: null };
+  // reset() is called by the modal's open useEffect to clear stale errors.
+  return { mutateAsync, reset: vi.fn(), isPending: false, error: null };
 }
 
 function renderModal(props: Parameters<typeof FolderFormModal>[0]) {
@@ -27,11 +28,18 @@ function renderModal(props: Parameters<typeof FolderFormModal>[0]) {
 }
 
 describe('FolderFormModal — create', () => {
-  it('renders dialog with "Yeni Klasör" title', () => {
+  it('renders dialog with "Yeni Kök Klasör" title by default (no isSubFolder)', () => {
     useCreate.mockReturnValue(makeMutationStub());
     useUpdate.mockReturnValue(makeMutationStub());
     renderModal({ open: true, onOpenChange: () => {} });
-    expect(screen.getByText('Yeni Klasör')).toBeInTheDocument();
+    expect(screen.getByText('Yeni Kök Klasör')).toBeInTheDocument();
+  });
+
+  it('renders dialog with "Yeni Alt Klasör" title when isSubFolder', () => {
+    useCreate.mockReturnValue(makeMutationStub());
+    useUpdate.mockReturnValue(makeMutationStub());
+    renderModal({ open: true, onOpenChange: () => {}, parentId: 'p-1', isSubFolder: true });
+    expect(screen.getByText('Yeni Alt Klasör')).toBeInTheDocument();
   });
 
   it('disables submit when name is empty', () => {
