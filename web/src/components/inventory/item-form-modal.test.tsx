@@ -25,7 +25,8 @@ const useCreate = itemsApi.useCreateItemMutation as ReturnType<typeof vi.fn>;
 const useUpdate = itemsApi.useUpdateItemMutation as ReturnType<typeof vi.fn>;
 
 function makeMutationStub(mutateAsync = vi.fn().mockResolvedValue({})) {
-  return { mutateAsync, isPending: false, error: null };
+  // reset() is called by the modal's open useEffect to clear stale errors.
+  return { mutateAsync, reset: vi.fn(), isPending: false, error: null };
 }
 
 function renderModal(props: Partial<Parameters<typeof ItemFormModal>[0]> = {}) {
@@ -63,7 +64,7 @@ describe('ItemFormModal — create', () => {
     useCreate.mockReturnValue(makeMutationStub());
     useUpdate.mockReturnValue(makeMutationStub());
     renderModal();
-    fireEvent.change(screen.getByLabelText(/^ad$/i), { target: { value: 'my-item' } });
+    fireEvent.change(screen.getByLabelText(/^Ad/i), { target: { value: 'my-item' } });
     expect(screen.getByRole('button', { name: 'Oluştur' })).toBeEnabled();
   });
 
@@ -73,7 +74,7 @@ describe('ItemFormModal — create', () => {
     useUpdate.mockReturnValue(makeMutationStub());
     renderModal();
 
-    fireEvent.change(screen.getByLabelText(/^ad$/i), { target: { value: 'mysql-test' } });
+    fireEvent.change(screen.getByLabelText(/^Ad/i), { target: { value: 'mysql-test' } });
     fireEvent.click(screen.getByRole('button', { name: 'Oluştur' }));
     // Async crypto (SHA-256 + AES-GCM) completes outside React's scheduler;
     // waitFor polls until mutateAsync is called.

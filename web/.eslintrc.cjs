@@ -16,6 +16,17 @@ module.exports = {
   plugins: ['react-refresh'],
   rules: {
     'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+    // Accept underscore-prefixed args/vars as intentionally unused. Lets us
+    // keep parameter shape for API/typing reasons (e.g. mutation hooks that
+    // no longer use their folderId arg but call sites still pass it).
+    '@typescript-eslint/no-unused-vars': [
+      'error',
+      {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+        caughtErrorsIgnorePattern: '^_',
+      },
+    ],
   },
   overrides: [
     {

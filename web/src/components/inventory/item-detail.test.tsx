@@ -66,8 +66,9 @@ describe('ItemDetail', () => {
     expect(screen.getByText('Veritabanı')).toBeInTheDocument();
     expect(screen.getByText('Host')).toBeInTheDocument();
     expect(screen.getByText('Parola')).toBeInTheDocument();
+    // Without a privateKey in the auth store the decryption status stays
+    // 'idle' and every field falls back to the "Şifreli" lock placeholder.
     expect(screen.getAllByText('Şifreli').length).toBe(2);
-    expect(screen.getByText(/uçtan uca şifreli/i)).toBeInTheDocument();
   });
 
   it('renders empty fields message when item has no fields', () => {

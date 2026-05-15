@@ -29,8 +29,8 @@ func TestBootstrapPasswordLength(t *testing.T) {
 		pw   string
 		want bool // true = should be accepted
 	}{
-		{"short11char", false},  // 11 chars
-		{"exactly12ch!", true},  // 12 chars
+		{"short11char", false}, // 11 chars
+		{"exactly12ch!", true}, // 12 chars
 		{"longer_password_ok!", true},
 		{"", false},
 	}
