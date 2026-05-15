@@ -173,6 +173,16 @@ export default function LoginPage() {
             <Button type="submit" disabled={busy} className="mt-2">
               {substepLabel(substep)}
             </Button>
+            <div className="flex items-center justify-center pt-2 text-xs">
+              <button
+                type="button"
+                onClick={() => navigate('/admin-setup')}
+                className="text-muted-foreground underline hover:text-foreground"
+                disabled={busy}
+              >
+                İlk kurulum / Admin paneli
+              </button>
+            </div>
           </form>
         </CardContent>
       </Card>

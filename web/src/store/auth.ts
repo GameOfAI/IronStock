@@ -39,6 +39,8 @@ interface AuthState {
   privateKey: Uint8Array | null;
   /** True until we've checked refresh_token at app boot. UI shows splash. */
   hydrating: boolean;
+  /** True when logged in via the TOTP-free bootstrap panel (ADR-0010). */
+  isBootstrap: boolean;
 
   setSession(input: {
     user: SessionUser;
@@ -46,6 +48,12 @@ interface AuthState {
     refreshToken: string;
     kek: Uint8Array;
     privateKey: Uint8Array;
+  }): void;
+  /** Bootstrap login — no kek/privateKey available (TOTP-free admin path). */
+  setBootstrapSession(input: {
+    user: SessionUser;
+    accessToken: string;
+    refreshToken: string;
   }): void;
   /** Update only the access token (after refresh rotation). */
   setAccessToken(token: string, refreshToken: string): void;
@@ -61,6 +69,7 @@ export const useAuthStore = create<AuthState>()(
       kek: null,
       privateKey: null,
       hydrating: true,
+      isBootstrap: false,
 
       setSession({ user, accessToken, refreshToken, kek, privateKey }) {
         syncAccessToStorage(accessToken);
@@ -72,9 +81,56 @@ export const useAuthStore = create<AuthState>()(
             kek,
             privateKey,
             hydrating: false,
+            isBootstrap: false,
           },
           false,
           'auth/setSession',
+        );
+      },
+
+      setBootstrapSession({ user, accessToken, refreshToken }) {
+        syncAccessToStorage(accessToken);
+        syncRefreshToStorage(refreshToken);
+        // Persist a per-user bootstrap key in localStorage so items created in
+        // one session remain decryptable across reloads / re-logins. Without
+        // this, every bootstrap login mints a fresh random key and previously
+        // created items become un-decryptable.
+        //
+        // Trade-off: any code with localStorage access can read this key.
+        // Bootstrap is explicitly for early/IAM use — full E2E security is
+        // only available via the normal (TOTP) login path with KEK-derived
+        // private keys.
+        const storageKey = `envanter-bootstrap-pk:${user.id}`;
+        let privateKey: Uint8Array;
+        const stored = localStorage.getItem(storageKey);
+        if (stored && stored.length > 0) {
+          try {
+            const bin = atob(stored);
+            privateKey = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) privateKey[i] = bin.charCodeAt(i);
+          } catch {
+            privateKey = crypto.getRandomValues(new Uint8Array(32));
+            let bin = '';
+            for (let i = 0; i < privateKey.length; i++) bin += String.fromCharCode(privateKey[i]);
+            localStorage.setItem(storageKey, btoa(bin));
+          }
+        } else {
+          privateKey = crypto.getRandomValues(new Uint8Array(32));
+          let bin = '';
+          for (let i = 0; i < privateKey.length; i++) bin += String.fromCharCode(privateKey[i]);
+          localStorage.setItem(storageKey, btoa(bin));
+        }
+        set(
+          {
+            user,
+            accessToken,
+            kek: null,
+            privateKey,
+            hydrating: false,
+            isBootstrap: true,
+          },
+          false,
+          'auth/setBootstrapSession',
         );
       },
 
@@ -103,6 +159,7 @@ export const useAuthStore = create<AuthState>()(
             kek: null,
             privateKey: null,
             hydrating: false,
+            isBootstrap: false,
           },
           false,
           'auth/clear',
@@ -117,3 +174,4 @@ export const useAuthStore = create<AuthState>()(
 export const selectIsAuthenticated = (s: AuthState) => s.user !== null && s.accessToken !== null;
 export const selectIsAdmin = (s: AuthState) => s.user?.roles.includes('admin') ?? false;
 export const selectHasRole = (role: string) => (s: AuthState) => s.user?.roles.includes(role) ?? false;
+export const selectIsBootstrap = (s: AuthState) => s.isBootstrap;

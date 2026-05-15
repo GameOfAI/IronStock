@@ -28,10 +28,11 @@ import {
   Wifi,
   WifiOff,
   Loader2,
+  ShieldAlert,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ChangePasswordDialog } from '@/components/change-password-dialog';
-import { useAuthStore, selectIsAdmin } from '@/store/auth';
+import { useAuthStore, selectIsAdmin, selectIsBootstrap } from '@/store/auth';
 import { useUIStore } from '@/store/ui';
 import { useLogoutMutation } from '@/api/auth';
 import { useWsStatus } from '@/components/ws-provider';
@@ -132,6 +133,7 @@ export function AppShell() {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const isAdmin = useAuthStore(selectIsAdmin);
+  const isBootstrap = useAuthStore(selectIsBootstrap);
   const clear = useAuthStore((s) => s.clear);
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
@@ -152,6 +154,17 @@ export function AppShell() {
 
   return (
     <div className="flex h-screen flex-col">
+      {/* Bootstrap mode warning banner */}
+      {isBootstrap && (
+        <div className="flex shrink-0 items-center justify-center gap-2 bg-amber-500 px-4 py-1.5 text-sm font-medium text-black dark:bg-amber-700 dark:text-white">
+          <ShieldAlert className="h-4 w-4 shrink-0" />
+          <span>
+            Bootstrap Modu — TOTP atlanarak giriş yapıldı. İşiniz bitince çıkış yapın ve{' '}
+            <code className="font-mono text-xs">ENVANTER_BOOTSTRAP_ENABLED=false</code> yapın.
+          </span>
+        </div>
+      )}
+
       {/* Top bar */}
       <header className="flex h-14 shrink-0 items-center justify-between border-b bg-background px-4">
         <div className="flex items-center gap-2">

@@ -1,0 +1,35 @@
+module.exports = {
+  apps: [
+    {
+      name: 'envanter-server',
+      script: './server/bin/api',
+      cwd: __dirname,
+      instances: 1,
+      exec_mode: 'fork',
+      watch: false,
+      env: {
+        ENVANTER_ADDR: ':8080',
+        ENVANTER_LOG_LEVEL: 'debug',
+        ENVANTER_DB_URL: 'postgres://envanter:envanter_dev@localhost:5432/envanter?sslmode=disable',
+        ENVANTER_MASTER_KEY: 'Vb0/UxR3MObGNxhzEZ2xLX35nDSkiwAoPek5GBdm40I=',
+        ENVANTER_JWT_SECRET: 'EKuurRf6tOmDStGskLqnwZBL9s3e7NkcMcAP9fHQ1+s=',
+        ENVANTER_SMTP_HOST: 'localhost',
+        ENVANTER_SMTP_PORT: '1025',
+        ENVANTER_MINIO_ENDPOINT: 'localhost:9000',
+        ENVANTER_MINIO_BUCKET: 'envanter-dev',
+        ENVANTER_MINIO_ACCESS_KEY: 'minioadmin',
+        ENVANTER_MINIO_SECRET_KEY: 'minioadmin_dev',
+        ENVANTER_MINIO_SECURE: 'false',
+      },
+    },
+    {
+      name: 'envanter-web',
+      script: './start-web.bat',
+      cwd: __dirname,
+      instances: 1,
+      exec_mode: 'fork_mode',
+      watch: false,
+      interpreter: 'bash',
+    },
+  ],
+};

@@ -12,10 +12,13 @@ import { AuthGate, RoleGate } from '@/routes/auth-gate';
 import { WsProvider } from '@/components/ws-provider';
 
 import LoginPage from '@/pages/login';
+import RegisterPage from '@/pages/register';
 import TOTPSetupPage from '@/pages/totp-setup';
 import RecoverPage from '@/pages/recover';
 import InventoryPage from '@/pages/inventory';
 import AdminUsersPage, { AdminAuditLogPage } from '@/pages/admin';
+import AdminSetupPage from '@/pages/admin-setup';
+import AdminLoginPage from '@/pages/admin-login';
 import NotFoundPage from '@/pages/not-found';
 
 /**
@@ -66,8 +69,12 @@ export default function App() {
           <Routes>
             {/* Public */}
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
             <Route path="/totp/setup" element={<TOTPSetupPage />} />
             <Route path="/recover" element={<RecoverPage />} />
+            {/* Bootstrap admin panel — TOTP-free, ADR-0010 */}
+            <Route path="/admin-setup" element={<AdminSetupPage />} />
+            <Route path="/admin-login" element={<AdminLoginPage />} />
 
             {/* Authenticated — WsProvider starts WebSocket after login */}
             <Route element={<AuthGate />}>

@@ -1,13 +1,6 @@
 .git/
 .github/
-node_modules/
-**/node_modules/
-**/dist/
-**/.vite/
-server/
-client/
 docs/
-deploy/
 *.md
 .editorconfig
 .gitignore

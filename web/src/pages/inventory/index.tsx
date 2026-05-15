@@ -12,12 +12,15 @@
 
 import { useCallback, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { FolderPlus, Pencil, Plus, Share2, Trash2 } from 'lucide-react';
+import { Copy, FolderPlus, FolderTree as FolderTreeIcon, Pencil, Plus, Share2, Trash2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useFieldDefinitions, useItemTypes } from '@/api/catalog';
-import { useItems } from '@/api/items';
+import { useItem, useItems } from '@/api/items';
 import { useFolder } from '@/api/folders';
+import { useAuthStore } from '@/store/auth';
+import { useToast } from '@/hooks/use-toast';
+import { fromBase64, openDEKWithKEK, decryptField } from '@/lib/crypto';
 import { FolderTree } from '@/components/inventory/folder-tree';
 import { ItemList } from '@/components/inventory/item-list';
 import { ItemSearch } from '@/components/inventory/item-search';
@@ -29,7 +32,7 @@ import { ItemDeleteDialog } from '@/components/inventory/item-delete-dialog';
 import { ItemShareModal } from '@/components/inventory/item-share-modal';
 import type { Item } from '@/api/types';
 
-type FolderModal = 'create' | 'rename' | 'delete' | null;
+type FolderModal = 'create-root' | 'create-sub' | 'rename' | 'delete' | null;
 type ItemModal = 'create' | 'edit' | 'delete' | 'share' | null;
 
 export default function InventoryPage() {
@@ -41,11 +44,22 @@ export default function InventoryPage() {
   const [folderModal, setFolderModal] = useState<FolderModal>(null);
   const [itemModal, setItemModal] = useState<ItemModal>(null);
   const [activeItem, setActiveItem] = useState<Item | null>(null);
+  const [duplicateFrom, setDuplicateFrom] = useState<{
+    name: string;
+    description?: string;
+    itemTypeId: number;
+    fieldValues: Record<number, string>;
+  } | null>(null);
+
+  const privateKey = useAuthStore((s) => s.privateKey);
+  const { toast } = useToast();
 
   const fieldDefsQuery = useFieldDefinitions();
   const itemTypesQuery = useItemTypes();
   const itemsQuery = useItems(folderId, query);
   const folderQuery = useFolder(folderId);
+  // Full item (with encrypted fields + DEK) for duplicate decryption.
+  const fullItemQuery = useItem(itemId);
 
   const updateParams = useCallback(
     (mut: (p: URLSearchParams) => void) => {
@@ -82,7 +96,68 @@ export default function InventoryPage() {
 
   function openItemModal(modal: ItemModal, item?: Item) {
     setActiveItem(item ?? null);
+    // Clear any stale duplicate prefill when opening a regular create/edit.
+    setDuplicateFrom(null);
     setItemModal(modal);
+  }
+
+  async function handleDuplicate() {
+    const item = fullItemQuery.data;
+    if (!item) {
+      toast({
+        title: 'Item yükleniyor',
+        description: 'Item detayı hazır olduğunda tekrar deneyin.',
+      });
+      return;
+    }
+    if (!privateKey) {
+      toast({
+        title: 'Anahtar yok',
+        description: 'Şifreleme anahtarı bulunamadı. Yeniden giriş yapın.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (!item.owner_dek_wrapped || !item.owner_wrap_nonce) {
+      toast({
+        title: 'Kopyalanamadı',
+        description: 'Owner DEK eksik (sunucu döndürmedi).',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      const dek = await openDEKWithKEK(
+        fromBase64(item.owner_dek_wrapped),
+        fromBase64(item.owner_wrap_nonce),
+        privateKey,
+      );
+      const fieldValues: Record<number, string> = {};
+      for (const f of item.fields ?? []) {
+        if (!f.value_enc || !f.value_nonce) continue;
+        try {
+          const v = await decryptField(fromBase64(f.value_enc), fromBase64(f.value_nonce), dek);
+          fieldValues[f.field_definition_id] = v;
+        } catch {
+          // skip un-decryptable field; others can still be copied
+        }
+      }
+      setActiveItem(null);
+      setDuplicateFrom({
+        name: `${item.name} (kopya)`,
+        description: item.description,
+        itemTypeId: item.item_type_id,
+        fieldValues,
+      });
+      setItemModal('create');
+    } catch (err) {
+      toast({
+        title: 'Kopyalanamadı',
+        description: err instanceof Error ? err.message : 'Şifre çözme başarısız.',
+        variant: 'destructive',
+      });
+    }
   }
 
   return (
@@ -95,22 +170,36 @@ export default function InventoryPage() {
               Klasörler
             </span>
             <div className="flex gap-1">
+              {/* Her zaman görünür: kök klasör oluştur */}
               <Button
                 size="icon"
                 variant="ghost"
                 className="h-6 w-6"
-                aria-label="Yeni klasör"
-                onClick={() => setFolderModal('create')}
+                aria-label="Yeni kök klasör"
+                title="Yeni kök klasör"
+                onClick={() => setFolderModal('create-root')}
               >
                 <FolderPlus size={14} />
               </Button>
+              {/* Sadece klasör seçiliyken: alt klasör ekle, yeniden adlandır, sil */}
               {folderId && (
                 <>
                   <Button
                     size="icon"
                     variant="ghost"
                     className="h-6 w-6"
+                    aria-label="Seçili klasörün içine alt klasör ekle"
+                    title="Alt klasör ekle"
+                    onClick={() => setFolderModal('create-sub')}
+                  >
+                    <FolderTreeIcon size={14} />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6"
                     aria-label="Klasörü yeniden adlandır"
+                    title="Yeniden adlandır"
                     onClick={() => setFolderModal('rename')}
                   >
                     <Pencil size={14} />
@@ -120,6 +209,7 @@ export default function InventoryPage() {
                     variant="ghost"
                     className="h-6 w-6 hover:text-destructive"
                     aria-label="Klasörü sil"
+                    title="Klasörü sil"
                     onClick={() => setFolderModal('delete')}
                   >
                     <Trash2 size={14} />
@@ -171,6 +261,17 @@ export default function InventoryPage() {
                 size="icon"
                 variant="ghost"
                 className="h-6 w-6"
+                aria-label="Item kopyala"
+                title="Kopya oluştur"
+                onClick={handleDuplicate}
+                disabled={!selectedItem || !fullItemQuery.data}
+              >
+                <Copy size={13} />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6"
                 aria-label="Item paylaş"
                 onClick={() => selectedItem && openItemModal('share', selectedItem)}
                 disabled={!selectedItem}
@@ -214,10 +315,18 @@ export default function InventoryPage() {
       </div>
 
       {/* Folder modals */}
+      {/* Kök klasör — parent yok */}
       <FolderFormModal
-        open={folderModal === 'create'}
+        open={folderModal === 'create-root'}
+        onOpenChange={(v) => !v && setFolderModal(null)}
+        parentId={null}
+      />
+      {/* Alt klasör — seçili klasörün içine */}
+      <FolderFormModal
+        open={folderModal === 'create-sub'}
         onOpenChange={(v) => !v && setFolderModal(null)}
         parentId={folderId}
+        isSubFolder
       />
       <FolderFormModal
         open={folderModal === 'rename'}
@@ -257,10 +366,16 @@ export default function InventoryPage() {
         <>
           <ItemFormModal
             open={itemModal === 'create'}
-            onOpenChange={(v) => !v && setItemModal(null)}
+            onOpenChange={(v) => {
+              if (!v) {
+                setItemModal(null);
+                setDuplicateFrom(null);
+              }
+            }}
             folderId={folderId}
             fieldDefinitions={fieldDefsQuery.data?.field_definitions ?? []}
             itemTypes={itemTypesQuery.data?.item_types ?? []}
+            duplicateFrom={duplicateFrom}
           />
           <ItemFormModal
             open={itemModal === 'edit'}

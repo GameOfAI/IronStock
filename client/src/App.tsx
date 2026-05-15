@@ -16,6 +16,8 @@ import ConfigPage from '@/pages/config';
 import LoginPage from '@/pages/login';
 import TOTPSetupPage from '@/pages/totp-setup';
 import InventoryPage from '@/pages/inventory';
+import AdminSetupPage from '@/pages/admin-setup';
+import AdminLoginPage from '@/pages/admin-login';
 import NotFoundPage from '@/pages/not-found';
 
 /**
@@ -74,6 +76,9 @@ export default function App() {
               {/* Public */}
               <Route path="/login" element={<LoginPage />} />
               <Route path="/totp/setup" element={<TOTPSetupPage />} />
+              {/* Bootstrap admin (TOTP-free) — ADR-0010 */}
+              <Route path="/admin-setup" element={<AdminSetupPage />} />
+              <Route path="/admin-login" element={<AdminLoginPage />} />
 
               {/* Authenticated */}
               <Route element={<AuthGate />}>

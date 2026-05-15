@@ -65,7 +65,7 @@ func (h *AdminHandlers) ListUsers(w http.ResponseWriter, r *http.Request) {
 		    COALESCE(array_agg(username                        ORDER BY username), '{}'),
 		    COALESCE(array_agg(email                           ORDER BY username), '{}'),
 		    COALESCE(array_agg(status                          ORDER BY username), '{}'),
-		    COALESCE(array_agg(last_login_at::text             ORDER BY username), '{}'),
+		    COALESCE(array_agg(COALESCE(last_login_at::text, '') ORDER BY username), '{}'),
 		    COALESCE(array_agg(created_at::text                ORDER BY username), '{}')
 		FROM (
 		    SELECT id, username, email, status, last_login_at, created_at

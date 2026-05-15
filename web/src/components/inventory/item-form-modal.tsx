@@ -30,6 +30,17 @@ interface Props {
   itemTypes: ItemType[];
   /** When set, we're editing an existing item (name-only edit). */
   editItem?: Item | null;
+  /**
+   * When set, opens in CREATE mode but pre-fills name/type/fields from this
+   * template (used by the Duplicate action). Plaintext field values per
+   * field_definition_id; the form re-encrypts on save.
+   */
+  duplicateFrom?: {
+    name: string;
+    description?: string;
+    itemTypeId: number;
+    fieldValues: Record<number, string>;
+  } | null;
 }
 
 interface FieldState {
@@ -76,6 +87,7 @@ export function ItemFormModal({
   fieldDefinitions,
   itemTypes,
   editItem,
+  duplicateFrom,
 }: Props) {
   const isEdit = Boolean(editItem);
 
@@ -100,21 +112,40 @@ export function ItemFormModal({
       setName(editItem.name);
       setDescription(editItem.description ?? '');
       setItemTypeId(String(editItem.item_type_id));
+    } else if (duplicateFrom) {
+      setName(duplicateFrom.name);
+      setDescription(duplicateFrom.description ?? '');
+      setItemTypeId(String(duplicateFrom.itemTypeId));
     } else {
       setName('');
       setDescription('');
       setItemTypeId(itemTypes[0] ? String(itemTypes[0].id) : '');
     }
     setError(null);
-  }, [open, editItem, itemTypes]);
+    // Reset stale mutation errors from previous calls.
+    createMutation.reset();
+    updateMutation.reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editItem, duplicateFrom, itemTypes]);
 
+  // Re-build the field map whenever the modal opens or the selected type
+  // changes. Including `open` in deps ensures fields fully reset on each
+  // open — even when selectedType reference is stable across opens.
   useEffect(() => {
-    if (!selectedType || isEdit) return;
-    dispatchFields({
-      type: 'reset',
-      fields: buildInitialFields(selectedType.suggested_fields, fieldDefinitions),
-    });
-  }, [selectedType, fieldDefinitions, isEdit]);
+    if (!open || !selectedType || isEdit) return;
+    const initial = buildInitialFields(selectedType.suggested_fields, fieldDefinitions);
+    if (duplicateFrom) {
+      // Prefill plaintext values from the duplicate source.
+      for (const defIdStr of Object.keys(initial)) {
+        const defId = Number(defIdStr);
+        const v = duplicateFrom.fieldValues[defId];
+        if (v !== undefined) {
+          initial[defId] = { value: v, visible: false };
+        }
+      }
+    }
+    dispatchFields({ type: 'reset', fields: initial });
+  }, [open, selectedType, fieldDefinitions, isEdit, duplicateFrom]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -192,7 +223,9 @@ export function ItemFormModal({
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="item-name">Ad</Label>
+            <Label htmlFor="item-name">
+              Ad <span className="text-destructive">*</span>
+            </Label>
             <Input
               id="item-name"
               value={name}
@@ -218,7 +251,9 @@ export function ItemFormModal({
 
           {!isEdit && (
             <div className="space-y-1.5">
-              <Label htmlFor="item-type">Tip</Label>
+              <Label htmlFor="item-type">
+                Tip <span className="text-destructive">*</span>
+              </Label>
               <Select value={itemTypeId} onValueChange={setItemTypeId} disabled={isPending}>
                 <SelectTrigger id="item-type">
                   <SelectValue placeholder="Tip seçin" />
@@ -281,7 +316,12 @@ interface FieldInputProps {
 }
 
 function FieldInput({ def, state, disabled, onChangeValue, onToggleVisible }: FieldInputProps) {
-  const isSecret = def.is_secret || def.field_type === 'password';
+  // Username is treated as hideable per UI policy (eye toggle in form too).
+  const isSecret =
+    def.is_secret || def.field_type === 'password' || def.key === 'username';
+  const isNumeric = def.field_type === 'number' || def.field_type === 'port';
+  const isIP = def.field_type === 'ip';
+
   const inputType =
     isSecret && !state.visible
       ? 'password'
@@ -289,9 +329,35 @@ function FieldInput({ def, state, disabled, onChangeValue, onToggleVisible }: Fi
         ? 'url'
         : def.field_type === 'email'
           ? 'email'
-          : def.field_type === 'port'
+          : isNumeric
             ? 'number'
             : 'text';
+
+  // Integer constraints for numeric fields.
+  const numericProps = isNumeric
+    ? {
+        step: 1,
+        min: 0,
+        max: def.field_type === 'port' ? 65535 : undefined,
+        // Prevent non-integer input (e.g. "1.5").
+        onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => {
+          if (['.', ',', 'e', 'E', '+', '-'].includes(e.key)) e.preventDefault();
+        },
+      }
+    : {};
+
+  // IPv4/IPv6 hint + soft pattern validation. The pattern accepts standard
+  // dotted-quad IPv4 and any colon-bearing string for IPv6 (the latter is
+  // too complex for a regex; client-side hint is sufficient).
+  const ipProps = isIP
+    ? {
+        pattern:
+          '^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$|^([0-9a-fA-F:]+)$',
+        title: 'IPv4 (örn 192.168.1.10) veya IPv6 (örn ::1)',
+      }
+    : {};
+
+  const placeholder = def.hint ?? (isIP ? '192.168.1.10' : '');
 
   const id = `field-${def.id}`;
 
@@ -345,9 +411,11 @@ function FieldInput({ def, state, disabled, onChangeValue, onToggleVisible }: Fi
           type={inputType}
           value={state.value}
           onChange={(e) => onChangeValue(e.target.value)}
-          placeholder={def.hint ?? ''}
+          placeholder={placeholder}
           disabled={disabled}
           className={isSecret ? 'pr-9 font-mono' : ''}
+          {...numericProps}
+          {...ipProps}
         />
         {isSecret && (
           <button

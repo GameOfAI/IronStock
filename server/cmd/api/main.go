@@ -95,9 +95,13 @@ func run() error {
 	}
 	auditWriter := audit.NewWriter(pool)
 	authHandlers := &httpapi.AuthHandlers{
-		Service: authSvc,
-		Audit:   auditWriter,
-		Logger:  logger,
+		Service:          authSvc,
+		Audit:            auditWriter,
+		Logger:           logger,
+		BootstrapEnabled: cfg.BootstrapEnabled,
+	}
+	if cfg.BootstrapEnabled {
+		logger.Warn("BOOTSTRAP MODE ENABLED — /api/v1/auth/bootstrap is active (TOTP bypassed)")
 	}
 	// --- WebSocket hub (created early so handlers can attach Publish) ---
 	hub := ws.NewHub(logger)

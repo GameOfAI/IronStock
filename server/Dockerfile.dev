@@ -1,0 +1,20 @@
+# Dev Dockerfile for server
+FROM golang:1.22-alpine
+
+WORKDIR /app
+
+# Copy go mod files
+COPY server/go.mod server/go.sum ./
+
+# Download dependencies
+RUN go mod download
+
+# Copy server source
+COPY server/ .
+
+# Build
+RUN go build -o bin/api ./cmd/api
+
+# Run
+EXPOSE 8080
+CMD ["./bin/api"]

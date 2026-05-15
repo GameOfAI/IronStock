@@ -58,9 +58,11 @@ export function useUpdateFolderMutation(id: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (req: FolderRequest) =>
-      apiFetch<Folder>(`/api/v1/folders/${id}`, { method: 'PUT', body: req }),
-    onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: queryKeys.folders.byParent(data.parent_id ?? null) });
+      apiFetch<void>(`/api/v1/folders/${id}`, { method: 'PUT', body: req }),
+    onSuccess: (_data, variables) => {
+      // Server returns 204 No Content — use the request variables to know which
+      // parent's list to invalidate, not the (undefined) response body.
+      qc.invalidateQueries({ queryKey: queryKeys.folders.byParent(variables.parent_id ?? null) });
       qc.invalidateQueries({ queryKey: queryKeys.folders.detail(id) });
     },
   });

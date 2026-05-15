@@ -117,6 +117,13 @@ func NewRouter(d Deps) http.Handler {
 			ar.Post("/register", d.Auth.Register)
 			ar.With(authBruteRL.Middleware).Post("/login", d.Auth.Login)
 			ar.With(authBruteRL.Middleware).Post("/refresh", d.Auth.Refresh)
+			// Bootstrap panel (ADR-0010) — gated by ENVANTER_BOOTSTRAP_ENABLED.
+			// /status  : public, returns {"setup_complete": bool}
+			// /setup   : creates the ONE admin (fails if admin already exists)
+			// /login   : TOTP-free login for the existing admin
+			ar.Get("/bootstrap/status", d.Auth.BootstrapStatus)
+			ar.With(authBruteRL.Middleware).Post("/bootstrap/setup", d.Auth.BootstrapSetup)
+			ar.With(authBruteRL.Middleware).Post("/bootstrap/login", d.Auth.BootstrapLogin)
 
 			// tmp-token-protected (totp enroll).
 			ar.Post("/totp/init", d.Auth.TOTPInit)

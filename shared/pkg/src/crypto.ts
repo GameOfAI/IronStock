@@ -388,3 +388,38 @@ export async function generateX25519Keypair(): Promise<{
 export function randomKEKSalt(): Uint8Array {
   return crypto.getRandomValues(new Uint8Array(16));
 }
+
+/**
+ * Inverse of the KEK-wrapped DEK scheme used by the item-form-modal:
+ * the first 32 bytes of `wrapped` are an X25519-pub placeholder (random,
+ * ignored on open); the rest is AES-GCM(ciphertext+tag) under
+ * SHA-256(privateKey) as the wrap key.
+ *
+ * Used until the server exposes the owner's public key inline for true
+ * X25519 sealed-box. Compatible with items created by sealDEKWithKEK.
+ */
+export async function openDEKWithKEK(
+  wrapped: Uint8Array,
+  nonce: Uint8Array,
+  privateKey: Uint8Array,
+): Promise<Uint8Array> {
+  if (wrapped.length < 32 + 16) {
+    throw new Error('wrapped DEK çok kısa');
+  }
+  const ctWithTag = wrapped.subarray(32);
+  const wrapKeyBits = await crypto.subtle.digest('SHA-256', privateKey as BufferSource);
+  const wrapKey = await crypto.subtle.importKey(
+    'raw',
+    wrapKeyBits,
+    'AES-GCM',
+    false,
+    ['decrypt'],
+  );
+  return new Uint8Array(
+    await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: nonce as BufferSource },
+      wrapKey,
+      ctWithTag as BufferSource,
+    ),
+  );
+}

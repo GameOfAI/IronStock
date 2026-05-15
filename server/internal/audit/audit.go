@@ -56,6 +56,11 @@ const (
 	ActionAdminUserEnabled  = "admin.user_enabled"
 	ActionAdminRoleGranted  = "admin.role_granted"
 	ActionAdminRoleRevoked  = "admin.role_revoked"
+
+	// ActionAuthBootstrapLogin is emitted when an admin logs in via the
+	// TOTP-free bootstrap panel (ADR-0010). Requires ENVANTER_BOOTSTRAP_ENABLED=true.
+	ActionAuthBootstrapSetup = "auth.bootstrap_setup"
+	ActionAuthBootstrapLogin = "auth.bootstrap_login"
 )
 
 // ResourceFolder is the audit resource type for folder rows.

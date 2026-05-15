@@ -65,6 +65,45 @@ services:
       timeout: 5s
       retries: 5
 
+  server:
+    build:
+      context: ../..
+      dockerfile: server/Dockerfile.dev
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      ENVANTER_ADDR: ":8080"
+      ENVANTER_LOG_LEVEL: "debug"
+      ENVANTER_DB_URL: "postgres://envanter:envanter_dev@postgres:5432/envanter?sslmode=disable"
+      ENVANTER_MASTER_KEY: "Vb0/UxR3MObGNxhzEZ2xLX35nDSkiwAoPek5GBdm40I="
+      ENVANTER_JWT_SECRET: "EKuurRf6tOmDStGskLqnwZBL9s3e7NkcMcAP9fHQ1+s="
+      ENVANTER_SMTP_HOST: "mailhog"
+      ENVANTER_SMTP_PORT: "1025"
+      ENVANTER_MINIO_ENDPOINT: "minio:9000"
+      ENVANTER_MINIO_BUCKET: "envanter-dev"
+      ENVANTER_MINIO_ACCESS_KEY: "minioadmin"
+      ENVANTER_MINIO_SECRET_KEY: "minioadmin_dev"
+      ENVANTER_MINIO_SECURE: "false"
+      ENVANTER_BOOTSTRAP_ENABLED: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ../..
+      dockerfile: web/Dockerfile.dev
+    restart: unless-stopped
+    ports:
+      - "5175:5173"
+    environment:
+      VITE_API_URL: "http://localhost:8080"
+    depends_on:
+      - server
+
 volumes:
   postgres_data:
     driver: local
