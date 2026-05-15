@@ -24,6 +24,7 @@ interface AuthState {
   kek: Uint8Array | null;
   privateKey: Uint8Array | null;
   hydrating: boolean;
+  isBootstrap: boolean;
 
   setSession(input: {
     user: SessionUser;
@@ -31,6 +32,12 @@ interface AuthState {
     refreshToken: string;
     kek: Uint8Array;
     privateKey: Uint8Array;
+  }): void;
+  /** Bootstrap login (TOTP-free admin path) — kek=null, ephemeral privateKey */
+  setBootstrapSession(input: {
+    user: SessionUser;
+    accessToken: string;
+    refreshToken: string;
   }): void;
   setAccessToken(token: string, refreshToken: string): void;
   setHydrating(value: boolean): void;
@@ -45,11 +52,49 @@ export const useAuthStore = create<AuthState>()(
       kek: null,
       privateKey: null,
       hydrating: true,
+      isBootstrap: false,
 
       setSession({ user, accessToken, refreshToken, kek, privateKey }) {
         syncAccessToStorage(accessToken);
         syncRefreshToStorage(refreshToken);
-        set({ user, accessToken, kek, privateKey, hydrating: false }, false, 'auth/setSession');
+        set(
+          { user, accessToken, kek, privateKey, hydrating: false, isBootstrap: false },
+          false,
+          'auth/setSession',
+        );
+      },
+
+      setBootstrapSession({ user, accessToken, refreshToken }) {
+        syncAccessToStorage(accessToken);
+        syncRefreshToStorage(refreshToken);
+        // Persist per-user bootstrap key so items stay decryptable across
+        // reloads. Bootstrap path has no real KEK; this is best-effort
+        // session encryption only.
+        const storageKey = `envanter-bootstrap-pk:${user.id}`;
+        let privateKey: Uint8Array;
+        const stored = localStorage.getItem(storageKey);
+        if (stored && stored.length > 0) {
+          try {
+            const bin = atob(stored);
+            privateKey = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) privateKey[i] = bin.charCodeAt(i);
+          } catch {
+            privateKey = crypto.getRandomValues(new Uint8Array(32));
+            let bin = '';
+            for (let i = 0; i < privateKey.length; i++) bin += String.fromCharCode(privateKey[i]);
+            localStorage.setItem(storageKey, btoa(bin));
+          }
+        } else {
+          privateKey = crypto.getRandomValues(new Uint8Array(32));
+          let bin = '';
+          for (let i = 0; i < privateKey.length; i++) bin += String.fromCharCode(privateKey[i]);
+          localStorage.setItem(storageKey, btoa(bin));
+        }
+        set(
+          { user, accessToken, kek: null, privateKey, hydrating: false, isBootstrap: true },
+          false,
+          'auth/setBootstrapSession',
+        );
       },
 
       setAccessToken(token, refreshToken) {
@@ -68,7 +113,14 @@ export const useAuthStore = create<AuthState>()(
         if (state.privateKey) state.privateKey.fill(0);
         clearAllTokens();
         set(
-          { user: null, accessToken: null, kek: null, privateKey: null, hydrating: false },
+          {
+            user: null,
+            accessToken: null,
+            kek: null,
+            privateKey: null,
+            hydrating: false,
+            isBootstrap: false,
+          },
           false,
           'auth/clear',
         );

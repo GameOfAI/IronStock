@@ -22,6 +22,8 @@ vendor/
 
 # Rust
 /client/src-tauri/target/
+# Tauri-generated capability schemas — regenerated on each build per platform
+/client/src-tauri/gen/
 **/*.rs.bk
 Cargo.lock.bak
 
