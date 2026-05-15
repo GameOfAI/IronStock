@@ -51,6 +51,11 @@ type Config struct {
 	MinioSecretKey string // ENVANTER_MINIO_SECRET_KEY
 	MinioUseSSL    bool   // ENVANTER_MINIO_USE_SSL (default false)
 	MinioBucket    string // ENVANTER_MINIO_BUCKET (default "envanter")
+
+	// BootstrapEnabled enables POST /api/v1/auth/bootstrap — a TOTP-free
+	// Basic-Auth login for admin users who are locked out. Default false.
+	// Enable only temporarily during bootstrap/recovery ops (ADR-0010).
+	BootstrapEnabled bool // ENVANTER_BOOTSTRAP_ENABLED (default false)
 }
 
 // Load reads config from environment, applies defaults, and validates.
@@ -75,6 +80,7 @@ func Load() (*Config, error) {
 		MinioSecretKey:        os.Getenv("ENVANTER_MINIO_SECRET_KEY"),
 		MinioUseSSL:           envBoolOr("ENVANTER_MINIO_USE_SSL", false),
 		MinioBucket:           envOr("ENVANTER_MINIO_BUCKET", "envanter"),
+		BootstrapEnabled:      envBoolOr("ENVANTER_BOOTSTRAP_ENABLED", false),
 	}
 	if err := cfg.Validate(); err != nil {
 		return nil, err

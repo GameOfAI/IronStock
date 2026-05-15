@@ -11,7 +11,8 @@ import (
 // for /api/v1/auth/*. Constructed once at startup with full deps and bound
 // to chi via NewRouter.
 type AuthHandlers struct {
-	Service *auth.Service
-	Audit   *audit.Writer
-	Logger  *slog.Logger
+	Service          *auth.Service
+	Audit            *audit.Writer
+	Logger           *slog.Logger
+	BootstrapEnabled bool // mirrors config.BootstrapEnabled — gates /auth/bootstrap
 }
