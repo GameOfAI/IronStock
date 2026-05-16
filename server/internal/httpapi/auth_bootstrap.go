@@ -381,12 +381,13 @@ func (s *AuthHandlers) BootstrapLogin(w http.ResponseWriter, r *http.Request) {
 	})
 
 	writeJSON(w, http.StatusOK, loginResponse{
-		AccessToken:  accessToken,
-		RefreshToken: refresh.Token,
-		ExpiresIn:    int(auth.AccessTokenLifetime.Seconds()),
-		TokenType:    "Bearer",
-		UserID:       userRow.ID,
-		Roles:        roles,
+		AccessToken:        accessToken,
+		RefreshToken:       refresh.Token,
+		ExpiresIn:          int(auth.AccessTokenLifetime.Seconds()),
+		TokenType:          "Bearer",
+		UserID:             userRow.ID,
+		Roles:              roles,
+		MustChangePassword: userRow.MustChangePassword,
 	})
 }
 
