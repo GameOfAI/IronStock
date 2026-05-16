@@ -1,6 +1,6 @@
 # İlerleyiş
 
-Son güncelleme: 2026-04-28
+Son güncelleme: 2026-05-16
 
 ## Mevcut Durum
 
@@ -50,6 +50,28 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-05-16 (Win) — Kapsamlı Plan: PR-F1 ✅ + PR-N6 ✅ + PR-F2a ✅
+
+Kapsamlı Geliştirme Planı (plan dosyasına göre) başlatıldı. Bu session'da tamamlananlar:
+
+**PR-F1: Default admin + must_change_password** ✅
+- Migration: `00021_must_change_password.sql` — `users.must_change_password BOOLEAN`
+- Server: bootstrap admin seed, `must_change_password` login response, ChangePassword handler flag sıfırlar, CreateUser `must_change_password=true` set eder, BootstrapLogin response dahil
+- Web: `mustChangePassword` auth store state, MustChangePasswordGate route guard, `/change-password` sayfası (Argon2id KEK yenileme + bootstrap keypair upgrade), login redirect filtresi (`/change-password` fromPath engeli), clear() reset fix
+
+**PR-N6: Read event audit logging** ✅
+- `item.viewed`, `item.listed`, `folder.listed` action sabitleri eklendi
+- `WriteAsync()` metodu — goroutine + `context.Background()`, hot-path latency korunur
+- GetItem, ListItems, ListFolders handler'larına async audit eklendi
+
+**PR-F2a: TOTP Status/Disable/Backup + Admin Reset** ✅
+- Server: `GET /api/v1/auth/totp/status`, `DELETE /api/v1/auth/totp`, `POST /api/v1/auth/totp/backup-codes/regenerate`, `POST /api/v1/admin/users/{id}/totp/reset`
+- Audit constants: `auth.totp_disabled`, `auth.totp_backup_regenerated`, `admin.totp_reset`
+- Web: `/profile` sayfası — TOTP durum kartı, devre dışı dialog (şifre onayı), backup regenerate dialog, UserCircle nav butonu AppShell'de
+- Fix: `LoginRequest.totp_code` optional yapıldı; `ws.test.ts` no-arg WsClient constructor'a güncellendi
+
+**Sıradaki:** PR-F4 (Smart Item Type Fields — grouped, enum selects)
 
 ### 2026-04-28 (Win) — Faz 5 kapandı: PR-A1/A2/P1/V1 merged — v1.0.0 🎉
 
