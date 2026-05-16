@@ -19,10 +19,13 @@ import InventoryPage from '@/pages/inventory';
 import AdminUsersPage, { AdminAuditLogPage } from '@/pages/admin';
 import AdminRolesPage from '@/pages/admin/roles';
 import AdminGroupsPage from '@/pages/admin/groups';
+import TagsPage from '@/pages/tags';
+import { GraphPage } from '@/pages/graph';
 import AdminSetupPage from '@/pages/admin-setup';
 import AdminLoginPage from '@/pages/admin-login';
 import ChangePasswordPage from '@/pages/change-password';
 import ProfilePage from '@/pages/profile';
+import SharePage from '@/pages/share';
 import NotFoundPage from '@/pages/not-found';
 
 /**
@@ -79,6 +82,8 @@ export default function App() {
             {/* Bootstrap admin panel — TOTP-free, ADR-0010 */}
             <Route path="/admin-setup" element={<AdminSetupPage />} />
             <Route path="/admin-login" element={<AdminLoginPage />} />
+            {/* PR-N5: Public one-time share link — no auth required */}
+            <Route path="/share/:token" element={<SharePage />} />
 
             {/* Authenticated — WsProvider starts WebSocket after login */}
             <Route element={<AuthGate />}>
@@ -91,6 +96,8 @@ export default function App() {
                 <Route element={<AppShell />}>
                   <Route index element={<Navigate to="/inventory" replace />} />
                   <Route path="/inventory/*" element={<InventoryPage />} />
+                  <Route path="/tags" element={<TagsPage />} />
+                  <Route path="/graph" element={<GraphPage />} />
                   <Route path="/profile" element={<ProfilePage />} />
 
                   {/* Admin */}

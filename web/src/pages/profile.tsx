@@ -38,9 +38,12 @@ import {
   useTOTPDisableMutation,
   useTOTPRegenerateBackupMutation,
   useTOTPStatusQuery,
+  useTrustedDevicesQuery,
+  useRevokeTrustedDeviceMutation,
+  useRevokeAllTrustedDevicesMutation,
 } from '@/api/auth';
 import { useAuthStore } from '@/store/auth';
-import { ShieldCheck, ShieldOff, RefreshCw, Copy, CheckCheck } from 'lucide-react';
+import { ShieldCheck, ShieldOff, RefreshCw, Copy, CheckCheck, Laptop, Trash2 } from 'lucide-react';
 
 // --- Recovery Codes Display ---
 
@@ -322,6 +325,140 @@ function TOTPManagementCard() {
   );
 }
 
+// --- Trusted Devices Card (PR-F2b) ---
+
+function TrustedDevicesCard() {
+  const { data, isLoading } = useTrustedDevicesQuery();
+  const revokeMut = useRevokeTrustedDeviceMutation();
+  const revokeAllMut = useRevokeAllTrustedDevicesMutation();
+  const { toast } = useToast();
+
+  const devices = data?.devices ?? [];
+
+  async function handleRevoke(id: string) {
+    try {
+      await revokeMut.mutateAsync(id);
+      toast({ title: 'Cihaz kaldırıldı', description: 'Güvenilir cihaz iptal edildi.' });
+    } catch (err) {
+      toast({
+        title: 'Cihaz kaldırılamadı',
+        description: err instanceof Error ? err.message : 'Bilinmeyen hata.',
+        variant: 'destructive',
+      });
+    }
+  }
+
+  async function handleRevokeAll() {
+    try {
+      await revokeAllMut.mutateAsync();
+      toast({ title: 'Tüm cihazlar kaldırıldı', description: 'Güvenilir cihaz listesi temizlendi.' });
+    } catch (err) {
+      toast({
+        title: 'Cihazlar kaldırılamadı',
+        description: err instanceof Error ? err.message : 'Bilinmeyen hata.',
+        variant: 'destructive',
+      });
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Laptop className="h-5 w-5" />
+          Güvenilir Cihazlar
+        </CardTitle>
+        <CardDescription>
+          "Beni 30 gün hatırla" seçeneğiyle giriş yapılan cihazlar. Bu cihazlardan 2FA kodu
+          istenmez.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">Yükleniyor...</p>
+        ) : devices.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Kayıtlı güvenilir cihaz yok.</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {devices.map((d) => (
+              <div
+                key={d.id}
+                className="flex items-start justify-between rounded-md border px-3 py-2 text-sm"
+              >
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-medium line-clamp-1">{d.device_label ?? 'Bilinmeyen cihaz'}</span>
+                  <span className="text-xs text-muted-foreground">
+                    Son kullanım:{' '}
+                    {new Date(d.last_used_at).toLocaleString('tr-TR', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    Geçerlilik:{' '}
+                    {new Date(d.expires_at).toLocaleString('tr-TR', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                    })}
+                  </span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                  disabled={revokeMut.isPending}
+                  onClick={() => handleRevoke(d.id)}
+                  aria-label="Cihazı kaldır"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {devices.length > 0 && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="self-start gap-2 text-destructive hover:text-destructive"
+                disabled={revokeAllMut.isPending}
+              >
+                <Trash2 className="h-4 w-4" />
+                Tüm Cihazları Kaldır
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Tüm güvenilir cihazları kaldır</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Bu işlem tüm kayıtlı güvenilir cihazları siler. Bir sonraki girişinizde 2FA
+                  kodu tekrar istenecek.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>İptal</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleRevokeAll}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Tümünü Kaldır
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // --- Profile Page ---
 
 export default function ProfilePage() {
@@ -340,6 +477,7 @@ export default function ProfilePage() {
       </div>
 
       <TOTPManagementCard />
+      <TrustedDevicesCard />
     </div>
   );
 }

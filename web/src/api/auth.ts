@@ -1,5 +1,5 @@
 import { apiFetch } from './client';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type {
   ChangePasswordRequest,
   LoginRequest,
@@ -14,6 +14,7 @@ import type {
   TOTPStatusResponse,
   TOTPVerifyRequest,
   TOTPVerifyResponse,
+  TrustedDevicesResponse,
 } from './types';
 
 /**
@@ -172,6 +173,40 @@ export function useRecoverCompleteMutation() {
         throw new Error(body.message ?? `Recover complete: ${res.status}`);
       }
       return (await res.json()) as RecoverCompleteResponse;
+    },
+  });
+}
+
+// --- Trusted Devices (PR-F2b) ---
+
+export const trustedDevicesQueryKey = ['trusted-devices'] as const;
+
+export function useTrustedDevicesQuery() {
+  return useQuery({
+    queryKey: trustedDevicesQueryKey,
+    queryFn: () => apiFetch<TrustedDevicesResponse>('/api/v1/auth/trusted-devices'),
+    staleTime: 60_000,
+  });
+}
+
+export function useRevokeTrustedDeviceMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<void>(`/api/v1/auth/trusted-devices/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: trustedDevicesQueryKey });
+    },
+  });
+}
+
+export function useRevokeAllTrustedDevicesMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      apiFetch<void>('/api/v1/auth/trusted-devices', { method: 'DELETE' }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: trustedDevicesQueryKey });
     },
   });
 }

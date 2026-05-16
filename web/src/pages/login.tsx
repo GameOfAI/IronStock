@@ -60,6 +60,7 @@ export default function LoginPage() {
   const [password, setPassword] = React.useState('');
   const [totpCode, setTotpCode] = React.useState('');
   const [totpRequired, setTotpRequired] = React.useState(false);
+  const [rememberDevice, setRememberDevice] = React.useState(false);
   const [substep, setSubstep] = React.useState<Substep>('idle');
 
   const busy = substep !== 'idle';
@@ -97,6 +98,7 @@ export default function LoginPage() {
         username: username.toLowerCase(),
         master_password: password,
         totp_code: totpCode || undefined,
+        remember_device: rememberDevice || undefined,
       });
 
       // Step 3: keypair fetch (uses fresh access token, not yet in store)
@@ -209,21 +211,33 @@ export default function LoginPage() {
             </div>
 
             {totpRequired && (
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="totp">2FA Kodu</Label>
-                <Input
-                  id="totp"
-                  inputMode="numeric"
-                  pattern="[0-9]{6}"
-                  maxLength={8}
-                  value={totpCode}
-                  onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))}
-                  placeholder="123456"
-                  autoFocus
-                  required
-                  disabled={busy}
-                />
-              </div>
+              <>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="totp">2FA Kodu</Label>
+                  <Input
+                    id="totp"
+                    inputMode="numeric"
+                    pattern="[0-9]{6}"
+                    maxLength={8}
+                    value={totpCode}
+                    onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))}
+                    placeholder="123456"
+                    autoFocus
+                    required
+                    disabled={busy}
+                  />
+                </div>
+                <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-input accent-primary"
+                    checked={rememberDevice}
+                    onChange={(e) => setRememberDevice(e.target.checked)}
+                    disabled={busy}
+                  />
+                  Bu cihazı 30 gün hatırla
+                </label>
+              </>
             )}
 
             <Button type="submit" disabled={busy} className="mt-2">

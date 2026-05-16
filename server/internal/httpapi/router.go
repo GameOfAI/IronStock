@@ -42,6 +42,10 @@ type Deps struct {
 	Group      *GroupHandlers
 	Catalog    *CatalogHandlers
 	WS         *WSHandlers
+	Tag          *TagHandlers
+	Notification *NotificationHandlers
+	Graph        *GraphHandlers
+	ShareLink    *ShareLinkHandlers
 }
 
 // NewRouter builds a chi router with the standard middleware stack.
@@ -152,6 +156,11 @@ func NewRouter(d Deps) http.Handler {
 			// complete is tmp-token gated.
 			ar.With(authBruteRL.Middleware).Post("/recover/init", d.Auth.RecoverInit)
 			ar.Post("/recover/complete", d.Auth.RecoverComplete)
+
+			// Trusted device management (PR-F2b) — access-token protected.
+			ar.With(RequireAccessToken(d.Auth.Service.JWT)).Get("/trusted-devices", d.Auth.ListTrustedDevices)
+			ar.With(RequireAccessToken(d.Auth.Service.JWT)).Delete("/trusted-devices", d.Auth.RevokeAllTrustedDevices)
+			ar.With(RequireAccessToken(d.Auth.Service.JWT)).Delete("/trusted-devices/{id}", d.Auth.RevokeTrustedDevice)
 		})
 	}
 
@@ -181,6 +190,18 @@ func NewRouter(d Deps) http.Handler {
 			ir.Delete("/{id}", d.Item.Delete)
 			ir.Post("/{id}/shares", d.Item.Share)
 			ir.Delete("/{id}/shares/{user_id}", d.Item.Unshare)
+			ir.Post("/{id}/rotate", d.Item.RecordRotation) // PR-N1
+			ir.Get("/{id}/fields/{field_def_id}/versions", d.Item.ListFieldVersions) // PR-N2
+
+			// PR-N7 tag + favorite routes under /items/{id}
+			if d.Tag != nil {
+				ir.Get("/{id}/tags", d.Tag.ListItemTags)
+				ir.Post("/{id}/tags", d.Tag.AddItemTag)
+				ir.Delete("/{id}/tags/{tag_id}", d.Tag.RemoveItemTag)
+				ir.Get("/{id}/favorite", d.Tag.IsFavorite)
+				ir.Post("/{id}/favorite", d.Tag.AddFavorite)
+				ir.Delete("/{id}/favorite", d.Tag.RemoveFavorite)
+			}
 
 			if d.Attachment != nil {
 				ir.Get("/{id}/attachments", d.Attachment.List)
@@ -207,6 +228,8 @@ func NewRouter(d Deps) http.Handler {
 			ar.Get("/audit-log", d.Admin.QueryAuditLog)
 			// Admin TOTP reset (PR-F2a).
 			ar.Post("/users/{id}/totp/reset", d.Admin.AdminResetTOTP)
+			// Break-glass toggle (PR-N4).
+			ar.Post("/users/{id}/break-glass", d.Admin.SetBreakGlass)
 		})
 	}
 
@@ -226,6 +249,68 @@ func NewRouter(d Deps) http.Handler {
 			gr.Post("/{id}/folder-permissions", d.Group.GrantFolderGroupPermission)
 			gr.Delete("/{id}/folder-permissions/{folder_id}", d.Group.RevokeFolderGroupPermission)
 		})
+	}
+
+	// Tag + favorites routes (PR-N7).
+	if d.Tag != nil && d.Auth != nil {
+		r.Route("/api/v1/tags", func(tr chi.Router) {
+			tr.Use(timeoutMW)
+			tr.Use(RequireAccessToken(d.Auth.Service.JWT))
+			tr.Get("/", d.Tag.ListTags)
+			tr.Post("/", d.Tag.CreateTag)
+			tr.Delete("/{tag_id}", d.Tag.DeleteTag)
+		})
+		r.Route("/api/v1/favorites", func(fr chi.Router) {
+			fr.Use(timeoutMW)
+			fr.Use(RequireAccessToken(d.Auth.Service.JWT))
+			fr.Get("/", d.Tag.ListFavorites)
+		})
+	}
+
+	// Graph routes (PR-F5a) — pipeline relationship map.
+	if d.Graph != nil && d.Auth != nil {
+		r.Route("/api/v1/graph", func(gr chi.Router) {
+			gr.Use(timeoutMW)
+			gr.Use(RequireAccessToken(d.Auth.Service.JWT))
+			gr.Get("/", d.Graph.Graph)
+		})
+		// Relationship CRUD lives under /items/{id}/relationships.
+		// Mounted here (after item group) to avoid chi route conflicts.
+		if d.Item != nil {
+			r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+				Post("/api/v1/items/{id}/relationships", d.Graph.AddRelationship)
+			r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+				Delete("/api/v1/items/{id}/relationships/{target_id}/{rel_type}", d.Graph.DeleteRelationship)
+		}
+	}
+
+	// Notification routes (PR-N8).
+	if d.Notification != nil && d.Auth != nil {
+		r.Route("/api/v1/notifications", func(nr chi.Router) {
+			nr.Use(timeoutMW)
+			nr.Use(RequireAccessToken(d.Auth.Service.JWT))
+			nr.Get("/", d.Notification.List)
+			nr.Get("/unread-count", d.Notification.UnreadCount)
+			nr.Post("/read-all", d.Notification.MarkAllRead)
+			nr.Post("/{id}/read", d.Notification.MarkRead)
+		})
+	}
+
+	// Share link routes (PR-N5).
+	// Authenticated CRUD lives under /items/{id}/share-links (write-perm check
+	// is inside the handler). The public view endpoint has NO auth middleware —
+	// anyone with the token can access it.
+	if d.ShareLink != nil && d.Auth != nil {
+		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+			Post("/api/v1/items/{id}/share-links", d.ShareLink.CreateShareLink)
+		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+			Get("/api/v1/items/{id}/share-links", d.ShareLink.ListShareLinks)
+		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+			Delete("/api/v1/items/{id}/share-links/{link_id}", d.ShareLink.RevokeShareLink)
+	}
+	if d.ShareLink != nil {
+		// Public — no auth. token_hash lookup + view_count enforcement inside handler.
+		r.With(timeoutMW).Get("/api/v1/share/{token}", d.ShareLink.ViewShareLink)
 	}
 
 	// Catalog routes — read-only lookup tables for the form/share flows

@@ -6,16 +6,27 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { Info, Loader2, MousePointerClick, Package } from 'lucide-react';
+import { AlertTriangle, Clock, Info, Loader2, MousePointerClick, Package, RefreshCw, Star, StarOff, Tag as TagIcon } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
 import type { FieldDefinition, ItemType } from '@/api/types';
-import { useItem } from '@/api/items';
+import { useItem, useRecordRotationMutation } from '@/api/items';
+import {
+  useAddFavoriteMutation,
+  useRemoveFavoriteMutation,
+  useFavoriteStatusQuery,
+  useItemTagsQuery,
+} from '@/api/tags';
 import { useAuthStore } from '@/store/auth';
 import { fromBase64, openDEKWithKEK, decryptField } from '@/lib/crypto';
 import { PermissionBadge } from './permission-badge';
 import { ItemFieldRow } from './item-field-row';
 import { ItemAttachmentPanel } from './item-attachment-panel';
+import { ShareLinkDialog } from './share-link-dialog';
 import { RelativeTime } from '@/components/common/relative-time';
+import { cn } from '@/lib/cn';
 
 interface ItemDetailProps {
   itemId: string | null;
@@ -43,6 +54,15 @@ export function ItemDetail({ itemId, fieldDefinitions, itemTypes }: ItemDetailPr
   const itemQuery = useItem(itemId);
   const privateKey = useAuthStore((s) => s.privateKey);
   const [decryption, setDecryption] = useState<DecryptionState>({ status: 'idle' });
+  const { toast } = useToast();
+  const rotateMut = useRecordRotationMutation(itemId ?? '');
+
+  // PR-N7: tags + favorites
+  const { data: favData } = useFavoriteStatusQuery(itemId);
+  const isFavorited = favData === true;
+  const addFav = useAddFavoriteMutation(itemId ?? '');
+  const removeFav = useRemoveFavoriteMutation(itemId ?? '');
+  const { data: tagsData } = useItemTagsQuery(itemId);
 
   const item = itemQuery.data;
 
@@ -145,7 +165,37 @@ export function ItemDetail({ itemId, fieldDefinitions, itemTypes }: ItemDetailPr
             <Package className="h-5 w-5 text-muted-foreground" aria-hidden />
           </div>
           <div className="flex-1 space-y-1">
-            <h2 className="text-lg font-semibold leading-tight">{item.name}</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold leading-tight flex-1">{item.name}</h2>
+              {/* Share link (PR-N5) — write permission only */}
+              {item.permission === 'write' && (
+                <ShareLinkDialog item={item} />
+              )}
+              {/* Favorite toggle (PR-N7) */}
+              <button
+                type="button"
+                aria-label={isFavorited ? 'Favorilerden çıkar' : 'Favorilere ekle'}
+                title={isFavorited ? 'Favorilerden çıkar' : 'Favorilere ekle'}
+                className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors shrink-0"
+                disabled={addFav.isPending || removeFav.isPending}
+                onClick={async () => {
+                  try {
+                    if (isFavorited) {
+                      await removeFav.mutateAsync();
+                    } else {
+                      await addFav.mutateAsync();
+                    }
+                  } catch {
+                    toast({ title: 'Favori durumu güncellenemedi', variant: 'destructive' });
+                  }
+                }}
+              >
+                {isFavorited
+                  ? <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                  : <StarOff className="h-4 w-4" />
+                }
+              </button>
+            </div>
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               <span className="font-mono">
                 {findItemTypeLabel(itemTypes, item.item_type_id)}
@@ -153,6 +203,22 @@ export function ItemDetail({ itemId, fieldDefinitions, itemTypes }: ItemDetailPr
               <span aria-hidden>·</span>
               <PermissionBadge permission={item.permission} />
             </div>
+            {/* Item tags (PR-N7) */}
+            {(tagsData?.tags ?? []).length > 0 && (
+              <div className="flex flex-wrap items-center gap-1 pt-1">
+                <TagIcon className="h-3 w-3 text-muted-foreground" />
+                {(tagsData?.tags ?? []).map((tag) => (
+                  <Badge
+                    key={tag.id}
+                    variant="secondary"
+                    className="px-1.5 py-0 text-[10px]"
+                    style={tag.color ? { backgroundColor: `${tag.color}22`, color: tag.color } : undefined}
+                  >
+                    {tag.name}
+                  </Badge>
+                ))}
+              </div>
+            )}
           </div>
         </div>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
@@ -180,6 +246,65 @@ export function ItemDetail({ itemId, fieldDefinitions, itemTypes }: ItemDetailPr
         </section>
       )}
 
+      {/* PR-N1: Expiry / Rotation section */}
+      {(item.expires_at || item.rotation_interval_days || item.last_rotated_at) && (
+        <section aria-label="Süre ve Rotasyon">
+          <h3 className="mb-2 text-sm font-medium">Süre &amp; Rotasyon</h3>
+          <div className="rounded-md border px-3 py-2.5 space-y-1.5 text-xs">
+            {item.expires_at && (() => {
+              const exp = new Date(item.expires_at);
+              const now = Date.now();
+              const isExpired = exp.getTime() <= now;
+              const isWarning = exp.getTime() <= now + 7 * 24 * 60 * 60 * 1000;
+              return (
+                <div className="flex items-center gap-1.5">
+                  {isExpired
+                    ? <AlertTriangle className="h-3.5 w-3.5 text-destructive shrink-0" />
+                    : isWarning
+                      ? <Clock className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                      : <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  }
+                  <span className={cn(isExpired && 'text-destructive font-medium', isWarning && !isExpired && 'text-amber-600 dark:text-amber-400')}>
+                    Son geçerlilik: {exp.toLocaleDateString('tr-TR')}
+                    {isExpired && ' (Süresi doldu)'}
+                    {isWarning && !isExpired && ' (Yaklaşıyor)'}
+                  </span>
+                </div>
+              );
+            })()}
+            {item.rotation_interval_days && (
+              <div className="text-muted-foreground">
+                Rotasyon politikası: her {item.rotation_interval_days} günde bir
+              </div>
+            )}
+            {item.last_rotated_at && (
+              <div className="text-muted-foreground">
+                Son rotasyon: <RelativeTime iso={item.last_rotated_at} />
+              </div>
+            )}
+          </div>
+          {item.permission === 'write' && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="mt-2 gap-1.5"
+              disabled={rotateMut.isPending}
+              onClick={async () => {
+                try {
+                  await rotateMut.mutateAsync();
+                  toast({ title: 'Rotasyon kaydedildi', description: 'Son rotasyon tarihi güncellendi.' });
+                } catch {
+                  toast({ title: 'Rotasyon kaydedilemedi', variant: 'destructive' });
+                }
+              }}
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Rotasyonu Kaydet
+            </Button>
+          )}
+        </section>
+      )}
+
       <section aria-label="Alanlar">
         <div className="mb-2 flex items-center justify-between">
           <h3 className="text-sm font-medium">Alanlar</h3>
@@ -197,6 +322,7 @@ export function ItemDetail({ itemId, fieldDefinitions, itemTypes }: ItemDetailPr
                   definition={fieldDefMap.get(f.field_definition_id)}
                   decryptedValue={decryptedValues?.get(f.field_definition_id) ?? null}
                   decryptionStatus={decryption.status}
+                  itemId={item.id}
                 />
               ))}
             </div>
