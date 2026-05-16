@@ -1,5 +1,5 @@
-import { useMutation } from '@tanstack/react-query';
 import { apiFetch } from './client';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import type {
   ChangePasswordRequest,
   LoginRequest,
@@ -8,7 +8,10 @@ import type {
   RecoverCompleteResponse,
   RecoverInitRequest,
   RecoverInitResponse,
+  TOTPDisableRequest,
   TOTPInitResponse,
+  TOTPRegenerateBackupRequest,
+  TOTPStatusResponse,
   TOTPVerifyRequest,
   TOTPVerifyResponse,
 } from './types';
@@ -117,6 +120,38 @@ export function useRecoverInitMutation() {
         method: 'POST',
         body: input,
         unauthenticated: true,
+      }),
+  });
+}
+
+// --- TOTP management (PR-F2a) ---
+
+export const totpStatusQueryKey = ['totp', 'status'] as const;
+
+export function useTOTPStatusQuery() {
+  return useQuery({
+    queryKey: totpStatusQueryKey,
+    queryFn: () => apiFetch<TOTPStatusResponse>('/api/v1/auth/totp/status'),
+    staleTime: 30_000,
+  });
+}
+
+export function useTOTPDisableMutation() {
+  return useMutation({
+    mutationFn: (input: TOTPDisableRequest) =>
+      apiFetch<void>('/api/v1/auth/totp', {
+        method: 'DELETE',
+        body: input,
+      }),
+  });
+}
+
+export function useTOTPRegenerateBackupMutation() {
+  return useMutation({
+    mutationFn: (input: TOTPRegenerateBackupRequest) =>
+      apiFetch<TOTPVerifyResponse>('/api/v1/auth/totp/backup-codes/regenerate', {
+        method: 'POST',
+        body: input,
       }),
   });
 }

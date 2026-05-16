@@ -21,6 +21,7 @@ import AdminRolesPage from '@/pages/admin/roles';
 import AdminSetupPage from '@/pages/admin-setup';
 import AdminLoginPage from '@/pages/admin-login';
 import ChangePasswordPage from '@/pages/change-password';
+import ProfilePage from '@/pages/profile';
 import NotFoundPage from '@/pages/not-found';
 
 /**
@@ -89,6 +90,7 @@ export default function App() {
                 <Route element={<AppShell />}>
                   <Route index element={<Navigate to="/inventory" replace />} />
                   <Route path="/inventory/*" element={<InventoryPage />} />
+                  <Route path="/profile" element={<ProfilePage />} />
 
                   {/* Admin */}
                   <Route element={<RoleGate role="admin" />}>

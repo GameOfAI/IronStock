@@ -68,6 +68,13 @@ const (
 	// TOTP-free bootstrap panel (ADR-0010). Requires ENVANTER_BOOTSTRAP_ENABLED=true.
 	ActionAuthBootstrapSetup = "auth.bootstrap_setup"
 	ActionAuthBootstrapLogin = "auth.bootstrap_login"
+
+	// TOTP management (PR-F2a).
+	ActionAuthTOTPDisabled          = "auth.totp_disabled"
+	ActionAuthTOTPBackupRegenerated = "auth.totp_backup_regenerated"
+
+	// Admin TOTP reset (PR-F2a).
+	ActionAdminTOTPReset = "admin.totp_reset"
 )
 
 // ResourceFolder is the audit resource type for folder rows.

@@ -137,6 +137,11 @@ func NewRouter(d Deps) http.Handler {
 			ar.Post("/totp/init", d.Auth.TOTPInit)
 			ar.With(authBruteRL.Middleware).Post("/totp/verify", d.Auth.TOTPVerify)
 
+			// access-token-protected TOTP management (PR-F2a).
+			ar.Get("/totp/status", d.Auth.TOTPStatus)
+			ar.Delete("/totp", d.Auth.TOTPDisable)
+			ar.With(authBruteRL.Middleware).Post("/totp/backup-codes/regenerate", d.Auth.TOTPRegenerateBackup)
+
 			// access-token-protected.
 			ar.Post("/logout", d.Auth.Logout)
 			ar.Post("/logout-all", d.Auth.LogoutAll)
@@ -199,6 +204,8 @@ func NewRouter(d Deps) http.Handler {
 			ar.Post("/users/{id}/roles", d.Admin.GrantRole)
 			ar.Delete("/users/{id}/roles/{role_name}", d.Admin.RevokeRole)
 			ar.Get("/audit-log", d.Admin.QueryAuditLog)
+			// Admin TOTP reset (PR-F2a).
+			ar.Post("/users/{id}/totp/reset", d.Admin.AdminResetTOTP)
 		})
 	}
 

@@ -541,6 +541,85 @@ func (h *AdminHandlers) CreateUser(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// AdminResetTOTP implements POST /api/v1/admin/users/{id}/totp/reset.
+//
+// Clears the target user's TOTP secret and recovery codes, and sets
+// users.status = 'pending_totp' so the user must re-enroll on next login.
+// Intended for "I lost my phone" support scenarios.
+func (h *AdminHandlers) AdminResetTOTP(w http.ResponseWriter, r *http.Request) {
+	claims := ClaimsFromContext(r.Context())
+	if claims == nil {
+		writeMiddlewareUnauthorized(w, errors.New("no claims"))
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		writeError(w, h.Logger, http.StatusBadRequest, ErrCodeBadRequest,
+			"id zorunlu.", errors.New("missing id"))
+		return
+	}
+
+	ctx := r.Context()
+
+	tx, err := h.Service.DB.Begin(ctx)
+	if err != nil {
+		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
+			"Veritabanı hatası.", err)
+		return
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	if _, err := tx.Exec(ctx,
+		`DELETE FROM totp_secrets WHERE user_id = $1::uuid`,
+		id,
+	); err != nil {
+		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
+			"TOTP secret silinemedi.", err)
+		return
+	}
+	if _, err := tx.Exec(ctx,
+		`DELETE FROM recovery_codes WHERE user_id = $1::uuid`,
+		id,
+	); err != nil {
+		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
+			"Recovery code'lar silinemedi.", err)
+		return
+	}
+	// Move user back to pending_totp so they must set up TOTP again before
+	// being able to log in normally.
+	if _, err := tx.Exec(ctx,
+		`UPDATE users SET status = 'pending_totp' WHERE id = $1::uuid AND status <> 'disabled'`,
+		id,
+	); err != nil {
+		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
+			"Kullanıcı statüsü güncellenemedi.", err)
+		return
+	}
+	// Revoke all existing sessions so the user is forced to re-login.
+	if err := auth.RevokeAllUserSessions(ctx, tx, id, auth.RevokeReasonAdmin); err != nil {
+		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
+			"Oturumlar revoke edilemedi.", err)
+		return
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
+			"İşlem tamamlanamadı.", err)
+		return
+	}
+
+	_ = h.Audit.Write(ctx, audit.Entry{
+		ActorUserID:  claims.Subject,
+		Action:       audit.ActionAdminTOTPReset,
+		ResourceType: audit.ResourceUser,
+		ResourceID:   id,
+		IPAddress:    parseIP(r.RemoteAddr),
+		UserAgent:    r.UserAgent(),
+	})
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // parseIntDefault returns def if s isn't a valid int OR is out of [min,max].
 func parseIntDefault(s string, def, minVal, maxVal int) int {
 	if s == "" {

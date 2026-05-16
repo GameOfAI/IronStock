@@ -36,7 +36,7 @@ export interface RegisterResponse {
 export interface LoginRequest {
   username: string;
   master_password: string;
-  totp_code: string;
+  totp_code?: string;
 }
 
 export interface LoginResponse {
@@ -101,6 +101,19 @@ export interface TOTPVerifyRequest {
 }
 export interface TOTPVerifyResponse {
   recovery_codes: string[];
+}
+
+export interface TOTPStatusResponse {
+  enabled: boolean;
+  recovery_code_count: number;
+}
+
+export interface TOTPDisableRequest {
+  master_password: string;
+}
+
+export interface TOTPRegenerateBackupRequest {
+  totp_code: string;
 }
 
 // --- Folders ---

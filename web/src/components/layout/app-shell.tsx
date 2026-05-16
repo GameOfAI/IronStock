@@ -18,6 +18,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   Folder,
   Shield,
+  ShieldCheck,
   FileText,
   LogOut,
   Sun,
@@ -29,6 +30,7 @@ import {
   WifiOff,
   Loader2,
   ShieldAlert,
+  UserCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ChangePasswordDialog } from '@/components/change-password-dialog';
@@ -201,6 +203,14 @@ export function AppShell() {
           <Button
             variant="ghost"
             size="icon"
+            onClick={() => navigate('/profile')}
+            aria-label="Profil ve güvenlik"
+          >
+            <UserCircle className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => setPwOpen(true)}
             aria-label="Parola değiştir"
           >
@@ -255,6 +265,12 @@ export function AppShell() {
                   to="/admin/users"
                   icon={Shield}
                   label="Kullanıcılar"
+                  collapsed={sidebarCollapsed && !mobileOpen}
+                />
+                <NavItem
+                  to="/admin/roles"
+                  icon={ShieldCheck}
+                  label="Rol Yönetimi"
                   collapsed={sidebarCollapsed && !mobileOpen}
                 />
                 <NavItem
