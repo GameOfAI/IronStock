@@ -288,6 +288,12 @@ export interface FieldDefinitionsResponse {
   field_definitions: FieldDefinition[];
 }
 
+/** A group of related fields shown under a section header in the create-item form. */
+export interface FieldGroup {
+  name: string;
+  fields: string[];
+}
+
 export interface ItemType {
   id: number;
   key: string;
@@ -295,6 +301,8 @@ export interface ItemType {
   icon?: string | null;
   suggested_fields: string[];
   default_launchers: unknown[];
+  /** When present, fields are rendered under named section headers (PR-F4). */
+  field_groups?: FieldGroup[];
 }
 
 export interface ItemTypesResponse {

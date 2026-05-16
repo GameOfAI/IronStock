@@ -99,6 +99,10 @@ type itemType struct {
 	Icon             *string         `json:"icon,omitempty"`
 	SuggestedFields  json.RawMessage `json:"suggested_fields,omitempty"`
 	DefaultLaunchers json.RawMessage `json:"default_launchers,omitempty"`
+	// FieldGroups defines ordered section groupings for the create-item form.
+	// Each entry: { "name": string, "fields": string[] }.
+	// Empty array → flat display (legacy).
+	FieldGroups json.RawMessage `json:"field_groups,omitempty"`
 }
 
 type itemTypesResponse struct {
@@ -114,13 +118,14 @@ func (h *CatalogHandlers) ListItemTypes(w http.ResponseWriter, r *http.Request) 
 		    COALESCE(array_agg(label                           ORDER BY id), '{}'),
 		    COALESCE(array_agg(COALESCE(icon, '')              ORDER BY id), '{}'),
 		    COALESCE(array_agg(suggested_fields::text          ORDER BY id), '{}'),
-		    COALESCE(array_agg(default_launchers::text         ORDER BY id), '{}')
+		    COALESCE(array_agg(default_launchers::text         ORDER BY id), '{}'),
+		    COALESCE(array_agg(field_groups::text              ORDER BY id), '{}')
 		FROM item_types
 	`
 	var ids []int16
-	var keys, labels, icons, suggested, launchers []string
+	var keys, labels, icons, suggested, launchers, groups []string
 	if err := h.Service.DB.QueryRow(r.Context(), sqlText).Scan(
-		&ids, &keys, &labels, &icons, &suggested, &launchers,
+		&ids, &keys, &labels, &icons, &suggested, &launchers, &groups,
 	); err != nil {
 		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
 			"Item tipleri okunamadı.", err)
@@ -136,6 +141,11 @@ func (h *CatalogHandlers) ListItemTypes(w http.ResponseWriter, r *http.Request) 
 			Icon:             emptyToNil(icons[i]),
 			SuggestedFields:  json.RawMessage(suggested[i]),
 			DefaultLaunchers: json.RawMessage(launchers[i]),
+		}
+		// Only include field_groups when non-empty (avoids wire overhead for
+		// legacy types that haven't been annotated yet).
+		if groups[i] != "" && groups[i] != "[]" {
+			t.FieldGroups = json.RawMessage(groups[i])
 		}
 		out = append(out, t)
 	}

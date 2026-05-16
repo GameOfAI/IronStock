@@ -275,16 +275,43 @@ export function ItemFormModal({
                 <Lock size={12} />
                 Alanlar uçtan uca şifrelenir
               </div>
-              {suggestedDefs.map((def) => (
-                <FieldInput
-                  key={def.id}
-                  def={def}
-                  state={fields[def.id] ?? { value: '', visible: false }}
-                  disabled={isPending}
-                  onChangeValue={(v) => dispatchFields({ type: 'set', id: def.id, value: v })}
-                  onToggleVisible={() => dispatchFields({ type: 'toggle', id: def.id })}
-                />
-              ))}
+              {selectedType?.field_groups && selectedType.field_groups.length > 0
+                ? selectedType.field_groups.map((group) => {
+                    const groupDefs = group.fields
+                      .map((k) => suggestedDefs.find((d) => d.key === k))
+                      .filter(Boolean) as FieldDefinition[];
+                    if (groupDefs.length === 0) return null;
+                    return (
+                      <div key={group.name} className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            {group.name}
+                          </span>
+                          <div className="flex-1 border-t" />
+                        </div>
+                        {groupDefs.map((def) => (
+                          <FieldInput
+                            key={def.id}
+                            def={def}
+                            state={fields[def.id] ?? { value: '', visible: false }}
+                            disabled={isPending}
+                            onChangeValue={(v) => dispatchFields({ type: 'set', id: def.id, value: v })}
+                            onToggleVisible={() => dispatchFields({ type: 'toggle', id: def.id })}
+                          />
+                        ))}
+                      </div>
+                    );
+                  })
+                : suggestedDefs.map((def) => (
+                    <FieldInput
+                      key={def.id}
+                      def={def}
+                      state={fields[def.id] ?? { value: '', visible: false }}
+                      disabled={isPending}
+                      onChangeValue={(v) => dispatchFields({ type: 'set', id: def.id, value: v })}
+                      onToggleVisible={() => dispatchFields({ type: 'toggle', id: def.id })}
+                    />
+                  ))}
             </div>
           )}
 
