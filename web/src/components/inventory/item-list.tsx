@@ -5,7 +5,7 @@
  * scope'unda makul N). Search HMAC blind-index → exact match.
  */
 
-import { Inbox, Loader2, PackageSearch } from 'lucide-react';
+import { AlertTriangle, Clock, Inbox, Loader2, PackageSearch } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -15,6 +15,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/cn';
 import type { Item, ItemType } from '@/api/types';
 import { PermissionBadge } from './permission-badge';
@@ -35,6 +36,43 @@ interface ItemListProps {
 
 function itemTypeLabel(types: ItemType[], typeId: number): string {
   return types.find((t) => t.id === typeId)?.label ?? `tip:${typeId}`;
+}
+
+// --- Expiry badge (PR-N1) ---
+
+type ExpiryStatus = 'expired' | 'warning' | null;
+
+function getExpiryStatus(expiresAt?: string | null): ExpiryStatus {
+  if (!expiresAt) return null;
+  const exp = new Date(expiresAt).getTime();
+  const now = Date.now();
+  if (exp <= now) return 'expired';
+  if (exp <= now + 7 * 24 * 60 * 60 * 1000) return 'warning';
+  return null;
+}
+
+function ExpiryBadge({ expiresAt }: { expiresAt?: string | null }) {
+  const status = getExpiryStatus(expiresAt);
+  if (!status) return null;
+
+  const isExpired = status === 'expired';
+  const label = isExpired
+    ? `Süresi doldu: ${new Date(expiresAt!).toLocaleDateString('tr-TR')}`
+    : `Süresi yaklaşıyor: ${new Date(expiresAt!).toLocaleDateString('tr-TR')}`;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className={cn('ml-1.5 inline-flex items-center', isExpired ? 'text-destructive' : 'text-amber-500')}>
+          {isExpired
+            ? <AlertTriangle className="h-3.5 w-3.5" aria-label={label} />
+            : <Clock className="h-3.5 w-3.5" aria-label={label} />
+          }
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  );
 }
 
 function SkeletonRow() {
@@ -124,7 +162,12 @@ export function ItemList({
               )}
               onClick={() => onSelect(item.id)}
             >
-              <TableCell className="font-medium">{item.name}</TableCell>
+              <TableCell className="font-medium">
+                <span className="inline-flex items-center">
+                  {item.name}
+                  <ExpiryBadge expiresAt={item.expires_at} />
+                </span>
+              </TableCell>
               <TableCell className="text-muted-foreground">
                 {itemTypeLabel(itemTypes, item.item_type_id)}
               </TableCell>

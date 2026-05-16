@@ -14,11 +14,33 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from './client';
 import { queryKeys } from './query';
 import type {
+  AdminUser,
   AdminUsersResponse,
   AuditLogFilters,
   AuditLogResponse,
   GrantRoleRequest,
 } from './types';
+
+// ---------- Create user ----------
+
+export interface CreateUserInput {
+  username: string;
+  email: string;
+  password: string;
+  roles: string[];
+}
+
+export function useCreateUserMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateUserInput) =>
+      apiFetch<AdminUser>('/api/v1/admin/users', {
+        method: 'POST',
+        body: input,
+      }),
+    onSuccess: () => invalidateAllUserPages(queryClient),
+  });
+}
 
 // ---------- Users ----------
 

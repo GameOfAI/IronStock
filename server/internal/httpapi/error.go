@@ -24,6 +24,7 @@ const (
 	ErrCodeInvalidToken      = "invalid_token"
 	ErrCodeAccountLocked     = "account_locked"
 	ErrCodeAccountPendingMFA = "account_pending_totp"
+	ErrCodeMFARequired       = "mfa_required"
 	ErrCodeRateLimited       = "rate_limited"
 	ErrCodeNotFound          = "not_found"
 	ErrCodeConflict          = "conflict"

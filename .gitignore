@@ -14,6 +14,7 @@ desktop.ini
 # Go
 /server/bin/
 /server/dist/
+/server/api
 *.exe
 *.test
 *.out

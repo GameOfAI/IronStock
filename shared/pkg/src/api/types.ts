@@ -37,6 +37,22 @@ export interface LoginRequest {
   username: string;
   master_password: string;
   totp_code?: string;
+  /** PR-F2b: when true + TOTP verified, server sets a 30-day trusted-device cookie. */
+  remember_device?: boolean;
+}
+
+// --- Trusted Devices (PR-F2b) ---
+
+export interface TrustedDevice {
+  id: string;
+  device_label?: string | null;
+  last_used_at: string; // RFC 3339
+  expires_at: string; // RFC 3339
+  created_at: string; // RFC 3339
+}
+
+export interface TrustedDevicesResponse {
+  devices: TrustedDevice[];
 }
 
 export interface LoginResponse {
@@ -173,11 +189,19 @@ export interface ItemCreateRequest {
   owner_dek_wrapped: string; // base64, X25519 sealed-box
   owner_wrap_nonce: string; // base64, 12B
   external_source?: Record<string, unknown> | null;
+  /** RFC 3339 timestamp; null / omit to clear expiry (PR-N1). */
+  expires_at?: string | null;
+  /** "Rotate every N days" policy; null / omit to clear (PR-N1). */
+  rotation_interval_days?: number | null;
 }
 
 export interface ItemUpdateRequest {
   name: string;
   description?: string;
+  /** RFC 3339 timestamp; null to clear expiry (PR-N1). */
+  expires_at?: string | null;
+  /** "Rotate every N days" policy; null to clear (PR-N1). */
+  rotation_interval_days?: number | null;
 }
 
 export interface Item {
@@ -194,10 +218,26 @@ export interface Item {
   /** PR-13 sonrası sunucu tarafından doldurulur. Yoksa client decrypt edemez. */
   owner_dek_wrapped?: string;
   owner_wrap_nonce?: string;
+  /** Credential expiry / rotation (PR-N1). */
+  expires_at?: string | null;
+  rotation_interval_days?: number | null;
+  last_rotated_at?: string | null;
 }
 
 export interface ItemListResponse {
   items: Item[];
+}
+
+/** One snapshot of a field's encrypted value (PR-N2). Server stores opaque blobs. */
+export interface FieldVersionOutput {
+  version_number: number;
+  value_enc?: string; // base64
+  value_nonce?: string; // base64, 12B
+  changed_at: string; // RFC 3339
+}
+
+export interface FieldVersionsResponse {
+  versions: FieldVersionOutput[];
 }
 
 export interface ShareItemRequest {
@@ -217,6 +257,7 @@ export interface AdminUser {
   roles: string[];
   last_login_at?: string | null;
   created_at: string;
+  is_break_glass: boolean; // PR-N4
 }
 
 export interface AdminUsersResponse {
@@ -367,6 +408,107 @@ export interface GrantFolderGroupPermissionRequest {
   inherit_to_children: boolean;
 }
 
+// --- Tags + Favorites (PR-N7) ---
+
+export interface Tag {
+  id: string;
+  name: string;
+  color?: string | null; // '#RRGGBB'
+  created_by: string;
+  created_at: string;
+}
+
+export interface TagListResponse {
+  tags: Tag[];
+}
+
+export interface CreateTagRequest {
+  name: string;
+  color?: string | null;
+}
+
+export interface AddItemTagRequest {
+  tag_id: string;
+}
+
+export interface ItemTagsResponse {
+  tags: Tag[];
+}
+
+export interface FavoriteItem extends Item {
+  pinned_at: string;
+}
+
+export interface FavoritesListResponse {
+  items: FavoriteItem[];
+}
+
+// --- Notifications (PR-N8) ---
+
+export interface Notification {
+  id: string;
+  type: string;
+  title: string;
+  body?: string;
+  resource_type?: string;
+  resource_id?: string;
+  read_at?: string;
+  created_at: string;
+}
+
+export interface NotificationsListResponse {
+  notifications: Notification[];
+  unread_count: number;
+}
+
+export interface UnreadCountResponse {
+  unread_count: number;
+}
+
+// --- Graph / Pipeline Relationships (PR-F5a) ---
+
+export type RelationshipType =
+  | 'hosted_on'
+  | 'accessed_via'
+  | 'part_of'
+  | 'related_to'
+  | 'depends_on'
+  | 'uses_tool'
+  | 'builds_to'
+  | 'scans_with'
+  | 'deploys_to';
+
+/** A graph node representing an item the caller can see. Name is encrypted. */
+export interface GraphNode {
+  id: string;
+  folder_id: string;
+  item_type_id: number;
+  /** base64-encoded encrypted name — decrypt with server_dek_wrapped */
+  name_enc: string;
+  name_nonce: string;
+  server_dek_wrapped: string;
+  master_key_id: number;
+}
+
+/** A directed edge between two items. */
+export interface GraphEdge {
+  source_id: string;
+  target_id: string;
+  type: RelationshipType;
+  metadata?: Record<string, unknown>;
+}
+
+export interface GraphResponse {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+}
+
+export interface AddRelationshipRequest {
+  target_id: string;
+  type: RelationshipType;
+  metadata?: Record<string, unknown>;
+}
+
 // --- Attachments (PR-A2) ---
 
 export interface Attachment {
@@ -403,4 +545,68 @@ export interface AttachmentInitResponse {
 export interface AttachmentDownloadURLResponse {
   url: string;
   expires_at: string;
+}
+
+// --- One-Time Share Links (PR-N5) ---
+
+/** Request body for POST /api/v1/items/{id}/share-links */
+export interface CreateShareLinkRequest {
+  /** Item DEK wrapped (AES-GCM) with the random link_key. base64-encoded. */
+  dek_wrapped: string;
+  /** TTL choice: "1h" | "1d" | "7d" */
+  expires_in: '1h' | '1d' | '7d';
+  /** Max times this link can be viewed (1–10). */
+  view_limit: number;
+}
+
+/** Response body for POST /api/v1/items/{id}/share-links */
+export interface CreateShareLinkResponse {
+  /** The raw token to embed in the share URL path. */
+  token: string;
+  /** RFC 3339 expiry timestamp. */
+  expires_at: string;
+}
+
+/** Row returned by GET /api/v1/items/{id}/share-links */
+export interface ShareLink {
+  id: string;
+  expires_at: string; // RFC 3339
+  view_limit: number;
+  view_count: number;
+  created_at: string; // RFC 3339
+}
+
+export interface ShareLinksListResponse {
+  links: ShareLink[];
+}
+
+/** One encrypted field as returned by the public share view endpoint. */
+export interface ShareLinkField {
+  key: string;
+  label: string;
+  field_type: string;
+  is_secret: boolean;
+  /** base64-encoded ciphertext (only present for secret fields). */
+  value_enc?: string | null;
+  /** base64-encoded nonce (only present for secret fields). */
+  value_nonce?: string | null;
+}
+
+/**
+ * Response body for GET /api/v1/share/{token} — the public view endpoint.
+ *
+ * The server decrypts the item name (server-side envelope) and returns it in
+ * plaintext. The field values remain client-encrypted with the item DEK.
+ * The caller must derive the item DEK by decrypting `dek_wrapped` with the
+ * `link_key` (taken from the URL fragment, never sent to the server).
+ */
+export interface ShareLinkViewResponse {
+  /** Server-decrypted item name. */
+  item_name: string;
+  item_type_label: string;
+  fields: ShareLinkField[];
+  /** Item DEK wrapped with link_key — base64-encoded. */
+  dek_wrapped: string;
+  expires_at: string; // RFC 3339
+  views_left: number;
 }

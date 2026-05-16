@@ -32,13 +32,29 @@ import {
   ShieldAlert,
   UserCircle,
   Users,
+  Tag,
+  Bell,
+  CheckCheck,
+  GitBranch,
+  AlertOctagon,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { ChangePasswordDialog } from '@/components/change-password-dialog';
 import { useAuthStore, selectIsAdmin, selectIsBootstrap } from '@/store/auth';
 import { useUIStore } from '@/store/ui';
 import { useLogoutMutation } from '@/api/auth';
 import { useWsStatus } from '@/components/ws-provider';
+import {
+  useNotificationsQuery,
+  useMarkReadMutation,
+  useMarkAllReadMutation,
+} from '@/api/notifications';
 import { cn } from '@/lib/cn';
 
 // --- Theme toggle ---
@@ -130,6 +146,146 @@ function NavItem({ to, icon: Icon, label, collapsed }: NavItemProps) {
   );
 }
 
+// --- Break-Glass Alert Banner (PR-N4) ---
+
+function BreakGlassBanner() {
+  const [alerts, setAlerts] = React.useState<Array<{ userId: string; time: Date }>>([]);
+  const isAdmin = useAuthStore(selectIsAdmin);
+
+  React.useEffect(() => {
+    if (!isAdmin) return;
+    const handler = (e: Event) => {
+      const custom = e as CustomEvent<{ userId: string }>;
+      setAlerts((prev) => [
+        { userId: custom.detail.userId, time: new Date() },
+        ...prev.slice(0, 4), // keep last 5
+      ]);
+    };
+    window.addEventListener('break-glass:alert', handler);
+    return () => window.removeEventListener('break-glass:alert', handler);
+  }, [isAdmin]);
+
+  if (!isAdmin || alerts.length === 0) return null;
+
+  return (
+    <div className="flex shrink-0 flex-col gap-0.5">
+      {alerts.map((a, i) => (
+        <div
+          key={`${a.userId}-${i}`}
+          className="flex items-center gap-2 bg-red-600 px-4 py-1.5 text-sm font-medium text-white dark:bg-red-800"
+        >
+          <AlertOctagon className="h-4 w-4 shrink-0 animate-pulse" />
+          <span>
+            ⚠️ ACİL ERİŞİM (BREAK-GLASS) HESABI GİRİŞ YAPTI —{' '}
+            {a.time.toLocaleTimeString('tr-TR')} — Kullanıcı: {a.userId.slice(0, 8)}…
+          </span>
+          <button
+            className="ml-auto rounded p-0.5 hover:bg-white/20"
+            onClick={() => setAlerts((prev) => prev.filter((_, j) => j !== i))}
+            aria-label="Kapat"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// --- Notification Bell ---
+
+function NotificationBell() {
+  const [open, setOpen] = React.useState(false);
+  const { data } = useNotificationsQuery();
+  const markRead = useMarkReadMutation();
+  const markAllRead = useMarkAllReadMutation();
+
+  const notifications = data?.notifications ?? [];
+  const unreadCount = data?.unread_count ?? 0;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={unreadCount > 0 ? `${unreadCount} okunmamış bildirim` : 'Bildirimler'}
+          className="relative"
+        >
+          <Bell className="h-4 w-4" />
+          {unreadCount > 0 && (
+            <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 p-0" align="end">
+        <div className="flex items-center justify-between border-b px-3 py-2">
+          <span className="text-sm font-semibold">Bildirimler</span>
+          {unreadCount > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1 text-xs"
+              disabled={markAllRead.isPending}
+              onClick={() => markAllRead.mutate()}
+            >
+              <CheckCheck className="h-3 w-3" />
+              Tümünü okundu işaretle
+            </Button>
+          )}
+        </div>
+        <div className="max-h-72 overflow-y-auto">
+          {notifications.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 text-center text-sm text-muted-foreground">
+              <Bell className="mb-2 h-6 w-6 opacity-30" />
+              Bildirim yok
+            </div>
+          ) : (
+            <div className="flex flex-col">
+              {notifications.map((n) => (
+                <button
+                  key={n.id}
+                  className={cn(
+                    'flex flex-col gap-0.5 px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent',
+                    !n.read_at && 'bg-primary/5',
+                  )}
+                  onClick={() => {
+                    if (!n.read_at) {
+                      markRead.mutate(n.id);
+                    }
+                  }}
+                >
+                  <div className="flex items-start gap-2">
+                    {!n.read_at && (
+                      <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />
+                    )}
+                    <div className={cn('flex flex-col', n.read_at ? 'pl-4' : '')}>
+                      <span className="font-medium leading-snug">{n.title}</span>
+                      {n.body && (
+                        <span className="text-xs text-muted-foreground line-clamp-2">{n.body}</span>
+                      )}
+                      <span className="mt-0.5 text-[11px] text-muted-foreground">
+                        {new Date(n.created_at).toLocaleString('tr-TR', {
+                          day: 'numeric',
+                          month: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 // --- AppShell ---
 
 export function AppShell() {
@@ -167,6 +323,8 @@ export function AppShell() {
           </span>
         </div>
       )}
+      {/* Break-glass alert banners (PR-N4) — admin only, shown on WS event */}
+      <BreakGlassBanner />
 
       {/* Top bar */}
       <header className="flex h-14 shrink-0 items-center justify-between border-b bg-background px-4">
@@ -200,6 +358,7 @@ export function AppShell() {
           {user && (
             <span className="hidden text-sm text-muted-foreground sm:inline">{user.username}</span>
           )}
+          <NotificationBell />
           <ThemeToggle />
           <Button
             variant="ghost"
@@ -258,6 +417,18 @@ export function AppShell() {
               to="/inventory"
               icon={Folder}
               label="Envanter"
+              collapsed={sidebarCollapsed && !mobileOpen}
+            />
+            <NavItem
+              to="/tags"
+              icon={Tag}
+              label="Etiketlerim"
+              collapsed={sidebarCollapsed && !mobileOpen}
+            />
+            <NavItem
+              to="/graph"
+              icon={GitBranch}
+              label="İlişki Haritası"
               collapsed={sidebarCollapsed && !mobileOpen}
             />
             {isAdmin && (

@@ -5,9 +5,9 @@
  * button + paylaşım için. Default 50 / sayfa, ADR-0009 sınırları.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { RefreshCcw } from 'lucide-react';
+import { RefreshCcw, UserPlus } from 'lucide-react';
 import {
   Card,
   CardContent,
@@ -21,6 +21,7 @@ import { useUsers } from '@/api/admin';
 import { ApiError } from '@/api/errors';
 import { UserTable } from '@/components/admin/user-table';
 import { Pagination } from '@/components/common/pagination';
+import { CreateUserModal } from '@/components/admin/create-user-modal';
 
 const DEFAULT_LIMIT = 50;
 const ALLOWED_LIMITS = [25, 50, 100];
@@ -37,6 +38,7 @@ export default function AdminUsersPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { limit, offset } = parsePagination(searchParams);
   const { toast } = useToast();
+  const [createOpen, setCreateOpen] = useState(false);
 
   const { data, isLoading, isFetching, refetch, error } = useUsers({ limit, offset });
 
@@ -65,6 +67,8 @@ export default function AdminUsersPage() {
   };
 
   return (
+    <>
+    <CreateUserModal open={createOpen} onClose={() => setCreateOpen(false)} />
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-4">
         <div>
@@ -73,16 +77,25 @@ export default function AdminUsersPage() {
             Kullanıcı rollerini düzenleyin ve hesapları devre dışı bırakın.
           </CardDescription>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => refetch()}
-          disabled={isFetching}
-          aria-label="Listeyi yenile"
-        >
-          <RefreshCcw className={`mr-2 h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
-          Yenile
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            onClick={() => setCreateOpen(true)}
+          >
+            <UserPlus className="mr-2 h-4 w-4" />
+            Kullanıcı Oluştur
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetch()}
+            disabled={isFetching}
+            aria-label="Listeyi yenile"
+          >
+            <RefreshCcw className={`mr-2 h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+            Yenile
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <UserTable users={data?.users} isLoading={isLoading} />
@@ -98,5 +111,6 @@ export default function AdminUsersPage() {
         ) : null}
       </CardContent>
     </Card>
+    </>
   );
 }

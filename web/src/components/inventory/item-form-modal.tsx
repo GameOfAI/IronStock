@@ -96,6 +96,9 @@ export function ItemFormModal({
   const [itemTypeId, setItemTypeId] = useState<string>('');
   const [fields, dispatchFields] = useReducer(fieldReducer, {});
   const [error, setError] = useState<string | null>(null);
+  // PR-N1: expiry fields
+  const [expiresAt, setExpiresAt] = useState(''); // ISO date string (YYYY-MM-DD)
+  const [rotationIntervalDays, setRotationIntervalDays] = useState('');
 
   const privateKey = useAuthStore((s) => s.privateKey);
   const user = useAuthStore((s) => s.user);
@@ -112,6 +115,9 @@ export function ItemFormModal({
       setName(editItem.name);
       setDescription(editItem.description ?? '');
       setItemTypeId(String(editItem.item_type_id));
+      // Populate expiry from existing item (ISO → date input needs YYYY-MM-DD).
+      setExpiresAt(editItem.expires_at ? editItem.expires_at.slice(0, 10) : '');
+      setRotationIntervalDays(editItem.rotation_interval_days != null ? String(editItem.rotation_interval_days) : '');
     } else if (duplicateFrom) {
       setName(duplicateFrom.name);
       setDescription(duplicateFrom.description ?? '');
@@ -120,6 +126,8 @@ export function ItemFormModal({
       setName('');
       setDescription('');
       setItemTypeId(itemTypes[0] ? String(itemTypes[0].id) : '');
+      setExpiresAt('');
+      setRotationIntervalDays('');
     }
     setError(null);
     // Reset stale mutation errors from previous calls.
@@ -158,6 +166,8 @@ export function ItemFormModal({
         await updateMutation.mutateAsync({
           name: trimmed,
           description: description.trim() || undefined,
+          expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+          rotation_interval_days: rotationIntervalDays ? Number(rotationIntervalDays) : null,
         });
       } else {
         if (!privateKey || !user) {
@@ -197,6 +207,8 @@ export function ItemFormModal({
         await createMutation.mutateAsync({
           id: crypto.randomUUID(),
           folder_id: folderId,
+          expires_at: expiresAt ? new Date(expiresAt).toISOString() : undefined,
+          rotation_interval_days: rotationIntervalDays ? Number(rotationIntervalDays) : undefined,
           item_type_id: Number(itemTypeId),
           name: trimmed,
           description: description.trim() || undefined,
@@ -315,6 +327,41 @@ export function ItemFormModal({
             </div>
           )}
 
+
+          {/* PR-N1: Credential Expiry / Rotation */}
+          <div className="space-y-3 rounded-md border border-dashed p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Süre & Rotasyon
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="item-expires-at">
+                  Son geçerlilik tarihi
+                </Label>
+                <Input
+                  id="item-expires-at"
+                  type="date"
+                  value={expiresAt}
+                  onChange={(e) => setExpiresAt(e.target.value)}
+                  disabled={isPending}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="item-rotation-days">
+                  Rotasyon aralığı (gün)
+                </Label>
+                <Input
+                  id="item-rotation-days"
+                  type="number"
+                  min={1}
+                  value={rotationIntervalDays}
+                  onChange={(e) => setRotationIntervalDays(e.target.value)}
+                  placeholder="örn. 90"
+                  disabled={isPending}
+                />
+              </div>
+            </div>
+          </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 

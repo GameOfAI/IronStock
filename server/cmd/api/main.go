@@ -28,6 +28,7 @@ import (
 	"envanter.app/server/internal/db"
 	"envanter.app/server/internal/httpapi"
 	"envanter.app/server/internal/logging"
+	"envanter.app/server/internal/notify"
 	"envanter.app/server/internal/storage"
 	"envanter.app/server/internal/ws"
 )
@@ -100,15 +101,10 @@ func run() error {
 		return fmt.Errorf("auth service: %w", err)
 	}
 	auditWriter := audit.NewWriter(pool)
-	authHandlers := &httpapi.AuthHandlers{
-		Service:          authSvc,
-		Audit:            auditWriter,
-		Logger:           logger,
-		BootstrapEnabled: cfg.BootstrapEnabled,
-	}
 	if cfg.BootstrapEnabled {
 		logger.Warn("BOOTSTRAP MODE ENABLED — /api/v1/auth/bootstrap is active (TOTP bypassed)")
 	}
+
 	// --- WebSocket hub + ticket store ---
 	hub := ws.NewHub(logger)
 	defer hub.Close()
@@ -124,6 +120,95 @@ func run() error {
 				return
 			case <-ticker.C:
 				tickets.Cleanup()
+			}
+		}
+	}()
+
+	// --- Notification writer (PR-N8) ---
+	// Declared before authHandlers (break-glass alerting, PR-N4) and
+	// background goroutines (expiry scanner).
+	notifyWriter := notify.New(pool, hub, logger)
+
+	// --- Auth handlers ---
+	// Constructed after hub + notifyWriter so break-glass alerts (PR-N4) work.
+	authHandlers := &httpapi.AuthHandlers{
+		Service:          authSvc,
+		Audit:            auditWriter,
+		Logger:           logger,
+		BootstrapEnabled: cfg.BootstrapEnabled,
+		Hub:              hub,
+		Notify:           notifyWriter,
+	}
+
+	// --- Credential expiry scanner (PR-N1 + PR-N8) ---
+	// Runs every hour, finds items expiring within 7 days:
+	//   1. Publishes item.expiry_warning WS events (cache-bust for all clients).
+	//   2. Writes a notification row for the item owner (PR-N8).
+	// The notification is idempotent-ish: we check that no unread expiry_warning
+	// notification already exists for this item today before inserting.
+	go func() {
+		ticker := time.NewTicker(time.Hour)
+		defer ticker.Stop()
+		// Fetch item id + owner; skip items that already have an unread
+		// expiry_warning notification sent today to avoid spam.
+		const expirySQL = `
+			SELECT i.id::text, i.created_by::text,
+			       EXTRACT(DAY FROM (i.expires_at - now()))::int AS days_left
+			FROM items i
+			WHERE i.expires_at IS NOT NULL
+			  AND i.expires_at > now()
+			  AND i.expires_at <= now() + INTERVAL '7 days'
+			  AND NOT EXISTS (
+			      SELECT 1 FROM notifications n
+			      WHERE n.user_id = i.created_by
+			        AND n.resource_id = i.id
+			        AND n.type = 'expiry_warning'
+			        AND n.created_at >= now() - INTERVAL '23 hours'
+			  )
+		`
+		scan := func() {
+			scanCtx, scanCancel := context.WithTimeout(rootCtx, 30*time.Second)
+			defer scanCancel()
+			rows, err := pool.Query(scanCtx, expirySQL)
+			if err != nil {
+				logger.Warn("expiry scan query failed", slog.String("error", err.Error()))
+				return
+			}
+			defer rows.Close()
+			count := 0
+			for rows.Next() {
+				var itemID, userID string
+				var daysLeft int
+				if err := rows.Scan(&itemID, &userID, &daysLeft); err != nil {
+					continue
+				}
+				// Publish WS cache-bust (no secret data — just UUID).
+				hub.Publish(ws.NewEvent(ws.EventItemExpiryWarning, itemID, "system"))
+				// Write in-app notification for the owner.
+				title := fmt.Sprintf("Kimlik bilgisi %d gün içinde sona eriyor", daysLeft)
+				if daysLeft <= 1 {
+					title = "Kimlik bilgisi bugün sona eriyor!"
+				}
+				notifyWriter.WriteAsync(notify.Entry{
+					UserID:       userID,
+					Type:         "expiry_warning",
+					Title:        title,
+					Body:         "Kimlik bilgisini güncelleyin veya rotasyon yapın.",
+					ResourceType: "item",
+					ResourceID:   itemID,
+				})
+				count++
+			}
+			if count > 0 {
+				logger.Info("expiry scan: items nearing expiry", slog.Int("count", count))
+			}
+		}
+		for {
+			select {
+			case <-rootCtx.Done():
+				return
+			case <-ticker.C:
+				scan()
 			}
 		}
 	}()
@@ -149,6 +234,21 @@ func run() error {
 		Service: authSvc,
 		Audit:   auditWriter,
 		Logger:  logger,
+	}
+	tagHandlers := &httpapi.TagHandlers{
+		Service: authSvc,
+		Audit:   auditWriter,
+		Logger:  logger,
+	}
+	notificationHandlers := &httpapi.NotificationHandlers{
+		Service: authSvc,
+		Logger:  logger,
+	}
+	graphHandlers := &httpapi.GraphHandlers{
+		Service: authSvc,
+		Audit:   auditWriter,
+		Logger:  logger,
+		Hub:     hub,
 	}
 	catalogHandlers := &httpapi.CatalogHandlers{
 		Service: authSvc,
@@ -193,6 +293,13 @@ func run() error {
 		return fmt.Errorf("ensure default admin: %w", err)
 	}
 
+	shareLinkHandlers := &httpapi.ShareLinkHandlers{
+		DB:      pool,
+		Service: authSvc,
+		Audit:   auditWriter,
+		Logger:  logger,
+	}
+
 	// --- HTTP layer ---
 	router := httpapi.NewRouter(httpapi.Deps{
 		Logger:     logger,
@@ -203,8 +310,12 @@ func run() error {
 		Attachment: attachmentHandlers,
 		Admin:      adminHandlers,
 		Group:      groupHandlers,
-		Catalog:    catalogHandlers,
-		WS:         wsHandlers,
+		Tag:          tagHandlers,
+		Notification: notificationHandlers,
+		Graph:        graphHandlers,
+		Catalog:      catalogHandlers,
+		WS:           wsHandlers,
+		ShareLink:    shareLinkHandlers,
 	})
 
 	srv := &http.Server{

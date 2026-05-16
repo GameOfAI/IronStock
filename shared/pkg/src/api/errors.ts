@@ -32,6 +32,7 @@ export const ErrCode = {
   InvalidToken: 'invalid_token',
   AccountLocked: 'account_locked',
   AccountPendingMFA: 'account_pending_totp',
+  MFARequired: 'mfa_required',
   RateLimited: 'rate_limited',
   Conflict: 'conflict',
   Internal: 'internal_error',

@@ -24,13 +24,14 @@ type AdminHandlers struct {
 }
 
 type adminUserRow struct {
-	ID          string   `json:"id"`
-	Username    string   `json:"username"`
-	Email       string   `json:"email"`
-	Status      string   `json:"status"`
-	Roles       []string `json:"roles"`
-	LastLoginAt *string  `json:"last_login_at,omitempty"`
-	CreatedAt   string   `json:"created_at"`
+	ID           string   `json:"id"`
+	Username     string   `json:"username"`
+	Email        string   `json:"email"`
+	Status       string   `json:"status"`
+	Roles        []string `json:"roles"`
+	LastLoginAt  *string  `json:"last_login_at,omitempty"`
+	CreatedAt    string   `json:"created_at"`
+	IsBreakGlass bool     `json:"is_break_glass"` // PR-N4
 }
 
 type adminUsersResponse struct {
@@ -59,7 +60,7 @@ func (h *AdminHandlers) ListUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Page query.
+	// Page query — includes is_break_glass for badge display (PR-N4).
 	const sqlText = `
 		SELECT
 		    COALESCE(array_agg(id::text                        ORDER BY username), '{}'),
@@ -67,17 +68,19 @@ func (h *AdminHandlers) ListUsers(w http.ResponseWriter, r *http.Request) {
 		    COALESCE(array_agg(email                           ORDER BY username), '{}'),
 		    COALESCE(array_agg(status                          ORDER BY username), '{}'),
 		    COALESCE(array_agg(COALESCE(last_login_at::text, '') ORDER BY username), '{}'),
-		    COALESCE(array_agg(created_at::text                ORDER BY username), '{}')
+		    COALESCE(array_agg(created_at::text                ORDER BY username), '{}'),
+		    COALESCE(array_agg(is_break_glass                  ORDER BY username), '{}')
 		FROM (
-		    SELECT id, username, email, status, last_login_at, created_at
+		    SELECT id, username, email, status, last_login_at, created_at, is_break_glass
 		    FROM users
 		    ORDER BY username
 		    LIMIT $1 OFFSET $2
 		) page
 	`
 	var ids, usernames, emails, statuses, lastLogins, createdAts []string
+	var isBreakGlassFlags []bool
 	if err := h.Service.DB.QueryRow(ctx, sqlText, limit, offset).Scan(
-		&ids, &usernames, &emails, &statuses, &lastLogins, &createdAts,
+		&ids, &usernames, &emails, &statuses, &lastLogins, &createdAts, &isBreakGlassFlags,
 	); err != nil {
 		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
 			"Kullanıcı listesi alınamadı.", err)
@@ -101,14 +104,16 @@ func (h *AdminHandlers) ListUsers(w http.ResponseWriter, r *http.Request) {
 			ll := lastLogins[i]
 			lastLogin = &ll
 		}
+		breakGlass := i < len(isBreakGlassFlags) && isBreakGlassFlags[i]
 		out = append(out, adminUserRow{
-			ID:          ids[i],
-			Username:    usernames[i],
-			Email:       emails[i],
-			Status:      statuses[i],
-			Roles:       roles,
-			LastLoginAt: lastLogin,
-			CreatedAt:   createdAts[i],
+			ID:           ids[i],
+			Username:     usernames[i],
+			Email:        emails[i],
+			Status:       statuses[i],
+			Roles:        roles,
+			LastLoginAt:  lastLogin,
+			CreatedAt:    createdAts[i],
+			IsBreakGlass: breakGlass,
 		})
 	}
 
@@ -613,6 +618,74 @@ func (h *AdminHandlers) AdminResetTOTP(w http.ResponseWriter, r *http.Request) {
 		Action:       audit.ActionAdminTOTPReset,
 		ResourceType: audit.ResourceUser,
 		ResourceID:   id,
+		IPAddress:    parseIP(r.RemoteAddr),
+		UserAgent:    r.UserAgent(),
+	})
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// SetBreakGlass implements POST /api/v1/admin/users/{id}/break-glass.
+// Enables or disables the break-glass flag on a user account.
+// The target user must already have the admin role; the application
+// enforces this to prevent privilege escalation.
+func (h *AdminHandlers) SetBreakGlass(w http.ResponseWriter, r *http.Request) {
+	claims := ClaimsFromContext(r.Context())
+	if claims == nil {
+		writeMiddlewareUnauthorized(w, errors.New("no claims"))
+		return
+	}
+	id := chi.URLParam(r, "id")
+	ctx := r.Context()
+
+	// Decode body: { "enabled": true|false }
+	var body struct {
+		Enabled bool `json:"enabled"`
+	}
+	if !decodeJSON(w, r, h.Logger, &body) {
+		return
+	}
+
+	// Validate target user has admin role.
+	var isAdmin bool
+	err := h.Service.DB.QueryRow(ctx, `
+		SELECT EXISTS (
+		    SELECT 1 FROM user_roles ur
+		    JOIN roles r ON r.id = ur.role_id
+		    WHERE ur.user_id = $1::uuid AND r.name = 'admin'
+		)
+	`, id).Scan(&isAdmin)
+	if err != nil {
+		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
+			"Kullanıcı doğrulanamadı.", err)
+		return
+	}
+	if !isAdmin {
+		writeError(w, h.Logger, http.StatusBadRequest, ErrCodeBadRequest,
+			"Yalnızca admin rolündeki kullanıcılar break-glass olabilir.", errors.New("not admin"))
+		return
+	}
+
+	_, err = h.Service.DB.Exec(ctx,
+		`UPDATE users SET is_break_glass = $2 WHERE id = $1::uuid`,
+		id, body.Enabled,
+	)
+	if err != nil {
+		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
+			"Break-glass durumu güncellenemedi.", err)
+		return
+	}
+
+	action := "admin.break_glass_enabled"
+	if !body.Enabled {
+		action = "admin.break_glass_disabled"
+	}
+	_ = h.Audit.Write(ctx, audit.Entry{
+		ActorUserID:  claims.Subject,
+		Action:       action,
+		ResourceType: audit.ResourceUser,
+		ResourceID:   id,
+		Details:      map[string]any{"enabled": body.Enabled},
 		IPAddress:    parseIP(r.RemoteAddr),
 		UserAgent:    r.UserAgent(),
 	})

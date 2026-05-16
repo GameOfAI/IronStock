@@ -81,6 +81,42 @@ const (
 	ActionGroupDeleted       = "group.deleted"
 	ActionGroupMemberAdded   = "group.member_added"
 	ActionGroupMemberRemoved = "group.member_removed"
+
+	// Tags + favorites (PR-N7).
+	ActionTagCreated   = "tag.created"
+	ActionTagDeleted   = "tag.deleted"
+	ActionItemTagged   = "item.tagged"
+	ActionItemUntagged = "item.untagged"
+	ActionItemFavorited   = "item.favorited"
+	ActionItemUnfavorited = "item.unfavorited"
+
+	// Break-glass emergency access (PR-N4).
+	// Emitted on every successful login by a break-glass account.
+	// All admins receive an in-app notification + WS alert banner.
+	ActionAuthBreakGlass = "auth.break_glass"
+
+	// Graph/pipeline relationships (PR-F5a).
+	ActionItemRelationshipAdded   = "item.relationship_added"
+	ActionItemRelationshipRemoved = "item.relationship_removed"
+
+	// Credential rotation/expiry (PR-N1).
+	// ActionItemRotationRecorded is emitted when a user records that they
+	// have rotated a credential (last_rotated_at set to now()).
+	ActionItemRotationRecorded = "item.rotation_recorded"
+	// ActionItemExpiryWarning is emitted by the background expiry scanner
+	// when an item's expires_at is within the warning window.
+	ActionItemExpiryWarning = "item.expiry_warning"
+
+	// Trusted device (PR-F2b) — "remember this device for 30 days".
+	ActionTrustedDeviceCreated = "auth.trusted_device_created"
+	ActionTrustedDeviceRevoked = "auth.trusted_device_revoked"
+	ActionTrustedDeviceUsed    = "auth.trusted_device_used" // TOTP skipped via cookie
+
+	// One-time share links (PR-N5).
+	ActionShareLinkCreated = "item.share_link_created"
+	ActionShareLinkViewed  = "item.share_link_viewed"   // public endpoint hit + view_count++
+	ActionShareLinkExpired = "item.share_link_expired"  // view_limit or TTL reached
+	ActionShareLinkRevoked = "item.share_link_revoked"
 )
 
 // ResourceGroup is the audit resource type for group rows.

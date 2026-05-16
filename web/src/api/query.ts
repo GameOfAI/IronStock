@@ -56,4 +56,7 @@ export const queryKeys = {
   attachments: {
     byItem: (itemId: string) => ['attachments', { itemId }] as const,
   },
+  notifications: {
+    all: ['notifications'] as const,
+  },
 } as const;

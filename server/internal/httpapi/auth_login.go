@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -14,6 +15,8 @@ import (
 	"envanter.app/server/internal/audit"
 	"envanter.app/server/internal/auth"
 	"envanter.app/server/internal/crypto"
+	"envanter.app/server/internal/notify"
+	"envanter.app/server/internal/ws"
 )
 
 // loginRequest is the body of POST /api/v1/auth/login.
@@ -24,9 +27,10 @@ import (
 // intentionally generic ("invalid credentials") regardless of which factor
 // failed — denies the attacker an oracle.
 type loginRequest struct {
-	Username string `json:"username"`
-	Password string `json:"master_password"`
-	TOTPCode string `json:"totp_code"` // optional; required only when TOTP is configured
+	Username       string `json:"username"`
+	Password       string `json:"master_password"`
+	TOTPCode       string `json:"totp_code"`        // optional; required only when TOTP is configured
+	RememberDevice bool   `json:"remember_device"` // PR-F2b: if true, issue a 30-day trusted-device cookie
 }
 
 type loginResponse struct {
@@ -127,29 +131,47 @@ func (s *AuthHandlers) Login(w http.ResponseWriter, r *http.Request) {
 			"TOTP secret sorgulanamadı.", err)
 		return
 	}
-	if err == nil {
-		// User has TOTP configured — code is required.
-		if req.TOTPCode == "" {
-			s.recordLoginFail(ctx, r, userRow.ID, "missing_totp")
-			writeError(w, s.Logger, http.StatusUnauthorized, ErrCodeMFARequired,
-				"Bu hesap için 2FA kodu gerekli.", errors.New("totp required"))
-			return
+
+	var trustedDeviceSkipped bool // PR-F2b: true when we skip TOTP via a valid cookie
+	var trustedDeviceID string    // ID of the device row that was used (for audit)
+	hasTOTP := err == nil         // true when user has an active TOTP secret
+
+	if hasTOTP {
+		// User has TOTP configured.
+		// PR-F2b: check the trusted-device cookie first.
+		if cookie, cookieErr := r.Cookie(trustedDeviceCookieName); cookieErr == nil {
+			devID, ok, verifyErr := verifyTrustedDevice(ctx, s.Service.DB, userRow.ID, cookie.Value)
+			if verifyErr == nil && ok {
+				// Valid trusted device: skip TOTP code check.
+				trustedDeviceSkipped = true
+				trustedDeviceID = devID
+			}
 		}
-		aad := crypto.MakeAAD("totp_secrets", userRow.ID, "secret_enc")
-		totpSecret, err := s.Service.Master.Open(totpEnc, aad)
-		if err != nil {
-			writeError(w, s.Logger, http.StatusInternalServerError, ErrCodeInternal,
-				"TOTP secret çözülemedi.", err)
-			return
-		}
-		if err := auth.VerifyTOTP(totpSecret, req.TOTPCode); err != nil {
-			_ = recordLoginFailure(ctx, s.Service.DB, userRow.ID)
-			s.recordLoginFail(ctx, r, userRow.ID, "wrong_totp")
-			writeInvalidCreds(w, s.Logger, err)
-			return
+
+		if !trustedDeviceSkipped {
+			// No valid trusted device — code is required.
+			if req.TOTPCode == "" {
+				s.recordLoginFail(ctx, r, userRow.ID, "missing_totp")
+				writeError(w, s.Logger, http.StatusUnauthorized, ErrCodeMFARequired,
+					"Bu hesap için 2FA kodu gerekli.", errors.New("totp required"))
+				return
+			}
+			aad := crypto.MakeAAD("totp_secrets", userRow.ID, "secret_enc")
+			totpSecret, totpDecErr := s.Service.Master.Open(totpEnc, aad)
+			if totpDecErr != nil {
+				writeError(w, s.Logger, http.StatusInternalServerError, ErrCodeInternal,
+					"TOTP secret çözülemedi.", totpDecErr)
+				return
+			}
+			if err := auth.VerifyTOTP(totpSecret, req.TOTPCode); err != nil {
+				_ = recordLoginFailure(ctx, s.Service.DB, userRow.ID)
+				s.recordLoginFail(ctx, r, userRow.ID, "wrong_totp")
+				writeInvalidCreds(w, s.Logger, err)
+				return
+			}
 		}
 	}
-	// No TOTP configured — password alone is sufficient.
+	// No TOTP configured OR trusted-device verified — password alone is sufficient.
 
 	// All factors OK: create session in a tx so the failed-login counter
 	// reset and session insert are atomic.
@@ -214,6 +236,44 @@ func (s *AuthHandlers) Login(w http.ResponseWriter, r *http.Request) {
 		UserAgent:    r.UserAgent(),
 	})
 
+	// PR-F2b: Trusted device — audit skip or create.
+	if trustedDeviceSkipped {
+		// TOTP was bypassed via a valid trusted-device cookie.
+		_ = s.Audit.Write(ctx, audit.Entry{
+			ActorUserID:  userRow.ID,
+			Action:       audit.ActionTrustedDeviceUsed,
+			ResourceType: "trusted_device",
+			ResourceID:   trustedDeviceID,
+			IPAddress:    parseIP(r.RemoteAddr),
+			UserAgent:    r.UserAgent(),
+		})
+	} else if req.RememberDevice && hasTOTP {
+		// User opted in to "remember device" after a fresh TOTP verify.
+		// Issue a new device token and set the HttpOnly cookie.
+		rawToken, tokenHash, tokenErr := generateDeviceToken()
+		if tokenErr == nil {
+			label := deviceLabelFromRequest(r)
+			if devID, insertErr := createTrustedDevice(ctx, s.Service.DB, userRow.ID, tokenHash, label); insertErr == nil {
+				expires := time.Now().Add(trustedDeviceTTL)
+				setTrustedDeviceCookie(w, r, rawToken, expires)
+				_ = s.Audit.Write(ctx, audit.Entry{
+					ActorUserID:  userRow.ID,
+					Action:       audit.ActionTrustedDeviceCreated,
+					ResourceType: "trusted_device",
+					ResourceID:   devID,
+					IPAddress:    parseIP(r.RemoteAddr),
+					UserAgent:    r.UserAgent(),
+				})
+			}
+		}
+	}
+
+	// PR-N4: Break-glass emergency alert.
+	// Fire-and-forget: do not block the login response.
+	if userRow.IsBreakGlass {
+		go s.emitBreakGlassAlert(userRow.ID, r.RemoteAddr, r.UserAgent())
+	}
+
 	writeJSON(w, http.StatusOK, loginResponse{
 		AccessToken:        accessToken,
 		RefreshToken:       refresh.Token,
@@ -234,6 +294,7 @@ type userLoginRow struct {
 	FailedAttempts     int
 	LockedUntil        *time.Time
 	MustChangePassword bool
+	IsBreakGlass       bool // PR-N4 — triggers emergency alert on successful login
 }
 
 // fetchUserForLogin returns the row needed to verify the password and check
@@ -242,7 +303,7 @@ func fetchUserForLogin(ctx context.Context, db auth.DBExec, usernameLower string
 	const sqlText = `
 		SELECT id::text, password_hash, argon2_params,
 		       status, failed_login_attempts, locked_until,
-		       must_change_password
+		       must_change_password, is_break_glass
 		FROM users
 		WHERE username = $1
 		LIMIT 1
@@ -251,7 +312,7 @@ func fetchUserForLogin(ctx context.Context, db auth.DBExec, usernameLower string
 	err := db.QueryRow(ctx, sqlText, usernameLower).Scan(
 		&row.ID, &row.PasswordHash, &row.Argon2Params,
 		&row.Status, &row.FailedAttempts, &row.LockedUntil,
-		&row.MustChangePassword,
+		&row.MustChangePassword, &row.IsBreakGlass,
 	)
 	return row, err
 }
@@ -356,4 +417,60 @@ func (s *AuthHandlers) recordLoginFail(ctx context.Context, r *http.Request, use
 		IPAddress:    parseIP(r.RemoteAddr),
 		UserAgent:    r.UserAgent(),
 	})
+}
+
+// emitBreakGlassAlert runs asynchronously after a break-glass login (PR-N4).
+// It:
+//   1. Writes an auth.break_glass audit entry.
+//   2. Publishes the EventBreakGlassLogin WS event (all admins see the alert banner).
+//   3. Creates an in-app notification for every admin user.
+func (s *AuthHandlers) emitBreakGlassAlert(userID, remoteAddr, userAgent string) {
+	ctx := context.Background()
+
+	// 1. Audit — break_glass supersedes the normal login entry.
+	_ = s.Audit.Write(ctx, audit.Entry{
+		ActorUserID:  userID,
+		Action:       audit.ActionAuthBreakGlass,
+		ResourceType: audit.ResourceUser,
+		ResourceID:   userID,
+		Details:      map[string]any{"remote_addr": remoteAddr, "user_agent": userAgent},
+	})
+
+	// 2. WS event — all connected clients receive this; admin UI shows red banner.
+	if s.Hub != nil {
+		s.Hub.Publish(ws.NewEvent(ws.EventBreakGlassLogin, userID, "system"))
+	}
+
+	// 3. In-app notification for all admins.
+	if s.Notify == nil {
+		return
+	}
+	rows, err := s.Service.DB.Query(ctx, `
+		SELECT u.id::text
+		FROM users u
+		JOIN user_roles ur ON ur.user_id = u.id
+		JOIN roles r ON r.id = ur.role_id
+		WHERE r.name = 'admin'
+		  AND u.status = 'active'
+		  AND u.id != $1::uuid
+	`, userID)
+	if err != nil {
+		s.Logger.Warn("break_glass: failed to fetch admins", slog.String("error", err.Error()))
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var adminID string
+		if err := rows.Scan(&adminID); err != nil {
+			continue
+		}
+		s.Notify.Write(ctx, notify.Entry{
+			UserID:       adminID,
+			Type:         "break_glass",
+			Title:        "⚠️ Acil Erişim Hesabı Kullanıldı!",
+			Body:         "Bir break-glass hesabı sisteme giriş yaptı. Denetim günlüğünü kontrol edin.",
+			ResourceType: "user",
+			ResourceID:   userID,
+		})
+	}
 }

@@ -88,6 +88,25 @@ function handleEvent(ev: WsEvent) {
       queryClient.invalidateQueries({ queryKey: queryKeys.items.detail(ev.resource_id) });
       break;
 
+    case 'item.expiry_warning':
+      // Invalidate item list + detail so expiry badges refresh.
+      queryClient.invalidateQueries({ queryKey: queryKeys.items.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.items.detail(ev.resource_id) });
+      break;
+
+    case 'notification.created':
+      // Invalidate notification list so the bell badge updates immediately.
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
+      break;
+
+    case 'auth.break_glass':
+      // Dispatch a DOM event so admin UI can show a red alert banner
+      // without needing to subscribe to the WS client directly.
+      window.dispatchEvent(
+        new CustomEvent('break-glass:alert', { detail: { userId: ev.resource_id } }),
+      );
+      break;
+
     default:
       break;
   }

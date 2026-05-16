@@ -10,6 +10,7 @@ import type {
   ItemCreateRequest,
   ItemUpdateRequest,
   ItemListResponse,
+  FieldVersionsResponse,
   ShareItemRequest,
 } from './types';
 
@@ -86,5 +87,31 @@ export function useUnshareItemMutation(itemId: string) {
   return useMutation({
     mutationFn: (userId: string) =>
       apiFetch<void>(`/api/v1/items/${itemId}/shares/${userId}`, { method: 'DELETE' }),
+  });
+}
+
+/** PR-N2: Fetch up to 10 previous encrypted values for a field. */
+export function useFieldVersionsQuery(itemId: string | null, fieldDefId: number | null) {
+  return useQuery({
+    queryKey: ['field-versions', itemId, fieldDefId],
+    queryFn: () =>
+      apiFetch<FieldVersionsResponse>(
+        `/api/v1/items/${itemId}/fields/${fieldDefId}/versions`,
+      ),
+    enabled: itemId !== null && fieldDefId !== null,
+    staleTime: 30_000,
+  });
+}
+
+/** PR-N1: Record that a credential has been manually rotated. Sets last_rotated_at = now(). */
+export function useRecordRotationMutation(itemId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      apiFetch<void>(`/api/v1/items/${itemId}/rotate`, { method: 'POST' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.items.detail(itemId) });
+      qc.invalidateQueries({ queryKey: queryKeys.items.all });
+    },
   });
 }

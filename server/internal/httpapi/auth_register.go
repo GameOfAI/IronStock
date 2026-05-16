@@ -42,8 +42,8 @@ var usernameRE = regexp.MustCompile(`^[a-zA-Z0-9._-]{3,64}$`)
 //  1. Validate input (username/email shape, key lengths).
 //  2. Hash password (Argon2id, server-side salt).
 //  3. Marshal kek_params, validate sizes.
-//  4. INSERT users (status='pending_totp') + INSERT user_keypairs in a tx.
-//  5. Issue tmp token (purpose=totp_enroll) for the subsequent /totp/init+verify calls.
+//  4. INSERT users (status='active') + INSERT user_keypairs in a tx.
+//  5. Issue tmp token (purpose=totp_enroll) for optional /totp/init+verify calls.
 //  6. Audit log auth.register, return 201.
 func (s *AuthHandlers) Register(w http.ResponseWriter, r *http.Request) {
 	var req registerRequest
@@ -80,7 +80,7 @@ func (s *AuthHandlers) Register(w http.ResponseWriter, r *http.Request) {
 
 	const insertUserSQL = `
 		INSERT INTO users (username, email, password_hash, argon2_params, status)
-		VALUES ($1, $2, $3, $4, 'pending_totp')
+		VALUES ($1, $2, $3, $4, 'active')
 		RETURNING id::text
 	`
 	var userID string

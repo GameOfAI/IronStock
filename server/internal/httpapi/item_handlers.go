@@ -66,6 +66,12 @@ type itemRequest struct {
 	OwnerDEKWrapped []byte           `json:"owner_dek_wrapped"` // X25519 sealed-box
 	OwnerWrapNonce  []byte           `json:"owner_wrap_nonce"`  // 12B (matches schema)
 	ExternalSource  json.RawMessage  `json:"external_source,omitempty"`
+
+	// Credential expiry / rotation (PR-N1).
+	// expires_at: RFC 3339 timestamp; null removes expiry.
+	// rotation_interval_days: "rotate every N days" policy; null clears it.
+	ExpiresAt            *string `json:"expires_at,omitempty"`
+	RotationIntervalDays *int    `json:"rotation_interval_days,omitempty"`
 }
 
 // itemResponse is the API representation. name is decrypted for the caller;
@@ -85,6 +91,11 @@ type itemResponse struct {
 	Permission      auth.ItemPermission `json:"permission"`
 	OwnerDEKWrapped []byte              `json:"owner_dek_wrapped,omitempty"`
 	OwnerWrapNonce  []byte              `json:"owner_wrap_nonce,omitempty"`
+
+	// Credential expiry / rotation (PR-N1).
+	ExpiresAt            *string `json:"expires_at,omitempty"`
+	RotationIntervalDays *int    `json:"rotation_interval_days,omitempty"`
+	LastRotatedAt        *string `json:"last_rotated_at,omitempty"`
 }
 
 type itemFieldOutput struct {
@@ -186,13 +197,15 @@ func (h *ItemHandlers) Create(w http.ResponseWriter, r *http.Request) {
 		    name_enc, name_nonce, name_search,
 		    server_dek_wrapped, master_key_id,
 		    description,
-		    external_source, created_by
+		    external_source, created_by,
+		    expires_at, rotation_interval_days
 		) VALUES (
 		    $1::uuid, $2::uuid, $3,
 		    $4, $5, $6,
 		    $7, $8,
 		    $9,
-		    $10, $11::uuid
+		    $10, $11::uuid,
+		    $12, $13
 		)
 		RETURNING created_at::text, updated_at::text
 	`
@@ -203,6 +216,7 @@ func (h *ItemHandlers) Create(w http.ResponseWriter, r *http.Request) {
 		serverDEKWrapped, h.Service.MasterKey.ID,
 		req.Description,
 		nullableJSON(req.ExternalSource), claims.Subject,
+		req.ExpiresAt, req.RotationIntervalDays,
 	).Scan(&createdAt, &updatedAt)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -262,18 +276,20 @@ func (h *ItemHandlers) Create(w http.ResponseWriter, r *http.Request) {
 	h.publishEvent(ws.EventItemCreated, req.ID, claims.Subject)
 
 	writeJSON(w, http.StatusCreated, itemResponse{
-		ID:              req.ID,
-		FolderID:        req.FolderID,
-		ItemTypeID:      req.ItemTypeID,
-		Name:            req.Name,
-		Description:     req.Description,
-		Fields:          fieldInputsToOutputs(req.Fields),
-		CreatedBy:       claims.Subject,
-		CreatedAt:       createdAt,
-		UpdatedAt:       updatedAt,
-		Permission:      auth.ItemPermWrite,
-		OwnerDEKWrapped: req.OwnerDEKWrapped,
-		OwnerWrapNonce:  req.OwnerWrapNonce,
+		ID:                   req.ID,
+		FolderID:             req.FolderID,
+		ItemTypeID:           req.ItemTypeID,
+		Name:                 req.Name,
+		Description:          req.Description,
+		Fields:               fieldInputsToOutputs(req.Fields),
+		CreatedBy:            claims.Subject,
+		CreatedAt:            createdAt,
+		UpdatedAt:            updatedAt,
+		Permission:           auth.ItemPermWrite,
+		OwnerDEKWrapped:      req.OwnerDEKWrapped,
+		OwnerWrapNonce:       req.OwnerWrapNonce,
+		ExpiresAt:            req.ExpiresAt,
+		RotationIntervalDays: req.RotationIntervalDays,
 	})
 }
 
@@ -421,14 +437,17 @@ func (h *ItemHandlers) List(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		out = append(out, itemResponse{
-			ID:         ir.ID,
-			FolderID:   ir.FolderID,
-			ItemTypeID: ir.ItemTypeID,
-			Name:       name,
-			CreatedBy:  ir.CreatedBy,
-			CreatedAt:  ir.CreatedAt,
-			UpdatedAt:  ir.UpdatedAt,
-			Permission: perm,
+			ID:                   ir.ID,
+			FolderID:             ir.FolderID,
+			ItemTypeID:           ir.ItemTypeID,
+			Name:                 name,
+			CreatedBy:            ir.CreatedBy,
+			CreatedAt:            ir.CreatedAt,
+			UpdatedAt:            ir.UpdatedAt,
+			Permission:           perm,
+			ExpiresAt:            ir.ExpiresAt,
+			RotationIntervalDays: ir.RotationIntervalDays,
+			LastRotatedAt:        ir.LastRotatedAt,
 		})
 	}
 
@@ -570,10 +589,12 @@ func (h *ItemHandlers) Update(w http.ResponseWriter, r *http.Request) {
 		    name_enc = $3,
 		    name_nonce = $4,
 		    name_search = $5,
-		    description = $6
+		    description = $6,
+		    expires_at = $7,
+		    rotation_interval_days = $8
 		WHERE id = $1::uuid
 	`
-	if _, err := tx.Exec(ctx, updateItemSQL, id, folderArg, nameEnc, nameNonce, nameSearch, req.Description); err != nil {
+	if _, err := tx.Exec(ctx, updateItemSQL, id, folderArg, nameEnc, nameNonce, nameSearch, req.Description, req.ExpiresAt, req.RotationIntervalDays); err != nil {
 		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
 			"Item güncellenemedi.", err)
 		return
@@ -673,6 +694,69 @@ func (h *ItemHandlers) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// RecordRotation implements POST /api/v1/items/{id}/rotate.
+//
+// Sets last_rotated_at = now() on the item. No request body needed.
+// Useful for "I just rotated this credential — mark it as done".
+// Item Write permission required.
+func (h *ItemHandlers) RecordRotation(w http.ResponseWriter, r *http.Request) {
+	claims := ClaimsFromContext(r.Context())
+	if claims == nil {
+		writeError(w, h.Logger, http.StatusUnauthorized, ErrCodeUnauthorized,
+			"Token gerekli.", errors.New("no claims"))
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		writeError(w, h.Logger, http.StatusBadRequest, ErrCodeBadRequest,
+			"id zorunlu.", errors.New("missing id"))
+		return
+	}
+
+	ctx := r.Context()
+
+	if !hasRole(claims, RoleAdmin) {
+		ip, err := auth.ResolveItemPermission(ctx, h.Service.DB, claims.Subject, id)
+		if err != nil {
+			writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
+				"Yetki sorgulanamadı.", err)
+			return
+		}
+		if !ip.AllowsWrite() {
+			writeError(w, h.Logger, http.StatusForbidden, ErrCodeUnauthorized,
+				"Yazma yetkisi yok.", errors.New("write denied"))
+			return
+		}
+	}
+
+	tag, err := h.Service.DB.Exec(ctx,
+		`UPDATE items SET last_rotated_at = now() WHERE id = $1::uuid`,
+		id,
+	)
+	if err != nil {
+		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
+			"Rotasyon kaydedilemedi.", err)
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		writeError(w, h.Logger, http.StatusNotFound, ErrCodeBadRequest,
+			"Item bulunamadı.", errors.New("no rows"))
+		return
+	}
+
+	_ = h.Audit.Write(ctx, audit.Entry{
+		ActorUserID:  claims.Subject,
+		Action:       audit.ActionItemRotationRecorded,
+		ResourceType: audit.ResourceItem,
+		ResourceID:   id,
+		IPAddress:    parseIP(r.RemoteAddr),
+		UserAgent:    r.UserAgent(),
+	})
+	h.publishEvent(ws.EventItemUpdated, id, claims.Subject)
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // --- helpers ---
 
 // itemRow is the projection used by list / get queries.
@@ -686,6 +770,11 @@ type itemRow struct {
 	CreatedBy        string
 	CreatedAt        string
 	UpdatedAt        string
+
+	// Credential expiry / rotation (PR-N1).
+	ExpiresAt            *string
+	RotationIntervalDays *int
+	LastRotatedAt        *string
 }
 
 func fetchItemForUpdate(ctx context.Context, db auth.DBExec, id string) (itemRow, error) {
@@ -693,7 +782,8 @@ func fetchItemForUpdate(ctx context.Context, db auth.DBExec, id string) (itemRow
 		SELECT id::text, folder_id::text, item_type_id,
 		       name_enc, server_dek_wrapped,
 		       description,
-		       created_by::text, created_at::text, updated_at::text
+		       created_by::text, created_at::text, updated_at::text,
+		       expires_at::text, rotation_interval_days, last_rotated_at::text
 		FROM items WHERE id = $1::uuid LIMIT 1
 	`
 	var row itemRow
@@ -702,6 +792,7 @@ func fetchItemForUpdate(ctx context.Context, db auth.DBExec, id string) (itemRow
 		&row.NameEnc, &row.ServerDEKWrapped,
 		&row.Description,
 		&row.CreatedBy, &row.CreatedAt, &row.UpdatedAt,
+		&row.ExpiresAt, &row.RotationIntervalDays, &row.LastRotatedAt,
 	)
 	return row, err
 }
@@ -727,17 +818,20 @@ func fetchItemFull(ctx context.Context, db auth.DBExec, svc *auth.Service, id, u
 		return itemResponse{}, err
 	}
 	return itemResponse{
-		ID:              row.ID,
-		FolderID:        row.FolderID,
-		ItemTypeID:      row.ItemTypeID,
-		Name:            name,
-		Description:     row.Description,
-		Fields:          fields,
-		CreatedBy:       row.CreatedBy,
-		CreatedAt:       row.CreatedAt,
-		UpdatedAt:       row.UpdatedAt,
-		OwnerDEKWrapped: dekWrapped,
-		OwnerWrapNonce:  wrapNonce,
+		ID:                   row.ID,
+		FolderID:             row.FolderID,
+		ItemTypeID:           row.ItemTypeID,
+		Name:                 name,
+		Description:          row.Description,
+		Fields:               fields,
+		CreatedBy:            row.CreatedBy,
+		CreatedAt:            row.CreatedAt,
+		UpdatedAt:            row.UpdatedAt,
+		OwnerDEKWrapped:      dekWrapped,
+		OwnerWrapNonce:       wrapNonce,
+		ExpiresAt:            row.ExpiresAt,
+		RotationIntervalDays: row.RotationIntervalDays,
+		LastRotatedAt:        row.LastRotatedAt,
 	}, nil
 }
 
@@ -793,45 +887,54 @@ func fetchItemList(ctx context.Context, db auth.DBExec, folderID string, nameSea
 	if len(nameSearch) > 0 {
 		sqlText = `
 			SELECT
-			    COALESCE(array_agg(id::text                 ORDER BY name_search), '{}'),
-			    COALESCE(array_agg(folder_id::text          ORDER BY name_search), '{}'),
-			    COALESCE(array_agg(item_type_id             ORDER BY name_search), '{}'),
-			    COALESCE(array_agg(name_enc                 ORDER BY name_search), '{}'),
-			    COALESCE(array_agg(server_dek_wrapped       ORDER BY name_search), '{}'),
-			    COALESCE(array_agg(created_by::text         ORDER BY name_search), '{}'),
-			    COALESCE(array_agg(created_at::text         ORDER BY name_search), '{}'),
-			    COALESCE(array_agg(updated_at::text         ORDER BY name_search), '{}')
+			    COALESCE(array_agg(id::text                    ORDER BY name_search), '{}'),
+			    COALESCE(array_agg(folder_id::text             ORDER BY name_search), '{}'),
+			    COALESCE(array_agg(item_type_id                ORDER BY name_search), '{}'),
+			    COALESCE(array_agg(name_enc                    ORDER BY name_search), '{}'),
+			    COALESCE(array_agg(server_dek_wrapped          ORDER BY name_search), '{}'),
+			    COALESCE(array_agg(created_by::text            ORDER BY name_search), '{}'),
+			    COALESCE(array_agg(created_at::text            ORDER BY name_search), '{}'),
+			    COALESCE(array_agg(updated_at::text            ORDER BY name_search), '{}'),
+			    COALESCE(array_agg(expires_at::text            ORDER BY name_search), '{}'),
+			    COALESCE(array_agg(rotation_interval_days      ORDER BY name_search), '{}'),
+			    COALESCE(array_agg(last_rotated_at::text       ORDER BY name_search), '{}')
 			FROM items WHERE folder_id = $1::uuid AND name_search = $2
 		`
 		args = []any{folderID, nameSearch}
 	} else {
 		sqlText = `
 			SELECT
-			    COALESCE(array_agg(id::text                 ORDER BY name_search), '{}'),
-			    COALESCE(array_agg(folder_id::text          ORDER BY name_search), '{}'),
-			    COALESCE(array_agg(item_type_id             ORDER BY name_search), '{}'),
-			    COALESCE(array_agg(name_enc                 ORDER BY name_search), '{}'),
-			    COALESCE(array_agg(server_dek_wrapped       ORDER BY name_search), '{}'),
-			    COALESCE(array_agg(created_by::text         ORDER BY name_search), '{}'),
-			    COALESCE(array_agg(created_at::text         ORDER BY name_search), '{}'),
-			    COALESCE(array_agg(updated_at::text         ORDER BY name_search), '{}')
+			    COALESCE(array_agg(id::text                    ORDER BY name_search), '{}'),
+			    COALESCE(array_agg(folder_id::text             ORDER BY name_search), '{}'),
+			    COALESCE(array_agg(item_type_id                ORDER BY name_search), '{}'),
+			    COALESCE(array_agg(name_enc                    ORDER BY name_search), '{}'),
+			    COALESCE(array_agg(server_dek_wrapped          ORDER BY name_search), '{}'),
+			    COALESCE(array_agg(created_by::text            ORDER BY name_search), '{}'),
+			    COALESCE(array_agg(created_at::text            ORDER BY name_search), '{}'),
+			    COALESCE(array_agg(updated_at::text            ORDER BY name_search), '{}'),
+			    COALESCE(array_agg(expires_at::text            ORDER BY name_search), '{}'),
+			    COALESCE(array_agg(rotation_interval_days      ORDER BY name_search), '{}'),
+			    COALESCE(array_agg(last_rotated_at::text       ORDER BY name_search), '{}')
 			FROM items WHERE folder_id = $1::uuid
 		`
 		args = []any{folderID}
 	}
 
 	var ids, folderIDs, createdBys, createdAts, updatedAts []string
+	var expiresAts, lastRotatedAts []*string
 	var typeIDs []int16
+	var rotIntervals []*int
 	var nameEncs, dekWraps [][]byte
 	if err := db.QueryRow(ctx, sqlText, args...).Scan(
 		&ids, &folderIDs, &typeIDs, &nameEncs, &dekWraps,
 		&createdBys, &createdAts, &updatedAts,
+		&expiresAts, &rotIntervals, &lastRotatedAts,
 	); err != nil {
 		return nil, err
 	}
 	out := make([]itemRow, 0, len(ids))
 	for i := range ids {
-		out = append(out, itemRow{
+		row := itemRow{
 			ID:               ids[i],
 			FolderID:         folderIDs[i],
 			ItemTypeID:       typeIDs[i],
@@ -840,7 +943,17 @@ func fetchItemList(ctx context.Context, db auth.DBExec, folderID string, nameSea
 			CreatedBy:        createdBys[i],
 			CreatedAt:        createdAts[i],
 			UpdatedAt:        updatedAts[i],
-		})
+		}
+		if i < len(expiresAts) {
+			row.ExpiresAt = expiresAts[i]
+		}
+		if i < len(rotIntervals) {
+			row.RotationIntervalDays = rotIntervals[i]
+		}
+		if i < len(lastRotatedAts) {
+			row.LastRotatedAt = lastRotatedAts[i]
+		}
+		out = append(out, row)
 	}
 	return out, nil
 }

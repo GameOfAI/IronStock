@@ -10,6 +10,7 @@ import { useState } from 'react';
 import { Eye, EyeOff, Lock, Loader2, Copy, Check } from 'lucide-react';
 import type { FieldDefinition, ItemFieldOutput } from '@/api/types';
 import { cn } from '@/lib/cn';
+import { FieldVersionsDialog } from './field-versions-dialog';
 
 interface ItemFieldRowProps {
   field: ItemFieldOutput;
@@ -17,6 +18,8 @@ interface ItemFieldRowProps {
   /** Decrypted plaintext value, or null when not (yet) available. */
   decryptedValue: string | null;
   decryptionStatus: 'idle' | 'pending' | 'success' | 'error';
+  /** Item UUID — passed to FieldVersionsDialog for history (PR-N2). */
+  itemId?: string;
 }
 
 const MASK = '••••••••••';
@@ -26,6 +29,7 @@ export function ItemFieldRow({
   definition,
   decryptedValue,
   decryptionStatus,
+  itemId,
 }: ItemFieldRowProps) {
   const label = definition?.label ?? `field:${field.field_definition_id}`;
   const key = definition?.key;
@@ -52,7 +56,7 @@ export function ItemFieldRow({
   const showLock = decryptionStatus === 'error' || decryptionStatus === 'idle';
 
   return (
-    <div className="grid grid-cols-[140px_1fr] items-start gap-3 border-b py-2 last:border-b-0">
+    <div className="group grid grid-cols-[140px_1fr] items-start gap-3 border-b py-2 last:border-b-0">
       <div className="space-y-0.5">
         <div className="text-sm font-medium">{label}</div>
         {key ? (
@@ -89,6 +93,13 @@ export function ItemFieldRow({
               {visible ? decryptedValue : MASK}
             </span>
             <div className="ml-auto flex items-center gap-1">
+              {itemId && (
+                <FieldVersionsDialog
+                  itemId={itemId}
+                  fieldDefId={field.field_definition_id}
+                  fieldLabel={label}
+                />
+              )}
               <button
                 type="button"
                 aria-label={visible ? 'Gizle' : 'Göster'}
