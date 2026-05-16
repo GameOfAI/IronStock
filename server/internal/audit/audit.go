@@ -75,7 +75,16 @@ const (
 
 	// Admin TOTP reset (PR-F2a).
 	ActionAdminTOTPReset = "admin.totp_reset"
+
+	// Group lifecycle (PR-F6a).
+	ActionGroupCreated       = "group.created"
+	ActionGroupDeleted       = "group.deleted"
+	ActionGroupMemberAdded   = "group.member_added"
+	ActionGroupMemberRemoved = "group.member_removed"
 )
+
+// ResourceGroup is the audit resource type for group rows.
+const ResourceGroup = "group"
 
 // ResourceFolder is the audit resource type for folder rows.
 const ResourceFolder = "folder"

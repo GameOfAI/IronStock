@@ -18,6 +18,7 @@ import RecoverPage from '@/pages/recover';
 import InventoryPage from '@/pages/inventory';
 import AdminUsersPage, { AdminAuditLogPage } from '@/pages/admin';
 import AdminRolesPage from '@/pages/admin/roles';
+import AdminGroupsPage from '@/pages/admin/groups';
 import AdminSetupPage from '@/pages/admin-setup';
 import AdminLoginPage from '@/pages/admin-login';
 import ChangePasswordPage from '@/pages/change-password';
@@ -96,6 +97,7 @@ export default function App() {
                   <Route element={<RoleGate role="admin" />}>
                     <Route path="/admin/users" element={<AdminUsersPage />} />
                     <Route path="/admin/roles" element={<AdminRolesPage />} />
+                    <Route path="/admin/groups" element={<AdminGroupsPage />} />
                     <Route path="/admin/audit-log" element={<AdminAuditLogPage />} />
                   </Route>
                 </Route>

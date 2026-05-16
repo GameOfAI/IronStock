@@ -31,6 +31,7 @@ import {
   Loader2,
   ShieldAlert,
   UserCircle,
+  Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ChangePasswordDialog } from '@/components/change-password-dialog';
@@ -265,6 +266,12 @@ export function AppShell() {
                   to="/admin/users"
                   icon={Shield}
                   label="Kullanıcılar"
+                  collapsed={sidebarCollapsed && !mobileOpen}
+                />
+                <NavItem
+                  to="/admin/groups"
+                  icon={Users}
+                  label="Gruplar"
                   collapsed={sidebarCollapsed && !mobileOpen}
                 />
                 <NavItem

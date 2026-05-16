@@ -324,6 +324,49 @@ export interface MyKeypairResponse {
   rotated_at?: string | null;
 }
 
+// --- Groups (PR-F6a) ---
+
+export interface Group {
+  id: string;
+  name: string;
+  description?: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  member_count: number;
+}
+
+export interface GroupListResponse {
+  groups: Group[];
+  total: number;
+}
+
+export interface GroupMember {
+  user_id: string;
+  username: string;
+  added_by?: string;
+  added_at: string;
+}
+
+export interface GroupMembersResponse {
+  members: GroupMember[];
+}
+
+export interface CreateGroupRequest {
+  name: string;
+  description?: string;
+}
+
+export interface AddGroupMemberRequest {
+  user_id: string;
+}
+
+export interface GrantFolderGroupPermissionRequest {
+  folder_id: string;
+  permission: 'read' | 'write';
+  inherit_to_children: boolean;
+}
+
 // --- Attachments (PR-A2) ---
 
 export interface Attachment {

@@ -145,6 +145,11 @@ func run() error {
 		Audit:   auditWriter,
 		Logger:  logger,
 	}
+	groupHandlers := &httpapi.GroupHandlers{
+		Service: authSvc,
+		Audit:   auditWriter,
+		Logger:  logger,
+	}
 	catalogHandlers := &httpapi.CatalogHandlers{
 		Service: authSvc,
 		Logger:  logger,
@@ -197,6 +202,7 @@ func run() error {
 		Item:       itemHandlers,
 		Attachment: attachmentHandlers,
 		Admin:      adminHandlers,
+		Group:      groupHandlers,
 		Catalog:    catalogHandlers,
 		WS:         wsHandlers,
 	})

@@ -39,6 +39,7 @@ type Deps struct {
 	Item       *ItemHandlers
 	Attachment *AttachmentHandlers
 	Admin      *AdminHandlers
+	Group      *GroupHandlers
 	Catalog    *CatalogHandlers
 	WS         *WSHandlers
 }
@@ -206,6 +207,24 @@ func NewRouter(d Deps) http.Handler {
 			ar.Get("/audit-log", d.Admin.QueryAuditLog)
 			// Admin TOTP reset (PR-F2a).
 			ar.Post("/users/{id}/totp/reset", d.Admin.AdminResetTOTP)
+		})
+	}
+
+	// Group routes — admin only (PR-F6a).
+	if d.Group != nil && d.Auth != nil {
+		r.Route("/api/v1/admin/groups", func(gr chi.Router) {
+			gr.Use(timeoutMW)
+			gr.Use(RequireAccessToken(d.Auth.Service.JWT))
+			gr.Use(RequireRole(RoleAdmin))
+			gr.Get("/", d.Group.ListGroups)
+			gr.Post("/", d.Group.CreateGroup)
+			gr.Get("/{id}", d.Group.GetGroup)
+			gr.Delete("/{id}", d.Group.DeleteGroup)
+			gr.Get("/{id}/members", d.Group.ListGroupMembers)
+			gr.Post("/{id}/members", d.Group.AddGroupMember)
+			gr.Delete("/{id}/members/{user_id}", d.Group.RemoveGroupMember)
+			gr.Post("/{id}/folder-permissions", d.Group.GrantFolderGroupPermission)
+			gr.Delete("/{id}/folder-permissions/{folder_id}", d.Group.RevokeFolderGroupPermission)
 		})
 	}
 
