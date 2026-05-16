@@ -71,7 +71,23 @@ Kapsamlı Geliştirme Planı (plan dosyasına göre) başlatıldı. Bu session'd
 - Web: `/profile` sayfası — TOTP durum kartı, devre dışı dialog (şifre onayı), backup regenerate dialog, UserCircle nav butonu AppShell'de
 - Fix: `LoginRequest.totp_code` optional yapıldı; `ws.test.ts` no-arg WsClient constructor'a güncellendi
 
-**Sıradaki:** PR-F4 (Smart Item Type Fields — grouped, enum selects)
+**PR-F4: Smart Item Type Fields** ✅
+- Migration 00022: `item_types.field_groups JSONB`, `ssl_mode` enum field, server/database/ssh_key/url/cert/cloud type updates
+- Server: `ListItemTypes` response includes `field_groups`
+- Web: grouped field rendering under named section headers in ItemFormModal; flat fallback for legacy types
+
+**PR-F6a: Groups + folder_group_permissions** ✅
+- Migration 00023: `groups`, `group_members`, `folder_group_permissions` tables
+- Server: `GroupHandlers` — CRUD + member management + folder-permission grant/revoke (9 routes)
+- Audit: group.created/deleted/member_added/member_removed constants
+- Web: `/admin/groups` page (list, create dialog, member management, delete), nav item, API hooks
+
+**PR-F6b: Group-based folder visibility** ✅
+- `ResolveFolderPermission` CTE extended with UNION-based perms CTE
+- Adds group ACL path: `folder_group_permissions` JOIN `group_members` → same bool_or aggregation
+- All server tests pass
+
+**Sıradaki:** PR-N1 (Credential Expiry/TTL) veya PR-N2 (Secret Versioning)
 
 ### 2026-04-28 (Win) — Faz 5 kapandı: PR-A1/A2/P1/V1 merged — v1.0.0 🎉
 
