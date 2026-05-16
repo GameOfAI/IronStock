@@ -21,6 +21,7 @@ export interface BootstrapLoginResponse {
   token_type: string;
   user_id: string;
   roles: string[];
+  must_change_password?: boolean;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

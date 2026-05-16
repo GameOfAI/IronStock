@@ -1,5 +1,5 @@
 /**
- * WebSocket client — realtime event bus (PR-W6).
+ * WebSocket client — realtime event bus (PR-W6, güncellendi PR-RT-1).
  *
  * Server sends minimal JSON events:
  *   { type, resource_id, actor_user_id?, timestamp }
@@ -11,10 +11,15 @@
  * Reconnect: exponential backoff (1s → 2 → 4 → 8 → 16 → 30s cap).
  * Connection lifecycle is managed by WsProvider (src/components/ws-provider.tsx).
  *
- * Auth: browser WebSocket can't send Authorization header → token goes in
- * ?access_token= query param. Server ws_handler.go supports both paths.
+ * Auth (PR-RT-1): browser WebSocket can't send Authorization header, and
+ * putting the access token in ?access_token= exposes it in proxy/CDN logs.
+ * Instead we fetch a short-lived single-use ticket (POST /api/v1/ws/ticket)
+ * using the normal Bearer token flow, then pass ?ticket= on the WS URL.
+ * Tickets are 32-byte random, 30-second TTL, consumed on first use.
+ * A fresh ticket is fetched on every (re-)connect attempt.
  */
 
+import { getAccessToken } from './token-storage';
 import { queryClient, queryKeys } from './query';
 
 export type WsStatus = 'connecting' | 'connected' | 'reconnecting' | 'offline';
@@ -34,6 +39,32 @@ const SUBPROTOCOL = 'envanter.v1';
 
 function backoffDelay(attempt: number): number {
   return Math.min(BACKOFF_BASE_MS * 2 ** attempt, BACKOFF_MAX_MS);
+}
+
+/**
+ * Fetch a single-use WS ticket via the REST ticket endpoint.
+ * Uses the in-memory access token (from token-storage) directly so we
+ * don't need to inject the token again — same Bearer flow as apiFetch.
+ */
+async function fetchWsTicket(): Promise<string> {
+  const accessToken = getAccessToken();
+  if (!accessToken) throw new Error('Oturum yok — ticket alınamadı');
+
+  const res = await fetch('/api/v1/ws/ticket', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) {
+    throw new Error(`Ticket endpoint hatası: ${res.status}`);
+  }
+  const body = (await res.json()) as { ticket: string };
+  return body.ticket;
+}
+
+function buildWsUrl(ticket: string): string {
+  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const host = window.location.host;
+  return `${proto}//${host}/api/v1/ws?ticket=${encodeURIComponent(ticket)}`;
 }
 
 function handleEvent(ev: WsEvent) {
@@ -63,7 +94,6 @@ function handleEvent(ev: WsEvent) {
 }
 
 export class WsClient {
-  private url: string;
   private socket: WebSocket | null = null;
   private attempt = 0;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -71,12 +101,9 @@ export class WsClient {
   private statusListeners: Set<StatusListener> = new Set();
   private status: WsStatus = 'connecting';
 
-  constructor(accessToken: string) {
-    // Use relative WS URL so Vite proxy handles it in dev, and same-origin
-    // works in production. Protocol matches page protocol.
-    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
-    this.url = `${proto}//${host}/api/v1/ws?access_token=${encodeURIComponent(accessToken)}`;
+  constructor() {
+    // Kick off async ticket fetch + connect immediately.
+    // Status starts as 'connecting' so the UI shows the right indicator.
     this.connect();
   }
 
@@ -94,12 +121,25 @@ export class WsClient {
     return () => this.statusListeners.delete(cb);
   }
 
-  private connect() {
+  private async connect() {
     if (this.destroyed) return;
     this.setStatus(this.attempt === 0 ? 'connecting' : 'reconnecting');
 
+    // Fetch a fresh single-use ticket for this connect attempt.
+    let ticket: string;
     try {
-      this.socket = new WebSocket(this.url, [SUBPROTOCOL]);
+      ticket = await fetchWsTicket();
+    } catch {
+      // Ticket fetch failed (e.g. network error, access token expired).
+      // Schedule reconnect; the refresh interceptor will renew the token.
+      this.scheduleReconnect();
+      return;
+    }
+
+    if (this.destroyed) return; // may have been destroyed while fetching ticket
+
+    try {
+      this.socket = new WebSocket(buildWsUrl(ticket), [SUBPROTOCOL]);
     } catch {
       this.scheduleReconnect();
       return;

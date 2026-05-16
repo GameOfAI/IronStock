@@ -95,10 +95,18 @@ func NewRouter(d Deps) http.Handler {
 	// /metrics is internal-only; restricted at the network layer (NetworkPolicy).
 	r.Get("/metrics", metrics.Handler().ServeHTTP)
 
-	// WebSocket route mounted BEFORE timeout-wrapped groups; the long-lived
+	// WebSocket routes.
+	// GET /ws must be mounted BEFORE timeout-wrapped groups; the long-lived
 	// connection must not be wrapped by http.TimeoutHandler.
+	// POST /ws/ticket is a short REST call — it IS timeout-wrapped.
 	if d.WS != nil {
 		r.Get("/api/v1/ws", d.WS.Connect)
+		// Ticket endpoint: short-lived, subject to timeout + auth middleware.
+		// d.Auth is always non-nil when d.WS is non-nil (main.go wires both together).
+		if d.Auth != nil {
+			r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+				Post("/api/v1/ws/ticket", d.WS.IssueTicket)
+		}
 	}
 
 	// Auth routes — only mounted when auth deps are provided.
@@ -185,6 +193,7 @@ func NewRouter(d Deps) http.Handler {
 			ar.Use(RequireAccessToken(d.Auth.Service.JWT))
 			ar.Use(RequireRole(RoleAdmin))
 			ar.Get("/users", d.Admin.ListUsers)
+			ar.Post("/users", d.Admin.CreateUser)
 			ar.Post("/users/{id}/disable", d.Admin.DisableUser)
 			ar.Post("/users/{id}/enable", d.Admin.EnableUser)
 			ar.Post("/users/{id}/roles", d.Admin.GrantRole)

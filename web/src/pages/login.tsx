@@ -1,11 +1,11 @@
 /**
  * Login page.
  *
- * Single-step server flow (POST /auth/login takes username + password +
- * totp_code together) + client-side KEK derive afterwards:
+ * Two-phase flow:
+ *   Phase 1: username + password only.
+ *   Phase 2: if server returns mfa_required, show TOTP field and retry.
  *
- *   1. Form submit
- *   2. POST /auth/login           → access + refresh + user
+ * After server auth:
  *   3. GET /users/me/keypair      → keypair material
  *   4. Argon2id(master_pwd, kek_salt, kek_params)
  *   5. AES-GCM-decrypt(private_key_enc, KEK)
@@ -26,9 +26,10 @@ import { useToast } from '@/hooks/use-toast';
 import { useLoginMutation } from '@/api/auth';
 import { fetchMyKeypair } from '@/api/me';
 import { useAuthStore } from '@/store/auth';
+import type { SessionUser } from '@/store/auth';
 import { decryptPrivateKey, deriveKEK, fromBase64 } from '@/lib/crypto';
 import type { KEKParams } from '@/lib/crypto';
-import { ApiError } from '@/api/errors';
+import { ApiError, ErrCode } from '@/api/errors';
 
 type Substep = 'idle' | 'authenticating' | 'fetching_keypair' | 'deriving_key' | 'unlocking';
 
@@ -52,11 +53,13 @@ export default function LoginPage() {
   const location = useLocation();
   const { toast } = useToast();
   const setSession = useAuthStore((s) => s.setSession);
+  const setBootstrapSession = useAuthStore((s) => s.setBootstrapSession);
   const loginMut = useLoginMutation();
 
   const [username, setUsername] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [totpCode, setTotpCode] = React.useState('');
+  const [totpRequired, setTotpRequired] = React.useState(false);
   const [substep, setSubstep] = React.useState<Substep>('idle');
 
   const busy = substep !== 'idle';
@@ -65,10 +68,18 @@ export default function LoginPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (busy) return;
-    if (!username || !password || !totpCode) {
+    if (!username || !password) {
       toast({
         title: 'Eksik alan',
-        description: 'Kullanıcı adı, şifre ve TOTP kodu zorunlu.',
+        description: 'Kullanıcı adı ve şifre zorunlu.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (totpRequired && !totpCode) {
+      toast({
+        title: 'Eksik alan',
+        description: '2FA kodu zorunlu.',
         variant: 'destructive',
       });
       return;
@@ -80,41 +91,65 @@ export default function LoginPage() {
       const loginRes = await loginMut.mutateAsync({
         username: username.toLowerCase(),
         master_password: password,
-        totp_code: totpCode,
+        totp_code: totpCode || undefined,
       });
 
       // Step 3: keypair fetch (uses fresh access token, not yet in store)
       setSubstep('fetching_keypair');
       const keypair = await fetchMyKeypair(loginRes.access_token);
 
-      // Step 4: KEK derive (heavy, await spinner)
-      setSubstep('deriving_key');
-      const kekSalt = fromBase64(keypair.kek_salt);
-      const kekParams = keypair.kek_params as unknown as KEKParams;
-      const kek = await deriveKEK(password, kekSalt, kekParams);
+      const sessionUser: SessionUser = {
+        id: loginRes.user_id,
+        username,
+        roles: loginRes.roles,
+      };
 
-      // Step 5: decrypt priv key
-      setSubstep('unlocking');
-      const privateKeyEnc = fromBase64(keypair.private_key_enc);
-      const privateKey = await decryptPrivateKey(privateKeyEnc, kek);
+      const kekParams = keypair.kek_params as unknown as KEKParams & { alg?: string };
 
-      // Step 6: hydrate store
-      setSession({
-        user: {
-          id: loginRes.user_id,
-          username,
-          roles: loginRes.roles,
-        },
-        accessToken: loginRes.access_token,
-        refreshToken: loginRes.refresh_token,
-        kek,
-        privateKey,
-      });
+      if (kekParams?.alg === 'none') {
+        // Bootstrap admin: placeholder keypair — skip KEK derivation.
+        setBootstrapSession({
+          user: sessionUser,
+          accessToken: loginRes.access_token,
+          refreshToken: loginRes.refresh_token,
+          mustChangePassword: loginRes.must_change_password,
+        });
+      } else {
+        // Step 4: KEK derive (heavy, await spinner)
+        setSubstep('deriving_key');
+        const kekSalt = fromBase64(keypair.kek_salt);
+        const kek = await deriveKEK(password, kekSalt, kekParams);
 
-      // Step 7: navigate
+        // Step 5: decrypt priv key
+        setSubstep('unlocking');
+        const privateKeyEnc = fromBase64(keypair.private_key_enc);
+        const privateKey = await decryptPrivateKey(privateKeyEnc, kek);
+
+        // Step 6: hydrate store
+        setSession({
+          user: sessionUser,
+          accessToken: loginRes.access_token,
+          refreshToken: loginRes.refresh_token,
+          kek,
+          privateKey,
+          mustChangePassword: loginRes.must_change_password,
+        });
+      }
+
+      // Step 7: navigate (MustChangePasswordGate will redirect if must_change_password)
       navigate(fromPath ?? '/inventory', { replace: true });
     } catch (err) {
       setSubstep('idle');
+      // If server says 2FA is required, reveal the TOTP field and let user retry.
+      if (err instanceof ApiError && err.code === ErrCode.MFARequired) {
+        setTotpRequired(true);
+        setTotpCode('');
+        toast({
+          title: '2FA Gerekli',
+          description: 'Bu hesap için kimlik doğrulama kodu gerekli.',
+        });
+        return;
+      }
       const msg =
         err instanceof ApiError
           ? err.message
@@ -134,7 +169,11 @@ export default function LoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Envanter Girişi</CardTitle>
-          <CardDescription>Kullanıcı adınız, master parolanız ve TOTP kodunuz.</CardDescription>
+          <CardDescription>
+            {totpRequired
+              ? 'Hesabınızda 2FA aktif. Kimlik doğrulama kodunuzu girin.'
+              : 'Kullanıcı adınız ve master parolanızla giriş yapın.'}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="flex flex-col gap-4">
@@ -164,20 +203,23 @@ export default function LoginPage() {
               />
             </div>
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="totp">TOTP Kodu</Label>
-              <Input
-                id="totp"
-                inputMode="numeric"
-                pattern="[0-9]{6}"
-                maxLength={8}
-                value={totpCode}
-                onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))}
-                placeholder="123456"
-                required
-                disabled={busy}
-              />
-            </div>
+            {totpRequired && (
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="totp">2FA Kodu</Label>
+                <Input
+                  id="totp"
+                  inputMode="numeric"
+                  pattern="[0-9]{6}"
+                  maxLength={8}
+                  value={totpCode}
+                  onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))}
+                  placeholder="123456"
+                  autoFocus
+                  required
+                  disabled={busy}
+                />
+              </div>
+            )}
 
             <Button type="submit" disabled={busy} className="mt-2">
               {substepLabel(substep)}

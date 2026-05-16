@@ -8,7 +8,7 @@ import { useAuthStore } from '@/store/auth';
 import { ThemeProvider } from '@/components/layout/theme-provider';
 import { AppShell } from '@/components/layout/app-shell';
 import { Toaster } from '@/components/ui/toaster';
-import { AuthGate, RoleGate } from '@/routes/auth-gate';
+import { AuthGate, MustChangePasswordGate, RoleGate } from '@/routes/auth-gate';
 import { WsProvider } from '@/components/ws-provider';
 
 import LoginPage from '@/pages/login';
@@ -17,8 +17,10 @@ import TOTPSetupPage from '@/pages/totp-setup';
 import RecoverPage from '@/pages/recover';
 import InventoryPage from '@/pages/inventory';
 import AdminUsersPage, { AdminAuditLogPage } from '@/pages/admin';
+import AdminRolesPage from '@/pages/admin/roles';
 import AdminSetupPage from '@/pages/admin-setup';
 import AdminLoginPage from '@/pages/admin-login';
+import ChangePasswordPage from '@/pages/change-password';
 import NotFoundPage from '@/pages/not-found';
 
 /**
@@ -78,17 +80,24 @@ export default function App() {
 
             {/* Authenticated — WsProvider starts WebSocket after login */}
             <Route element={<AuthGate />}>
-              <Route element={<WsProvider><Outlet /></WsProvider>}>
-              <Route element={<AppShell />}>
-                <Route index element={<Navigate to="/inventory" replace />} />
-                <Route path="/inventory/*" element={<InventoryPage />} />
+              {/* Zorunlu şifre değiştirme — MustChangePasswordGate'ten önce erişilebilir */}
+              <Route path="/change-password" element={<ChangePasswordPage />} />
 
-                {/* Admin */}
-                <Route element={<RoleGate role="admin" />}>
-                  <Route path="/admin/users" element={<AdminUsersPage />} />
-                  <Route path="/admin/audit-log" element={<AdminAuditLogPage />} />
+              {/* MustChangePasswordGate: must_change_password=true ise /change-password'e yönlendirir */}
+              <Route element={<MustChangePasswordGate />}>
+                <Route element={<WsProvider><Outlet /></WsProvider>}>
+                <Route element={<AppShell />}>
+                  <Route index element={<Navigate to="/inventory" replace />} />
+                  <Route path="/inventory/*" element={<InventoryPage />} />
+
+                  {/* Admin */}
+                  <Route element={<RoleGate role="admin" />}>
+                    <Route path="/admin/users" element={<AdminUsersPage />} />
+                    <Route path="/admin/roles" element={<AdminRolesPage />} />
+                    <Route path="/admin/audit-log" element={<AdminAuditLogPage />} />
+                  </Route>
                 </Route>
-              </Route>
+                </Route>
               </Route>
             </Route>
 

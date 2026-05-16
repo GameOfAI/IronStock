@@ -113,7 +113,8 @@ func (s *AuthHandlers) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		SET password_hash = $2,
 		    argon2_params = $3,
 		    failed_login_attempts = 0,
-		    locked_until = NULL
+		    locked_until = NULL,
+		    must_change_password = false
 		WHERE id = $1::uuid
 	`
 	if _, err := tx.Exec(ctx, updateUserSQL, claims.Subject, hp.Hash, hp.ParamsJSON); err != nil {

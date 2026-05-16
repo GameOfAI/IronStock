@@ -7,14 +7,20 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 
 	"envanter.app/server/internal/audit"
 	"envanter.app/server/internal/auth"
@@ -103,9 +109,24 @@ func run() error {
 	if cfg.BootstrapEnabled {
 		logger.Warn("BOOTSTRAP MODE ENABLED — /api/v1/auth/bootstrap is active (TOTP bypassed)")
 	}
-	// --- WebSocket hub (created early so handlers can attach Publish) ---
+	// --- WebSocket hub + ticket store ---
 	hub := ws.NewHub(logger)
 	defer hub.Close()
+	// TicketStore enables secure WS auth without putting access tokens in URLs.
+	// Periodic cleanup runs inside the goroutine below.
+	tickets := ws.NewTicketStore()
+	go func() {
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-rootCtx.Done():
+				return
+			case <-ticker.C:
+				tickets.Cleanup()
+			}
+		}
+	}()
 
 	folderHandlers := &httpapi.FolderHandlers{
 		Service: authSvc,
@@ -131,6 +152,7 @@ func run() error {
 	wsHandlers := &httpapi.WSHandlers{
 		Service: authSvc,
 		Hub:     hub,
+		Tickets: tickets,
 		Logger:  logger,
 	}
 
@@ -159,6 +181,11 @@ func run() error {
 		}
 	} else {
 		logger.Info("minio credentials not set — attachment endpoints disabled")
+	}
+
+	// --- Seed default admin (first-run only) ---
+	if err := ensureDefaultAdmin(rootCtx, authSvc, auditWriter, cfg, logger); err != nil {
+		return fmt.Errorf("ensure default admin: %w", err)
 	}
 
 	// --- HTTP layer ---
@@ -207,5 +234,151 @@ func run() error {
 		return err
 	}
 	logger.Info("shutdown complete")
+	return nil
+}
+
+// ensureDefaultAdmin creates a default admin user on the very first startup
+// if no user with the 'admin' role exists.
+//
+// The created user:
+//   - username: "admin", email: "admin@localhost"
+//   - status: active, must_change_password: true
+//   - role: admin
+//   - password: ENVANTER_DEFAULT_ADMIN_PASSWORD env var, or random if unset
+//
+// A random password is printed to stdout ONCE — this is intentional.
+// The operator must change it immediately (the UI enforces this via
+// must_change_password = true which blocks all routes until changed).
+//
+// This is NOT the bootstrap mechanism (ADR-0010). Bootstrap is for
+// emergency access. ensureDefaultAdmin is for first-run convenience.
+func ensureDefaultAdmin(
+	ctx context.Context,
+	svc *auth.Service,
+	aw *audit.Writer,
+	cfg *config.Config,
+	logger *slog.Logger,
+) error {
+	// Check whether any admin user already exists.
+	var adminCount int
+	err := svc.DB.QueryRow(ctx, `
+		SELECT count(*)
+		FROM user_roles ur
+		JOIN roles r ON r.id = ur.role_id
+		WHERE r.name = 'admin'
+	`).Scan(&adminCount)
+	if err != nil {
+		return fmt.Errorf("count admin users: %w", err)
+	}
+	if adminCount > 0 {
+		// Admin already exists — nothing to do.
+		return nil
+	}
+
+	// Determine password.
+	password := cfg.DefaultAdminPassword
+	if password == "" {
+		// Generate a random 16-byte (32 hex char) temporary password.
+		b := make([]byte, 16)
+		if _, err := rand.Read(b); err != nil {
+			return fmt.Errorf("generate random password: %w", err)
+		}
+		password = hex.EncodeToString(b)
+		fmt.Printf("\n"+
+			"╔══════════════════════════════════════════════════════╗\n"+
+			"║          VARSAYILAN ADMİN ŞİFRESİ (tek seferlik)    ║\n"+
+			"║                                                      ║\n"+
+			"║  Kullanıcı adı: admin                                ║\n"+
+			"║  Şifre:         %-36s║\n"+
+			"║                                                      ║\n"+
+			"║  İlk girişten sonra şifrenizi değiştirmeniz          ║\n"+
+			"║  zorunludur. Bu şifreyi güvende tutun.               ║\n"+
+			"╚══════════════════════════════════════════════════════╝\n\n",
+			password+" ",
+		)
+	}
+
+	hp, err := auth.HashPassword(password)
+	if err != nil {
+		return fmt.Errorf("hash password: %w", err)
+	}
+
+	tx, err := svc.DB.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	// Check for existing user named "admin" (edge case: admin user without role).
+	var existingID string
+	err = tx.QueryRow(ctx, `SELECT id::text FROM users WHERE username = 'admin' LIMIT 1`).Scan(&existingID)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return fmt.Errorf("check existing admin user: %w", err)
+	}
+
+	var userID string
+	if existingID != "" {
+		// User exists without admin role — just grant admin role below.
+		userID = existingID
+	} else {
+		// Create the admin user.
+		err = tx.QueryRow(ctx, `
+			INSERT INTO users (username, email, password_hash, argon2_params, status, must_change_password)
+			VALUES ('admin', 'admin@localhost', $1, $2, 'active', true)
+			RETURNING id::text
+		`, hp.Hash, hp.ParamsJSON).Scan(&userID)
+		if err != nil {
+			return fmt.Errorf("insert admin user: %w", err)
+		}
+
+		// Persist Argon2 salt inside argon2_params jsonb (same pattern as
+		// httpapi.persistArgon2Salt — duplicated here to avoid a circular import).
+		// Must be base64 — extractSaltFromParams uses base64.StdEncoding.DecodeString.
+		saltB64 := base64.StdEncoding.EncodeToString(hp.Salt)
+		if _, err := tx.Exec(ctx, `
+			UPDATE users
+			SET argon2_params = argon2_params || jsonb_build_object('salt_b64', $2::text)
+			WHERE id = $1::uuid
+		`, userID, saltB64); err != nil {
+			return fmt.Errorf("persist argon2 salt: %w", err)
+		}
+
+		// Placeholder keypair (same as admin-created user pattern).
+		placeholderKEKParams := []byte(`{"alg":"none","note":"seed-admin-placeholder"}`)
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO user_keypairs (user_id, public_key, private_key_enc, kek_salt, kek_params)
+			VALUES ($1, $2, $3, $4, $5)
+		`, userID, make([]byte, 32), make([]byte, 1), make([]byte, 16), placeholderKEKParams); err != nil {
+			return fmt.Errorf("insert placeholder keypair: %w", err)
+		}
+	}
+
+	// Grant admin role.
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO user_roles (user_id, role_id)
+		SELECT $1::uuid, r.id FROM roles r WHERE r.name = 'admin'
+		ON CONFLICT DO NOTHING
+	`, userID); err != nil {
+		return fmt.Errorf("grant admin role: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit: %w", err)
+	}
+
+	_ = aw.Write(ctx, audit.Entry{
+		ActorUserID:  "",
+		Action:       audit.ActionAuthBootstrapSetup, // closest semantic; dedicated constant Faz 6'da
+		ResourceType: audit.ResourceUser,
+		ResourceID:   userID,
+		Details:      map[string]any{"note": "seed default admin created on first run"},
+	})
+
+	logger.Info("seed default admin created",
+		slog.String("username", "admin"),
+		slog.String("user_id", userID),
+		slog.Bool("must_change_password", true),
+		slog.Bool("password_from_env", strings.TrimSpace(cfg.DefaultAdminPassword) != ""),
+	)
 	return nil
 }

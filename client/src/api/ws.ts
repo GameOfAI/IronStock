@@ -2,9 +2,14 @@
  * WebSocket client — web/src/api/ws.ts ile aynı mantık.
  * Fark: URL, sabit `window.location.host` yerine `getBaseUrl()` ile inşa edilir.
  * Tauri app farklı sunuculara bağlanabilir; WS endpointi de aynı base URL'e gider.
+ *
+ * Auth (PR-RT-1): ticket-based flow. Her (re-)connect öncesinde
+ * POST {baseUrl}/api/v1/ws/ticket çağrısı yapılır, tek kullanımlık
+ * kısa-ömürlü ticket WS URL'ine eklenir. Access token URL'de yer almaz.
  */
 
 import { getBaseUrl } from './client';
+import { getAccessToken } from './token-storage';
 import { queryClient, queryKeys } from './query';
 
 export type WsStatus = 'connecting' | 'connected' | 'reconnecting' | 'offline';
@@ -26,11 +31,29 @@ function backoffDelay(attempt: number): number {
   return Math.min(BACKOFF_BASE_MS * 2 ** attempt, BACKOFF_MAX_MS);
 }
 
-function buildWsUrl(accessToken: string): string {
-  const base = getBaseUrl(); // e.g. "https://ironstock.example.com"
+async function fetchWsTicket(): Promise<string> {
+  const base = getBaseUrl();
+  if (!base) throw new Error('Base URL ayarlanmamış');
+
+  const accessToken = getAccessToken();
+  if (!accessToken) throw new Error('Oturum yok — ticket alınamadı');
+
+  const res = await fetch(`${base}/api/v1/ws/ticket`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) {
+    throw new Error(`Ticket endpoint hatası: ${res.status}`);
+  }
+  const body = (await res.json()) as { ticket: string };
+  return body.ticket;
+}
+
+function buildWsUrl(ticket: string): string {
+  const base = getBaseUrl();
   const wsProto = base.startsWith('https://') ? 'wss://' : 'ws://';
   const withoutProto = base.replace(/^https?:\/\//, '');
-  return `${wsProto}${withoutProto}/api/v1/ws?access_token=${encodeURIComponent(accessToken)}`;
+  return `${wsProto}${withoutProto}/api/v1/ws?ticket=${encodeURIComponent(ticket)}`;
 }
 
 function handleEvent(ev: WsEvent) {
@@ -56,7 +79,6 @@ function handleEvent(ev: WsEvent) {
 }
 
 export class WsClient {
-  private url: string;
   private socket: WebSocket | null = null;
   private attempt = 0;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -64,8 +86,7 @@ export class WsClient {
   private statusListeners: Set<StatusListener> = new Set();
   private status: WsStatus = 'connecting';
 
-  constructor(accessToken: string) {
-    this.url = buildWsUrl(accessToken);
+  constructor() {
     this.connect();
   }
 
@@ -83,12 +104,22 @@ export class WsClient {
     return () => this.statusListeners.delete(cb);
   }
 
-  private connect() {
+  private async connect() {
     if (this.destroyed) return;
     this.setStatus(this.attempt === 0 ? 'connecting' : 'reconnecting');
 
+    let ticket: string;
     try {
-      this.socket = new WebSocket(this.url, [SUBPROTOCOL]);
+      ticket = await fetchWsTicket();
+    } catch {
+      this.scheduleReconnect();
+      return;
+    }
+
+    if (this.destroyed) return;
+
+    try {
+      this.socket = new WebSocket(buildWsUrl(ticket), [SUBPROTOCOL]);
     } catch {
       this.scheduleReconnect();
       return;

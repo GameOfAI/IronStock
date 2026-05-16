@@ -6,6 +6,9 @@
  *  - not authed: redirect to /login (preserve intended path in state)
  *  - authed:    render <Outlet />
  *
+ * MustChangePasswordGate blocks all child routes until the user changes
+ * their password. Used for admin-created accounts and the seed admin.
+ *
  * RoleGate is a thin extension that additionally enforces a required role.
  */
 
@@ -33,6 +36,19 @@ export function AuthGate() {
   if (hydrating) return <Splash />;
   if (!isAuthed) {
     return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+  return <Outlet />;
+}
+
+/**
+ * MustChangePasswordGate — if the session has mustChangePassword=true,
+ * redirect to /change-password regardless of where the user is trying to go.
+ * Placed inside AuthGate, wrapping all regular app routes.
+ */
+export function MustChangePasswordGate() {
+  const mustChangePassword = useAuthStore((s) => s.mustChangePassword);
+  if (mustChangePassword) {
+    return <Navigate to="/change-password" replace />;
   }
   return <Outlet />;
 }

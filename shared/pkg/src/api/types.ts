@@ -48,6 +48,10 @@ export interface LoginResponse {
   roles: string[];
   /** TOTP setup gerektiğinde döner; access_token yerine bu alanla /totp/setup'a yönlendir. */
   tmp_token?: string;
+  /** Admin tarafından oluşturulan veya ilk kurulumda seed edilen kullanıcılarda true.
+   *  true olduğunda frontend /change-password'e yönlendirir ve şifre değiştirilinceye
+   *  kadar diğer route'lara erişimi engeller. */
+  must_change_password?: boolean;
 }
 
 export interface RefreshRequest {

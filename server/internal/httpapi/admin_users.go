@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -382,6 +383,162 @@ func validRoleName(name string) bool {
 		return true
 	}
 	return false
+}
+
+// CreateUser implements POST /api/v1/admin/users.
+//
+// Admin tarafından kullanıcı oluşturur. Normal register'dan farkı:
+//   - Client-side kripto yok; server placeholder keypair atar (bootstrap admin gibi).
+//   - Kullanıcı direkt 'active' statüsünde açılır, TOTP kurulumu gerektirmez.
+//   - Başlangıç rolleri req.Roles'dan atanır; boşsa ["read"] varsayılır.
+//
+// Body: { username, email, password, roles? }
+// Returns: adminUserRow (201 Created)
+func (h *AdminHandlers) CreateUser(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Username string   `json:"username"`
+		Email    string   `json:"email"`
+		Password string   `json:"password"`
+		Roles    []string `json:"roles"`
+	}
+	if !decodeJSON(w, r, h.Logger, &req) {
+		return
+	}
+
+	if !usernameRE.MatchString(req.Username) {
+		writeError(w, h.Logger, http.StatusBadRequest, ErrCodeBadRequest,
+			"Kullanıcı adı 3-64 karakter, sadece harf/rakam/._- olabilir.", errors.New("invalid username"))
+		return
+	}
+	if len(req.Email) < 3 || !strings.Contains(req.Email, "@") {
+		writeError(w, h.Logger, http.StatusBadRequest, ErrCodeBadRequest,
+			"Geçerli bir e-posta adresi giriniz.", errors.New("invalid email"))
+		return
+	}
+	if len(req.Password) < 12 {
+		writeError(w, h.Logger, http.StatusBadRequest, ErrCodeBadRequest,
+			"Şifre en az 12 karakter olmalı.", errors.New("password too short"))
+		return
+	}
+
+	// Validate and default roles.
+	roles := req.Roles
+	if len(roles) == 0 {
+		roles = []string{RoleRead}
+	}
+	for _, rn := range roles {
+		if !validRoleName(rn) {
+			writeError(w, h.Logger, http.StatusBadRequest, ErrCodeBadRequest,
+				"Geçersiz rol: "+rn, errors.New("invalid role: "+rn))
+			return
+		}
+	}
+
+	hp, err := auth.HashPassword(req.Password)
+	if err != nil {
+		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
+			"Şifre işlenemedi.", err)
+		return
+	}
+
+	ctx := r.Context()
+	tx, err := h.Service.DB.Begin(ctx)
+	if err != nil {
+		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
+			"Veritabanı hatası.", err)
+		return
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	const insertUser = `
+		INSERT INTO users (username, email, password_hash, argon2_params, status, must_change_password)
+		VALUES ($1, $2, $3, $4, 'active', true)
+		RETURNING id::text, created_at::text
+	`
+	var userID, createdAt string
+	err = tx.QueryRow(ctx, insertUser,
+		strings.ToLower(req.Username),
+		strings.ToLower(req.Email),
+		hp.Hash,
+		hp.ParamsJSON,
+	).Scan(&userID, &createdAt)
+	if err != nil {
+		if isUniqueViolation(err) {
+			writeError(w, h.Logger, http.StatusConflict, ErrCodeConflict,
+				"Kullanıcı adı veya e-posta zaten kullanımda.", err)
+			return
+		}
+		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
+			"Kullanıcı oluşturulamadı.", err)
+		return
+	}
+
+	if err := persistArgon2Salt(ctx, tx, userID, hp); err != nil {
+		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
+			"Argon2 parametreleri kaydedilemedi.", err)
+		return
+	}
+
+	// Placeholder keypair — admin tarafında oluşturulan kullanıcılar E2E crypto
+	// gerektirmez; kullanıcı ileride kendi keypair'ini kurabilir.
+	const insertKeypair = `
+		INSERT INTO user_keypairs (user_id, public_key, private_key_enc, kek_salt, kek_params)
+		VALUES ($1, $2, $3, $4, $5)
+	`
+	placeholderKEKParams := []byte(`{"alg":"none","note":"admin-provisioned-placeholder"}`)
+	if _, err := tx.Exec(ctx, insertKeypair,
+		userID,
+		make([]byte, 32),
+		make([]byte, 1),
+		make([]byte, 16),
+		placeholderKEKParams,
+	); err != nil {
+		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
+			"Anahtar çifti kaydedilemedi.", err)
+		return
+	}
+
+	// Assign roles.
+	const assignRoles = `
+		INSERT INTO user_roles (user_id, role_id)
+		SELECT $1::uuid, r.id FROM roles r WHERE r.name = ANY($2)
+		ON CONFLICT DO NOTHING
+	`
+	if _, err := tx.Exec(ctx, assignRoles, userID, roles); err != nil {
+		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
+			"Roller atanamadı.", err)
+		return
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
+			"İşlem tamamlanamadı.", err)
+		return
+	}
+
+	claims := ClaimsFromContext(r.Context())
+	actorID := ""
+	if claims != nil {
+		actorID = claims.Subject
+	}
+	_ = h.Audit.Write(ctx, audit.Entry{
+		ActorUserID:  actorID,
+		Action:       audit.ActionAdminUserEnabled, // nearest semantic; dedicated constant Faz 6'da
+		ResourceType: audit.ResourceUser,
+		ResourceID:   userID,
+		Details:      map[string]any{"username": strings.ToLower(req.Username), "roles": roles},
+		IPAddress:    parseIP(r.RemoteAddr),
+		UserAgent:    r.UserAgent(),
+	})
+
+	writeJSON(w, http.StatusCreated, adminUserRow{
+		ID:        userID,
+		Username:  strings.ToLower(req.Username),
+		Email:     strings.ToLower(req.Email),
+		Status:    "active",
+		Roles:     roles,
+		CreatedAt: createdAt,
+	})
 }
 
 // parseIntDefault returns def if s isn't a valid int OR is out of [min,max].

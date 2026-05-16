@@ -56,6 +56,12 @@ type Config struct {
 	// Basic-Auth login for admin users who are locked out. Default false.
 	// Enable only temporarily during bootstrap/recovery ops (ADR-0010).
 	BootstrapEnabled bool // ENVANTER_BOOTSTRAP_ENABLED (default false)
+
+	// DefaultAdminPassword is used by ensureDefaultAdmin() at startup.
+	// If unset and no admin user exists, a random password is generated and
+	// printed to stdout ONCE. Set this for repeatable deployments.
+	// ENVANTER_DEFAULT_ADMIN_PASSWORD — optional.
+	DefaultAdminPassword string // ENVANTER_DEFAULT_ADMIN_PASSWORD
 }
 
 // Load reads config from environment, applies defaults, and validates.
@@ -81,6 +87,7 @@ func Load() (*Config, error) {
 		MinioUseSSL:           envBoolOr("ENVANTER_MINIO_USE_SSL", false),
 		MinioBucket:           envOr("ENVANTER_MINIO_BUCKET", "envanter"),
 		BootstrapEnabled:      envBoolOr("ENVANTER_BOOTSTRAP_ENABLED", false),
+		DefaultAdminPassword:  os.Getenv("ENVANTER_DEFAULT_ADMIN_PASSWORD"),
 	}
 	if err := cfg.Validate(); err != nil {
 		return nil, err

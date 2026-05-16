@@ -67,8 +67,10 @@ export default function AdminLoginPage() {
         user: { id: res.user_id, username: username.toLowerCase().trim(), roles: res.roles },
         accessToken: res.access_token,
         refreshToken: res.refresh_token,
+        mustChangePassword: res.must_change_password,
       });
 
+      // MustChangePasswordGate handles the redirect if must_change_password=true
       navigate('/admin/users', { replace: true });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Giriş başarısız.';

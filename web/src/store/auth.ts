@@ -41,6 +41,10 @@ interface AuthState {
   hydrating: boolean;
   /** True when logged in via the TOTP-free bootstrap panel (ADR-0010). */
   isBootstrap: boolean;
+  /** True when the user must change their password before accessing the app.
+   *  Set for admin-created accounts and the default seed admin on first run.
+   *  Cleared after successful POST /auth/change-password. */
+  mustChangePassword: boolean;
 
   setSession(input: {
     user: SessionUser;
@@ -48,13 +52,17 @@ interface AuthState {
     refreshToken: string;
     kek: Uint8Array;
     privateKey: Uint8Array;
+    mustChangePassword?: boolean;
   }): void;
   /** Bootstrap login — no kek/privateKey available (TOTP-free admin path). */
   setBootstrapSession(input: {
     user: SessionUser;
     accessToken: string;
     refreshToken: string;
+    mustChangePassword?: boolean;
   }): void;
+  /** Clear the must_change_password flag after a successful password change. */
+  clearMustChangePassword(): void;
   /** Update only the access token (after refresh rotation). */
   setAccessToken(token: string, refreshToken: string): void;
   setHydrating(value: boolean): void;
@@ -70,8 +78,9 @@ export const useAuthStore = create<AuthState>()(
       privateKey: null,
       hydrating: true,
       isBootstrap: false,
+      mustChangePassword: false,
 
-      setSession({ user, accessToken, refreshToken, kek, privateKey }) {
+      setSession({ user, accessToken, refreshToken, kek, privateKey, mustChangePassword }) {
         syncAccessToStorage(accessToken);
         syncRefreshToStorage(refreshToken);
         set(
@@ -82,13 +91,14 @@ export const useAuthStore = create<AuthState>()(
             privateKey,
             hydrating: false,
             isBootstrap: false,
+            mustChangePassword: mustChangePassword ?? false,
           },
           false,
           'auth/setSession',
         );
       },
 
-      setBootstrapSession({ user, accessToken, refreshToken }) {
+      setBootstrapSession({ user, accessToken, refreshToken, mustChangePassword }) {
         syncAccessToStorage(accessToken);
         syncRefreshToStorage(refreshToken);
         // Persist a per-user bootstrap key in localStorage so items created in
@@ -128,10 +138,15 @@ export const useAuthStore = create<AuthState>()(
             privateKey,
             hydrating: false,
             isBootstrap: true,
+            mustChangePassword: mustChangePassword ?? false,
           },
           false,
           'auth/setBootstrapSession',
         );
+      },
+
+      clearMustChangePassword() {
+        set({ mustChangePassword: false }, false, 'auth/clearMustChangePassword');
       },
 
       setAccessToken(token, refreshToken) {
@@ -160,6 +175,7 @@ export const useAuthStore = create<AuthState>()(
             privateKey: null,
             hydrating: false,
             isBootstrap: false,
+            mustChangePassword: false,
           },
           false,
           'auth/clear',

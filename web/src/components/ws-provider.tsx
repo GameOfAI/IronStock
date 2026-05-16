@@ -35,7 +35,7 @@ export function WsProvider({ children }: Props) {
       return;
     }
 
-    const client = new WsClient(accessToken);
+    const client = new WsClient();
     clientRef.current = client;
     setWsStatus(client.getStatus());
 

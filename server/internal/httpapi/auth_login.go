@@ -18,13 +18,15 @@ import (
 
 // loginRequest is the body of POST /api/v1/auth/login.
 //
-// Per docs/auth-flow.md §3, login is single-step: password + TOTP submitted
-// together. The error response is intentionally generic ("invalid credentials")
-// regardless of which factor failed — denies the attacker an oracle.
+// totp_code is optional. If the user has an active TOTP secret configured,
+// the code is required and verified. If no TOTP secret exists, the field is
+// ignored and login succeeds with password alone. The error response is
+// intentionally generic ("invalid credentials") regardless of which factor
+// failed — denies the attacker an oracle.
 type loginRequest struct {
 	Username string `json:"username"`
 	Password string `json:"master_password"`
-	TOTPCode string `json:"totp_code"`
+	TOTPCode string `json:"totp_code"` // optional; required only when TOTP is configured
 }
 
 type loginResponse struct {
@@ -36,6 +38,11 @@ type loginResponse struct {
 	TokenType string   `json:"token_type"` // "Bearer"
 	UserID    string   `json:"user_id"`
 	Roles     []string `json:"roles"`
+	// MustChangePassword signals that the user must complete a password change
+	// before accessing the application. Set for admin-created accounts and the
+	// default seed admin. Frontend redirects to /change-password and blocks
+	// all other routes until the password is updated.
+	MustChangePassword bool `json:"must_change_password"`
 }
 
 // Login implements POST /api/v1/auth/login.
@@ -55,9 +62,9 @@ func (s *AuthHandlers) Login(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, s.Logger, &req) {
 		return
 	}
-	if req.Username == "" || req.Password == "" || req.TOTPCode == "" {
+	if req.Username == "" || req.Password == "" {
 		writeError(w, s.Logger, http.StatusBadRequest, ErrCodeBadRequest,
-			"username, master_password, totp_code zorunlu.",
+			"username ve master_password zorunlu.",
 			errors.New("missing field"))
 		return
 	}
@@ -83,12 +90,6 @@ func (s *AuthHandlers) Login(w http.ResponseWriter, r *http.Request) {
 		s.recordLoginFail(ctx, r, userRow.ID, "disabled")
 		writeError(w, s.Logger, http.StatusForbidden, ErrCodeAccountLocked,
 			"Hesap devre dışı.", errors.New("disabled"))
-		return
-	}
-	if userRow.Status == "pending_totp" {
-		s.recordLoginFail(ctx, r, userRow.ID, "pending_totp")
-		writeError(w, s.Logger, http.StatusForbidden, ErrCodeAccountPendingMFA,
-			"TOTP kurulumu tamamlanmadı.", errors.New("pending_totp"))
 		return
 	}
 	if auth.IsLocked(userRow.LockedUntil) {
@@ -119,28 +120,36 @@ func (s *AuthHandlers) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verify TOTP. Decrypt secret with master cipher.
+	// Verify TOTP only when the user has an active TOTP secret configured.
 	totpEnc, err := fetchTOTPSecret(ctx, s.Service.DB, userRow.ID)
-	if err != nil {
-		// Status 'active' with no totp row should be unreachable, but
-		// guard anyway.
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		writeError(w, s.Logger, http.StatusInternalServerError, ErrCodeInternal,
-			"TOTP secret bulunamadı.", err)
+			"TOTP secret sorgulanamadı.", err)
 		return
 	}
-	aad := crypto.MakeAAD("totp_secrets", userRow.ID, "secret_enc")
-	totpSecret, err := s.Service.Master.Open(totpEnc, aad)
-	if err != nil {
-		writeError(w, s.Logger, http.StatusInternalServerError, ErrCodeInternal,
-			"TOTP secret çözülemedi.", err)
-		return
+	if err == nil {
+		// User has TOTP configured — code is required.
+		if req.TOTPCode == "" {
+			s.recordLoginFail(ctx, r, userRow.ID, "missing_totp")
+			writeError(w, s.Logger, http.StatusUnauthorized, ErrCodeMFARequired,
+				"Bu hesap için 2FA kodu gerekli.", errors.New("totp required"))
+			return
+		}
+		aad := crypto.MakeAAD("totp_secrets", userRow.ID, "secret_enc")
+		totpSecret, err := s.Service.Master.Open(totpEnc, aad)
+		if err != nil {
+			writeError(w, s.Logger, http.StatusInternalServerError, ErrCodeInternal,
+				"TOTP secret çözülemedi.", err)
+			return
+		}
+		if err := auth.VerifyTOTP(totpSecret, req.TOTPCode); err != nil {
+			_ = recordLoginFailure(ctx, s.Service.DB, userRow.ID)
+			s.recordLoginFail(ctx, r, userRow.ID, "wrong_totp")
+			writeInvalidCreds(w, s.Logger, err)
+			return
+		}
 	}
-	if err := auth.VerifyTOTP(totpSecret, req.TOTPCode); err != nil {
-		_ = recordLoginFailure(ctx, s.Service.DB, userRow.ID)
-		s.recordLoginFail(ctx, r, userRow.ID, "wrong_totp")
-		writeInvalidCreds(w, s.Logger, err)
-		return
-	}
+	// No TOTP configured — password alone is sufficient.
 
 	// All factors OK: create session in a tx so the failed-login counter
 	// reset and session insert are atomic.
@@ -206,23 +215,25 @@ func (s *AuthHandlers) Login(w http.ResponseWriter, r *http.Request) {
 	})
 
 	writeJSON(w, http.StatusOK, loginResponse{
-		AccessToken:  accessToken,
-		RefreshToken: refresh.Token,
-		ExpiresIn:    int(auth.AccessTokenLifetime.Seconds()),
-		TokenType:    "Bearer",
-		UserID:       userRow.ID,
-		Roles:        roles,
+		AccessToken:        accessToken,
+		RefreshToken:       refresh.Token,
+		ExpiresIn:          int(auth.AccessTokenLifetime.Seconds()),
+		TokenType:          "Bearer",
+		UserID:             userRow.ID,
+		Roles:              roles,
+		MustChangePassword: userRow.MustChangePassword,
 	})
 }
 
 // userLoginRow holds the columns we need to authenticate.
 type userLoginRow struct {
-	ID             string
-	PasswordHash   []byte
-	Argon2Params   []byte
-	Status         string
-	FailedAttempts int
-	LockedUntil    *time.Time
+	ID                 string
+	PasswordHash       []byte
+	Argon2Params       []byte
+	Status             string
+	FailedAttempts     int
+	LockedUntil        *time.Time
+	MustChangePassword bool
 }
 
 // fetchUserForLogin returns the row needed to verify the password and check
@@ -230,7 +241,8 @@ type userLoginRow struct {
 func fetchUserForLogin(ctx context.Context, db auth.DBExec, usernameLower string) (userLoginRow, error) {
 	const sqlText = `
 		SELECT id::text, password_hash, argon2_params,
-		       status, failed_login_attempts, locked_until
+		       status, failed_login_attempts, locked_until,
+		       must_change_password
 		FROM users
 		WHERE username = $1
 		LIMIT 1
@@ -239,6 +251,7 @@ func fetchUserForLogin(ctx context.Context, db auth.DBExec, usernameLower string
 	err := db.QueryRow(ctx, sqlText, usernameLower).Scan(
 		&row.ID, &row.PasswordHash, &row.Argon2Params,
 		&row.Status, &row.FailedAttempts, &row.LockedUntil,
+		&row.MustChangePassword,
 	)
 	return row, err
 }
