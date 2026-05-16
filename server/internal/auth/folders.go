@@ -47,17 +47,18 @@ func (p FolderPermission) AllowsWrite() bool {
 }
 
 // ResolveFolderPermission walks the ancestor chain of folderID, looking for
-// folder_permissions rows belonging to userID:
+// direct or group-based folder permission rows belonging to userID.
 //
-//   - the row on folderID itself counts unconditionally
-//   - rows on any ancestor count only when inherit_to_children=true
+// Three grant paths (strongest wins):
+//  1. Owner: folders.created_by = userID → Write
+//  2. Direct ACL: folder_permissions.user_id = userID (inherit applies)
+//  3. Group ACL (PR-F6b): user is a group_member of a group that has an active
+//     folder_group_permissions row (inherit applies)
 //
-// Owner short-circuit: if folders.created_by = userID, returns Write
-// regardless of ACL. Admin short-circuit is the caller's job (claims.Roles).
+// Admin short-circuit is the caller's job (claims.Roles).
 //
 // Returns FolderPermNone when the folder doesn't exist OR the user has no
-// matching grant — caller decides how to surface (404 vs 403). We do NOT
-// distinguish, to avoid a folder-existence oracle.
+// matching grant — caller decides how to surface (404 vs 403).
 func ResolveFolderPermission(
 	ctx context.Context, q DBExec, userID, folderID string,
 ) (FolderPermission, error) {
@@ -65,9 +66,13 @@ func ResolveFolderPermission(
 		return FolderPermNone, errors.New("auth: ResolveFolderPermission: empty userID/folderID")
 	}
 
-	// One round-trip query:
-	//   1) confirm the folder exists + check ownership
-	//   2) walk ancestors via CTE and aggregate ACL
+	// One round-trip query using a UNION-based permissions CTE so both direct
+	// and group-based grants flow through the same aggregation logic (PR-F6b).
+	//
+	// Structure:
+	//   ancestors CTE  — walks parent_id chain from folderID to root
+	//   perms CTE      — unions direct ACL + group-based ACL rows
+	//   final SELECT   — aggregates is_owner / has_write / has_read / folder_exists
 	const sqlText = `
 		WITH RECURSIVE ancestors AS (
 		    SELECT id, parent_id, created_by, 0 AS depth
@@ -76,23 +81,46 @@ func ResolveFolderPermission(
 		    SELECT f.id, f.parent_id, f.created_by, a.depth + 1
 		    FROM folders f
 		    JOIN ancestors a ON f.id = a.parent_id
+		),
+		perms AS (
+		    -- Direct per-user ACL
+		    SELECT
+		        a.depth,
+		        a.created_by,
+		        COALESCE(fp.inherit_to_children, false) AS inherit_to_children,
+		        fp.permission
+		    FROM ancestors a
+		    LEFT JOIN folder_permissions fp
+		        ON fp.folder_id = a.id
+		       AND fp.user_id = $2::uuid
+		       AND fp.revoked_at IS NULL
+		    UNION ALL
+		    -- Group-based ACL (PR-F6b)
+		    SELECT
+		        a.depth,
+		        a.created_by,
+		        fgp.inherit_to_children,
+		        fgp.permission
+		    FROM ancestors a
+		    JOIN folder_group_permissions fgp
+		        ON fgp.folder_id = a.id
+		       AND fgp.revoked_at IS NULL
+		    JOIN group_members gm
+		        ON gm.group_id = fgp.group_id
+		       AND gm.user_id = $2::uuid
 		)
 		SELECT
-		    bool_or(a.depth = 0 AND a.created_by = $2::uuid) AS is_owner,
+		    bool_or(depth = 0 AND created_by = $2::uuid) AS is_owner,
 		    bool_or(
-		        (a.depth = 0 OR fp.inherit_to_children)
-		        AND fp.permission = 'write'
+		        (depth = 0 OR inherit_to_children)
+		        AND permission = 'write'
 		    ) AS has_write,
 		    bool_or(
-		        (a.depth = 0 OR fp.inherit_to_children)
-		        AND fp.permission IN ('read', 'write')
+		        (depth = 0 OR inherit_to_children)
+		        AND permission IN ('read', 'write')
 		    ) AS has_read,
-		    count(*) > 0 AS folder_exists
-		FROM ancestors a
-		LEFT JOIN folder_permissions fp
-		    ON fp.folder_id = a.id
-		   AND fp.user_id = $2::uuid
-		   AND fp.revoked_at IS NULL
+		    (SELECT count(*) > 0 FROM ancestors) AS folder_exists
+		FROM perms
 	`
 	var isOwner, hasWrite, hasRead, folderExists *bool
 	err := q.QueryRow(ctx, sqlText, folderID, userID).Scan(
