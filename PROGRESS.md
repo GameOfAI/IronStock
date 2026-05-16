@@ -4,10 +4,34 @@ Son güncelleme: 2026-05-16
 
 ## Mevcut Durum
 
-- **Aktif Faz:** — (Tüm fazlar tamamlandı ✅)
+- **Aktif Faz:** Post-v1.0.0 Kapsamlı Geliştirmeler (Faz 6+)
 - **Tamamlanan Faz:** Faz 0 + 1 + 2 + 3 + 4 + 5 ✅
-- **Son tamamlanan:** PR-V1 — v1.0.0 released ✅ 2026-04-28
-- **Proje durumu:** MVP tamamlandı. Sıradaki çalışmalar Parking Lot / Faz 6+ kapsamında (Vault, distroless, backup/restore, code signing).
+- **Son tamamlanan:** PR-N5 — One-Time Share Links ✅ 2026-05-16
+- **Proje durumu:** MVP + kapsamlı geliştirmeler devam ediyor. Faz 6+ PRları: PR-RT-1, PR-F1, PR-N6, PR-F2a, PR-F4, PR-F6a/b/c, PR-N4, PR-F2b, PR-F5a/b, PR-N7, PR-N8, PR-N1, PR-N2, PR-N5 tamamlandı. Kalan: PR-F3 (Tauri Sync), PR-N3 (Onay Workflow — Faz 5 büyük iş).
+
+## Kapsamlı Geliştirme Planı — Durum Özeti (2026-05-16)
+
+| PR | Özellik | Durum |
+|----|---------|-------|
+| PR-RT-1 | WS ticket endpoint (URL güvenliği) | ✅ DONE |
+| PR-F1 | Default admin + must_change_password | ✅ DONE |
+| PR-N6 | Read event audit logging | ✅ DONE |
+| PR-F2a | TOTP Status/Disable/Backup/Admin reset | ✅ DONE |
+| PR-F4 | Smart Item Type Fields (enum, multiline, number) | ✅ DONE |
+| PR-F6a | Groups CRUD + folder_group_permissions | ✅ DONE |
+| PR-F6b | Folder visibility (CTE grup aware) | ✅ DONE |
+| PR-F6c | Groups Admin UI | ✅ DONE |
+| PR-N4 | Break-Glass Emergency Access | ✅ DONE |
+| PR-F2b | Trusted Device (remember 30 days) | ✅ DONE |
+| PR-F5a | Graph Handler (backend) | ✅ DONE |
+| PR-F5b | Graph UI (React Flow) | ✅ DONE |
+| PR-N7 | Tags + Favoriler | ✅ DONE |
+| PR-N8 | Notification/Alert Sistemi | ✅ DONE |
+| PR-N1 | Credential Expiry / TTL + Rotation Hatırlatıcısı | ✅ DONE |
+| PR-N2 | Secret Versioning (10 versiyon) | ✅ DONE |
+| PR-N5 | One-Time Paylaşım Linki | ✅ DONE |
+| PR-F3 | Tauri Client Sync | ⏳ TODO |
+| PR-N3 | Onay Workflow / Dual Control | ⏳ Faz 6+ (büyük iş) |
 
 ## Faz Durumu
 
@@ -50,6 +74,124 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-05-16 (Win) — PR-F2b: Trusted Device ✅
+
+**PR-F2b: "Bu cihazı 30 gün hatırla" (Trusted Device)** ✅
+- Migration 00030: `trusted_devices` tablosu (id, user_id, token_hash BYTEA 32B UNIQUE, device_label, last_used_at, expires_at) + index
+- Server helpers: `generateDeviceToken()` (32-byte random, base64url + SHA-256), `hashDeviceToken()`, `setTrustedDeviceCookie()` (HttpOnly/Secure/SameSite=Strict), `clearTrustedDeviceCookie()`, `verifyTrustedDevice()` (UPDATE + RETURNING → rolling 30-day TTL), `createTrustedDevice()`, `deviceLabelFromRequest()` (truncated UA string)
+- Login flow: password OK → TOTP configured → check `trusted_device` cookie → if valid (DB hit), skip TOTP; else require code
+- `remember_device: true` on login + fresh TOTP verify → issue token → set cookie → audit entry
+- Handlers: `ListTrustedDevices`, `RevokeTrustedDevice`, `RevokeAllTrustedDevices` (always clears cookie)
+- Router: GET/DELETE /api/v1/auth/trusted-devices, DELETE /api/v1/auth/trusted-devices/{id} (access-token required)
+- Audit constants: `auth.trusted_device_created`, `auth.trusted_device_revoked`, `auth.trusted_device_used`
+- Shared types: `TrustedDevice`, `TrustedDevicesResponse`; `LoginRequest.remember_device?: boolean`
+- Web `auth.ts`: `useTrustedDevicesQuery`, `useRevokeTrustedDeviceMutation`, `useRevokeAllTrustedDevicesMutation`
+- Web `login.tsx`: "Bu cihazı 30 gün hatırla" checkbox (shown when totpRequired phase)
+- Web `profile.tsx`: `TrustedDevicesCard` — device list (label, last used, expiry), revoke individual + "tüm cihazları kaldır" AlertDialog
+
+**Sıradaki:** PR-F3 (Tauri Sync) veya PR-N3 (Onay Workflow, Faz 5)
+
+### 2026-05-16 (Win) — PR-N5: One-Time Share Links ✅
+
+**PR-N5: Güvenli One-Time Paylaşım Linki** ✅
+
+**Server:**
+- Migration 00031: `item_share_links` tablosu (id, item_id, token_hash BYTEA 32B UNIQUE, dek_wrapped BYTEA, expires_at, view_limit SMALLINT 1–10, view_count SMALLINT, created_by) + index
+- Audit constants: `item.share_link_created`, `item.share_link_viewed`, `item.share_link_expired`, `item.share_link_revoked`
+- `ShareLinkHandlers` (DB `*pgxpool.Pool`, Service `*auth.Service`, Audit, Logger):
+  - `generateShareToken()`: 32-byte random → base64url token + SHA-256 hash
+  - `hashShareToken()`: base64url decode + SHA-256 (validate 32B)
+  - `parseTTL()`: "1h" → 1h, "7d" → 7×24h, default 24h
+  - `CreateShareLink` (POST /api/v1/items/{id}/share-links): write-perm check, store token_hash + dek_wrapped, return raw token
+  - `ListShareLinks` (GET): active only (expires_at > now AND view_count < view_limit), write-perm check
+  - `RevokeShareLink` (DELETE /{link_id}): write-perm check, DELETE row, audit
+  - `ViewShareLink` (GET /api/v1/share/{token}): PUBLIC (no auth); `UPDATE ... SET view_count = view_count+1 WHERE ... AND expires_at > now AND view_count < view_limit RETURNING ...`; pgx.ErrNoRows → 410 Gone; async audit
+  - `fetchItemForPublicShare`: joins items+item_types (server-decrypt name via master cipher), queries item_fields+field_definitions → encrypted fields
+- Router: `ShareLink *ShareLinkHandlers` field added to `Deps`; 3 auth routes + 1 public route
+- main.go: `shareLinkHandlers` wired into `Deps.ShareLink`
+
+**Shared types:**
+- `CreateShareLinkRequest`, `CreateShareLinkResponse`, `ShareLink`, `ShareLinksListResponse`, `ShareLinkField`, `ShareLinkViewResponse`
+
+**Web:**
+- `web/src/api/share-links.ts`: `useShareLinksQuery`, `useCreateShareLinkMutation`, `useRevokeShareLinkMutation`, `useShareLinkViewQuery` (unauthenticated, staleTime=Infinity, no auto-refetch)
+- `web/src/components/inventory/share-link-dialog.tsx`: Dialog (Select TTL+view_limit, create button, generated URL + copy + open, active links list with revoke) — E2E crypto: `openDEKWithKEK` → generate 32B link_key → `encryptPrivateKey(dek, link_key)` → POST → URL with `#base64url(link_key)`
+- `web/src/components/inventory/item-detail.tsx`: "Paylaşım Linki" button (write permission only, above favorite toggle)
+- `web/src/pages/share.tsx`: Public page — reads link_key from `window.location.hash`, fetches payload (no auth), `decryptPrivateKey(dek_wrapped, link_key)` → item_dek → `decryptField` per secret field; show/hide + copy per field; error states (expired, missing key, DEK error); no-login required
+- `web/src/App.tsx`: `/share/:token` route added to public section (outside AuthGate)
+
+### 2026-05-16 (Win) — PR-RT-1 ✅ + PR-N8 ✅ + PR-F5a/b ✅ + PR-N4 ✅
+
+**PR-RT-1: WS ticket endpoint (URL'de token güvenliği)** ✅
+- `ws_tickets` in-memory store (`sync.Map`) — 32-byte random, 30s TTL, tek kullanım
+- `POST /api/v1/ws/ticket` endpoint (Bearer auth) → ticket string döner
+- WS upgrade `?ticket=` query param ile authenticate eder; token URL'ye artık gitmez
+- Web `ws.ts` güncellendi: her connect attempt öncesi `fetchWsTicket()` çağrısı
+
+**PR-N8: Notification System** ✅
+- Migration 00031: `notifications` tablosu (user_id, type, title, body, resource_type, resource_id, read_at) + partial index (unread)
+- Server `notify.Writer`: Write (sync, returns error) + WriteAsync (goroutine wrapper, hot-path safe)
+- `NotificationHandlers`: GET /notifications, GET /notifications/unread-count, POST /notifications/read-all, POST /notifications/{id}/read
+- WS event `notification.created` → bell badge anında güncellenir
+- Web: `useNotificationsQuery`, `useMarkReadMutation`, `useMarkAllReadMutation`
+- Web `NotificationBell` component: Popover, unread count badge (9+), okunmamış blue dot, "tümünü okundu işaretle", tr-TR timestamp
+
+**PR-F5a/b: DevOps Pipeline İlişki Haritası** ✅
+- Migration 00028: `item_rel_type_chk` genişletildi — uses_tool, builds_to, scans_with, deploys_to eklendi
+- Server `GraphHandlers`: `GET /api/v1/graph` (RBAC-filtered nodes + edges), `POST /items/{id}/relationships`, `DELETE /items/{id}/relationships/{target_id}/{type}`
+- Admin: tüm items; normal user: CTE (owned + directly_shared + folder ACL + group ACL)
+- Shared types: RelationshipType union, GraphNode, GraphEdge, GraphResponse, AddRelationshipRequest
+- Web `/graph` sayfası: node kartları (type badge + edges), relationship ekleme/silme, search, GitBranch nav item
+
+**PR-N4: Break-Glass Emergency Access** ✅
+- Migration 00029: `users.is_break_glass BOOLEAN DEFAULT false` + partial index
+- Login handler: break-glass user detect edince async `emitBreakGlassAlert()` — audit + WS + notify all admins
+- `POST /api/v1/admin/users/{id}/break-glass` toggle endpoint
+- ListUsers response'a `is_break_glass` eklendi
+- Web `BreakGlassBanner`: `break-glass:alert` DOM CustomEvent dinler, admin-only, kırmızı banner (AlertOctagon, dismiss X), son 5 alert
+- WS `auth.break_glass` event → DOM CustomEvent dispatch
+
+**Sıradaki:** PR-F2b (Trusted Device — remember 30 days)
+
+### 2026-05-16 (Win) — PR-N7: Tags + Favorites ✅
+
+**PR-N7: Tags + User Favorites** ✅
+- Migration 00026: `tags` (id, name CHECK 1-64, color CHECK hex, created_by, UNIQUE(name,created_by)) + `item_tags` (item_id+tag_id PK) + `user_favorites` (user_id+item_id PK) tables
+- Audit constants: tag.created/deleted, item.tagged/untagged, item.favorited/unfavorited
+- Server `TagHandlers`: 9 endpoints — GET/POST/DELETE /tags, GET/POST/DELETE /items/{id}/tags, GET/POST/DELETE /items/{id}/favorite, GET /favorites
+- Favorite toggle returns 204/404 for status polling; ListFavorites does per-row permission check + name decrypt
+- Router: Tag routes mounted under /api/v1/tags, /api/v1/favorites, nested under /api/v1/items/{id}
+- Shared types: Tag, TagListResponse, CreateTagRequest, AddItemTagRequest, ItemTagsResponse, FavoriteItem, FavoritesListResponse
+- Web `tags.ts`: useTagsQuery, useCreateTagMutation, useDeleteTagMutation, useItemTagsQuery, useAddItemTagMutation, useRemoveItemTagMutation, useFavoritesQuery, useFavoriteStatusQuery, useAddFavoriteMutation, useRemoveFavoriteMutation
+- Web `/tags` page: create tag form (name + hex color), tag list with delete AlertDialog
+- Web `item-detail.tsx`: favorite star toggle (filled/outlined), tag badge chips under item header
+- Web `app-shell.tsx`: "Etiketlerim" nav item with Tag icon
+
+### 2026-05-16 (Win) — PR-N2: Secret Field Versioning ✅
+
+**PR-N2: Item Field Value Versioning** ✅
+- Migration 00025: `item_field_versions` table (id, item_field_id FK, version_number, value_enc, value_nonce, changed_at) + `idx_item_field_versions_lookup`
+- PostgreSQL trigger `trg_snapshot_item_field` — fires BEFORE UPDATE ON item_fields when value_enc changes; inserts old row into versions + prunes to max 10
+- Server: `GET /api/v1/items/{id}/fields/{field_def_id}/versions` → up to 10 snapshots sorted by version DESC; Read permission required
+- Shared types: `FieldVersionOutput`, `FieldVersionsResponse`
+- Web `items.ts`: `useFieldVersionsQuery` hook (lazy — only fetches when dialog is open)
+- Web: `FieldVersionsDialog` component — History icon on hover, opens dialog with version list showing timestamps; values stay encrypted (opaque blobs shown as "Şifreli değer")
+- Web `item-field-row.tsx`: history button added for secret fields (group-hover pattern), passes `itemId` prop
+
+### 2026-05-16 (Win) — PR-N1: Credential Expiry / Rotation ✅
+
+**PR-N1: Credential Expiry + Rotation Tracking** ✅
+- Migration 00024: `items.expires_at`, `rotation_interval_days`, `last_rotated_at` + partial index
+- Server: `itemRequest`/`itemResponse`/`itemRow` struct'lara expiry alanları eklendi
+- SQL: CREATE/UPDATE/GET/LIST sorgularına expiry kolonları eklendi
+- Server: `RecordRotation` handler — `POST /api/v1/items/{id}/rotate` → `last_rotated_at = now()`; audit `item.rotation_recorded`
+- Server: background expiry scanner goroutine (hourly) — 7 gün içinde dolacak item'lar için `item.expiry_warning` WS event
+- Shared types: `Item`, `ItemCreateRequest`, `ItemUpdateRequest`'e expiry alanları eklendi
+- Web `item-list.tsx`: `ExpiryBadge` bileşeni — süresi dolmuş (🔴) / yaklaşan (🟡) Tooltip ile
+- Web `item-form-modal.tsx`: "Süre & Rotasyon" bölümü — tarih input + gün input; create+edit modda
+- Web `item-detail.tsx`: expiry/rotation bilgi kutusu, "Rotasyonu Kaydet" butonu (write izni olan item'larda)
+- Web `items.ts`: `useRecordRotationMutation` hook
 
 ### 2026-05-16 (Win) — Kapsamlı Plan: PR-F1 ✅ + PR-N6 ✅ + PR-F2a ✅
 

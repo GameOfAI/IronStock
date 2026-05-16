@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-04-28 (**Faz 5 TAMAMLANDI ✅** — PR-K1..K5 + PR-A1 + PR-A2 + PR-P1 + PR-V1 tümü merged. v1.0.0 released. Proje MVP tamamlandı.)
+Son güncelleme: 2026-05-16 (**Post-v1.0.0 Kapsamlı Geliştirmeler devam ediyor** — PR-RT-1..PR-N5 tamamlandı. Kalan: PR-F3 + PR-N3.)
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 
@@ -591,6 +591,49 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 - [ ] nginx `readOnlyRootFilesystem: true` — emptyDir volume + custom config
 - [ ] Win MSI code signing
 
+---
+
+## 🚀 Post-v1.0.0 Kapsamlı Geliştirme Planı (2026-05-16)
+
+Ürün araştırması + güvenlik analizi sonucu eklenen 19 PR. Kaynak: Kapsamlı Geliştirme Planı (glistening-singing-moth.md).
+
+### ✅ Tier 1 — Kritik / Güvenlik
+
+- [x] **PR-RT-1** — WS ticket endpoint: URL'de access_token yerine kısa-ömürlü bilet (`POST /api/v1/ws/ticket`, 30s TTL, tek kullanım). `ws.TicketStore` in-memory. Web `ws.ts` güncellendi.
+- [x] **PR-F1** — Default admin + `must_change_password`: İlk başlatmada `admin` kullanıcısı seed'lenir, random şifre stdout'a yazılır, şifre değiştirene kadar tüm route'lar bloke. `MustChangePasswordGate`, `/change-password` sayfası.
+- [x] **PR-N6** — Read event audit logging: `item.viewed`, `item.listed`, `folder.listed` audit action'ları eklendi. `WriteAsync` hot-path için goroutine + context.Background() ile latency'siz.
+
+### ✅ Tier 2 — Önemli / Core Features
+
+- [x] **PR-F2a** — TOTP yönetimi: `GET /auth/totp/status`, `DELETE /auth/totp` (devre dışı), `POST /auth/totp/backup-codes/regenerate`, `POST /admin/users/{id}/totp/reset`. Web `profile.tsx` TOTPManagementCard.
+- [x] **PR-F4** — Smart Item Type Fields: `enum` → `Select`, `multiline` → `Textarea`, `number` → number input. Field group desteği (server + web form render).
+- [x] **PR-F6a** — Groups CRUD: `groups` + `group_members` tablosu. Admin API: list/create/delete grup, add/remove member. Audit constants.
+- [x] **PR-F6b** — Folder Group Permissions: `folder_group_permissions` tablosu. `ResolveFolderPermission` CTE'ye group_members JOIN eklendi. Admin API: grant/revoke folder-group izin.
+- [x] **PR-F6c** — Groups Admin UI: `/admin/groups` sayfası, grup detay, üye yönetimi, folder izin modal.
+- [x] **PR-N4** — Break-Glass Emergency Access: `users.is_break_glass` boolean. Login'de detect → tüm adminlere WS alert + notify. Admin toggle endpoint. Web `BreakGlassBanner` component.
+
+### ✅ Tier 3 — Ekosistem Genişletme
+
+- [x] **PR-F2b** — Trusted Device: 30 günlük "Bu cihazı hatırla". `trusted_devices` tablosu, SHA-256 cookie token, rolling TTL. Login flow entegrasyonu. Web: login checkbox + profile TrustedDevicesCard.
+- [x] **PR-F5a** — Graph Handler: `GET /api/v1/graph` (RBAC-filtered nodes+edges), `POST/DELETE /items/{id}/relationships`. item_rel_type_chk genişletildi (uses_tool, builds_to, scans_with, deploys_to).
+- [x] **PR-F5b** — Graph UI: `/graph` sayfası, node kartları (type badge + edges), ilişki ekleme/silme, arama. Nav sidebar'a GitBranch linki.
+- [x] **PR-N7** — Tags + Favoriler: `tags`, `item_tags`, `user_favorites` tablosu. 9 endpoint. Web: inventory left panel favoriler, item detail tag chip'leri, ItemTagsPanel, FavoritesPage.
+- [x] **PR-N8** — Notification Sistemi: `notifications` tablosu + partial index (unread). `notify.Writer` (sync + async). WS `notification.created` event. Web: TopBar bell badge + popover list + mark-all-read.
+- [x] **PR-N1** — Credential Expiry/Rotation: `items.expires_at`, `rotation_interval_days`, `last_rotated_at`. Nightly scanner goroutine (1h tick, 7-gün penceresi, idempotent). Item detail expiry/rotation section. `POST /items/{id}/rotate`.
+- [x] **PR-N2** — Secret Versioning: `item_field_versions` tablosu (max 10, FIFO). Trigger-benzeri hook field update'te. `GET /items/{id}/fields/{field_def_id}/versions` endpoint. Web: field history modal + restore.
+- [x] **PR-N5** — One-Time Paylaşım Linki: `item_share_links` tablosu (token_hash SHA-256, dek_wrapped, view_limit 1-10, TTL). Public `GET /api/v1/share/{token}` (no auth, atomic view_count++, 410 Gone). E2E: link_key URL fragment'ta, asla sunucuya gitmez. Web: ShareLinkDialog + public SharePage.
+
+### ⏳ Kalan
+
+- [ ] **PR-F3** — Tauri Client Sync: Rust keyring `bootstrap_pk_store/load/delete` komutları. Login'de Tauri path'te keyring'e kek_store. Bootstrap'ta keyring'den yükle.
+- [ ] **PR-N3** — Onay Workflow / Dual Control: `access_requests` tablosu. Kritik item için erişim isteği → admin onayı → zaman-sınırlı görüntüleme. WS event'lar. **Büyük iş — Faz 6+ ayrı plan gerekir.**
+
+### ⏸ Ertelenen (Deferred)
+
+- [ ] **PR-RT-2** — SSE fallback (WS bloklu kurumsal ağlar için)
+- [ ] **PR-RT-3** — Redis pub/sub (horizontal scale)
+- [ ] **PR-RT-4** — Per-user WS event routing (meta-leak azaltma)
+
 ### Observability
 - [x] Prometheus metrics (custom + runtime) — PR-K4
 - [x] Grafana dashboard template — PR-K4
@@ -636,8 +679,8 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 - Terraform provider
 
 ### Feature
-- Paylaşım linkleri (geçici, token-based, TTL'li erişim)
-- Item versioning / change history görüntüleme
+- ~~Paylaşım linkleri (geçici, token-based, TTL'li erişim)~~ → ✅ **PR-N5 tamamlandı** (2026-05-16)
+- ~~Item versioning / change history görüntüleme~~ → ✅ **PR-N2 tamamlandı** (2026-05-16)
 - Bulk import/export (CSV, KeePassXC .kdbx import)
 - Telemetri (opsiyonel, self-hosted, anon kullanım istatistikleri)
 - Searchable encryption — full-text arama için bigram/trigram blind index

@@ -10,13 +10,20 @@ DevOps/SRE takımı için envanter yönetim uygulaması. KeePassXC'ye alternatif
 - Server: Kubernetes üzerinde, Go tabanlı REST + WebSocket API
 - Web Admin UI: React + Vite + TypeScript — kullanıcı/rol yönetimi, envanter görüntüleme
 - Client: Tauri (Rust) — Windows + macOS native, ağaç UI + offline cache
-- Auth: Username + password (Argon2id) + TOTP (RFC 6238, Google Authenticator uyumlu)
+- Auth: Username + password (Argon2id) + TOTP (RFC 6238, Google Authenticator uyumlu) + Trusted Device (30 gün cookie)
 - **3-katmanlı RBAC:**
   - Global rol: `admin` / `write` / `read`
-  - Klasör-level ACL: `folder_permissions` (inherit_to_children)
-  - Item-level share: `item_shares` (per-user wrapped DEK)
-- **Dinamik veri modeli:** `item_types` (server/url/database/ssh_key/…) + `field_definitions` (merkezi field sözlüğü, hostname/ip_address/environment vs), `item_relationships` (hosted_on, accessed_via, depends_on…).
-- **External secret backends:** HashiCorp Vault proxy (Faz 5) — native item'ların yanında Vault-backed item'lar, aynı UI. ADR-0007.
+  - Klasör-level ACL: `folder_permissions` (inherit_to_children) + `folder_group_permissions` (grup bazlı)
+  - Item-level share: `item_shares` (per-user wrapped DEK) + `item_share_links` (one-time public links)
+- **Gruplar:** `groups` + `group_members` — grup bazlı klasör izni (PR-F6a/b)
+- **Dinamik veri modeli:** `item_types` (server/url/database/ssh_key/…) + `field_definitions` (merkezi field sözlüğü, hostname/ip_address/environment vs), `item_relationships` (hosted_on, accessed_via, depends_on, uses_tool, builds_to, scans_with, deploys_to…).
+- **Versiyonlama:** `item_field_versions` — max 10 versiyon, FIFO (PR-N2)
+- **Etiketler + Favoriler:** `tags`, `item_tags`, `user_favorites` (PR-N7)
+- **Bildirimler:** `notifications` — in-app + WS push (PR-N8)
+- **Credential expiry:** `items.expires_at/rotation_interval_days/last_rotated_at` + nightly scanner (PR-N1)
+- **Break-glass:** `users.is_break_glass` — acil erişim, tüm adminlere anlık uyarı (PR-N4)
+- **One-time share:** `item_share_links` — token_hash + dek_wrapped, link_key URL fragment'ta (PR-N5)
+- **External secret backends:** HashiCorp Vault proxy (Faz 5, parking) — ADR-0007.
 
 ## Tech Stack
 
@@ -71,19 +78,13 @@ Envanter_App/
 - **Faz bazlı ilerleme:** Aynı anda bir faz aktif. Faz bitmeden sonraki başlamaz.
 - **TodoWrite eşleniği:** Aktif faz task'ları TodoWrite'ta tutulur, `TODO.md` kalıcı yansımadır.
 
-## İş Bölümü — Çift Makine Workflow (▶ Faz 3'te aktif)
+## İş Bölümü — Çift Makine Workflow (▶ Faz 3'te aktif, Post-v1.0.0'da tek makine)
 
-**Mevcut durum (2026-04-27):** Mac M4 paralel session yeniden devrede. Faz 3 (Admin Web UI) için 8 PR planı: Win 5 PR (server + foundation + auth + realtime/polish), Mac 3 PR (admin + inventory ekranlar). PR sırası: PR-10 ✅ → PR-11 ✅ → PR-12 (Win, KEK endpoint) → PR-W1 (Win, foundation) → PR-W2 (Win, auth) → **Mac unlock**: PR-W3 → PR-W4 → PR-W5 → PR-W6 (Win, realtime + polish).
-
-**Çakışma koruması:**
-- **Win sahası:** `server/**`, `deploy/**`, `shared/api/openapi.yaml`, `web/src/api/client.ts`, `web/src/store/`, layout shell, auth ekranları. Mac dokunmaz.
-- **Mac sahası:** `web/src/pages/admin/**`, `web/src/pages/inventory/**`, ilgili componentler ve testleri. PR akışıyla.
-- Tracking dosyaları (`PROGRESS.md`, `TODO.md`) — günlük entry'ler tarihli + makine etiketli (örn `### 2026-04-27 (Mac)`).
-- Branch namespace: Mac → `feat/web-{admin,inventory-read,inventory-write}`. Win → `feat/{server-*,web-foundation,web-auth,web-realtime-polish}`.
-
-**Önceki iterasyon (Faz 2 sonu, ⏸ pattern):** Mac geçici olarak pause edilmişti, server PR'ları Win'den merged. Geriye bakış için PROGRESS.md "2026-04-25/26" entry'leri.
+**Mevcut durum (2026-05-16):** Post-v1.0.0 Kapsamlı Geliştirme Planı kapsamındaki 17 PR tamamlandı (PR-RT-1 → PR-N5). Tek makine (Win) ile çalışılıyor. Kalan: PR-F3 (Tauri Sync), PR-N3 (büyük iş, ayrı plan).
 
 **Stack kararları (Faz 3):** ADR-0009 — Zustand + TanStack Query + Tailwind 4 + shadcn/ui + argon2-browser + WS subprotocol auth.
+
+**Migration sayısı (2026-05-16):** En son migration `00031_share_links.sql`. Yeni migration eklerken sıradaki numara `00032`.
 
 ## Her Session'da Yapılacaklar
 
