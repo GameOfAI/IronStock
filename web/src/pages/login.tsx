@@ -63,7 +63,12 @@ export default function LoginPage() {
   const [substep, setSubstep] = React.useState<Substep>('idle');
 
   const busy = substep !== 'idle';
-  const fromPath = (location.state as { from?: { pathname: string } } | null)?.from?.pathname;
+  // Exclude /change-password from 'from' redirect: when the store is cleared after a
+  // forced password change, AuthGate stamps state.from = '/change-password'. After
+  // re-logging in we must NOT redirect back there — MustChangePasswordGate handles
+  // that if must_change_password is still true.
+  const rawFrom = (location.state as { from?: { pathname: string } } | null)?.from?.pathname;
+  const fromPath = rawFrom && rawFrom !== '/change-password' ? rawFrom : undefined;
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();

@@ -18,7 +18,7 @@
  */
 
 import * as React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import {
   Card,
   CardContent,
@@ -47,7 +47,15 @@ export default function ChangePasswordPage() {
   const privateKey = useAuthStore((s) => s.privateKey);
   const user = useAuthStore((s) => s.user);
   const isBootstrap = useAuthStore((s) => s.isBootstrap);
+  const mustChangePassword = useAuthStore((s) => s.mustChangePassword);
   const clear = useAuthStore((s) => s.clear);
+
+  // Render-time guard: if the user navigates here directly (mustChangePassword=false),
+  // bounce to /inventory. This cannot fire during the clear() transition because
+  // AuthGate unmounts us before we re-render (isAuthed=false → AuthGate returns <Navigate>).
+  if (!mustChangePassword) {
+    return <Navigate to="/inventory" replace />;
+  }
 
   const mut = useChangePasswordMutation();
 
