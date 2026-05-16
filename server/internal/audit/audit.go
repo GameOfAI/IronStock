@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+
 // Action constants — keep these dot-namespaced and exhaustive for grep-ability.
 const (
 	ActionAuthRegister     = "auth.register"
@@ -50,6 +51,12 @@ const (
 	ActionItemFieldUpdated = "item.field_updated"
 	ActionItemShared       = "item.shared"
 	ActionItemUnshared     = "item.unshared"
+
+	// Read-event audit (PR-N6). Written async so hot-path latency is unaffected.
+	// Vault/CyberArk model: every read is traceable in the audit log.
+	ActionItemViewed   = "item.viewed"    // GET /items/{id} — full item + encrypted fields
+	ActionItemListed   = "item.listed"    // GET /items?folder_id=... — item list in folder
+	ActionFolderListed = "folder.listed"  // GET /folders?parent_id=... — tree navigation
 
 	// Admin actions (PR-10).
 	ActionAdminUserDisabled = "admin.user_disabled"
@@ -131,6 +138,18 @@ func (w *Writer) Write(ctx context.Context, e Entry) error {
 		return fmt.Errorf("audit: insert: %w", err)
 	}
 	return nil
+}
+
+// WriteAsync fires Write in a background goroutine, isolated from the
+// request context (uses context.Background()). Errors are silently dropped.
+//
+// Use on high-frequency read paths (item.viewed, item.listed, folder.listed)
+// where adding a synchronous DB round-trip to each GET would measurably
+// increase p99 latency. Mutation paths keep using Write() directly.
+func (w *Writer) WriteAsync(e Entry) {
+	go func() {
+		_ = w.Write(context.Background(), e)
+	}()
 }
 
 func nullString(s string) any {

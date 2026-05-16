@@ -238,6 +238,19 @@ func (h *FolderHandlers) List(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	// Async audit — folder.listed records tree navigation.
+	h.Audit.WriteAsync(audit.Entry{
+		ActorUserID:  claims.Subject,
+		Action:       audit.ActionFolderListed,
+		ResourceType: audit.ResourceFolder,
+		Details: map[string]any{
+			"parent_id":    parent,
+			"result_count": len(out),
+		},
+		IPAddress: parseIP(r.RemoteAddr),
+		UserAgent: r.UserAgent(),
+	})
+
 	writeJSON(w, http.StatusOK, folderListResponse{Folders: out})
 }
 

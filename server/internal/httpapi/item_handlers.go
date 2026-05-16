@@ -325,6 +325,18 @@ func (h *ItemHandlers) Get(w http.ResponseWriter, r *http.Request) {
 	}
 	item.Permission = perm
 
+	// Async audit — item.viewed tracks every full-detail read (fields included).
+	// Written off the hot path to avoid adding a DB round-trip to every GET.
+	h.Audit.WriteAsync(audit.Entry{
+		ActorUserID:  claims.Subject,
+		Action:       audit.ActionItemViewed,
+		ResourceType: audit.ResourceItem,
+		ResourceID:   id,
+		Details:      map[string]any{"folder_id": item.FolderID},
+		IPAddress:    parseIP(r.RemoteAddr),
+		UserAgent:    r.UserAgent(),
+	})
+
 	writeJSON(w, http.StatusOK, item)
 }
 
@@ -419,6 +431,20 @@ func (h *ItemHandlers) List(w http.ResponseWriter, r *http.Request) {
 			Permission: perm,
 		})
 	}
+
+	// Async audit — item.listed records folder browse events.
+	h.Audit.WriteAsync(audit.Entry{
+		ActorUserID:  claims.Subject,
+		Action:       audit.ActionItemListed,
+		ResourceType: audit.ResourceItem,
+		Details: map[string]any{
+			"folder_id":   folderID,
+			"result_count": len(out),
+			"searched":    q != "",
+		},
+		IPAddress: parseIP(r.RemoteAddr),
+		UserAgent: r.UserAgent(),
+	})
 
 	writeJSON(w, http.StatusOK, itemListResponse{Items: out})
 }
