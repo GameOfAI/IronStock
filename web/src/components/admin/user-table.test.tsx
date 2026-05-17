@@ -11,6 +11,7 @@ vi.mock('@/api/admin', () => ({
   useRevokeRoleMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDisableUserMutation: () => ({ mutate: vi.fn(), isPending: false }),
   useEnableUserMutation: () => ({ mutate: vi.fn(), isPending: false }),
+  useResetTOTPMutation: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
 }));
 
 function renderTable(props: Parameters<typeof UserTable>[0]) {
