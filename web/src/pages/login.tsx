@@ -20,7 +20,7 @@
 
 import * as React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { KeyRound, Loader2, ShieldCheck } from 'lucide-react';
+import { Eye, EyeOff, KeyRound, Loader2, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -41,6 +41,42 @@ import type { SessionUser } from '@/store/auth';
 import { decryptPrivateKey, deriveKEK, fromBase64 } from '@/lib/crypto';
 import type { KEKParams } from '@/lib/crypto';
 import { ApiError, ErrCode } from '@/api/errors';
+
+// --- Password input with show/hide toggle ---
+
+interface PasswordInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  value: string;
+  onChange: React.ChangeEventHandler<HTMLInputElement>;
+}
+
+function PasswordInput({ value, onChange, disabled, ...rest }: PasswordInputProps) {
+  const [visible, setVisible] = React.useState(false);
+
+  return (
+    <div className="relative">
+      <Input
+        {...rest}
+        type={visible ? 'text' : 'password'}
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+        className="pr-10"
+      />
+      <button
+        type="button"
+        tabIndex={-1}
+        disabled={disabled}
+        onClick={() => setVisible((v) => !v)}
+        className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground disabled:opacity-40 transition-colors"
+        aria-label={visible ? 'Parolayı gizle' : 'Parolayı göster'}
+      >
+        {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+      </button>
+    </div>
+  );
+}
+
+// ---
 
 type Substep = 'idle' | 'authenticating' | 'fetching_keypair' | 'deriving_key' | 'unlocking';
 
@@ -235,9 +271,8 @@ export default function LoginPage() {
 
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="password">Master Parola</Label>
-              <Input
+              <PasswordInput
                 id="password"
-                type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="current-password"
