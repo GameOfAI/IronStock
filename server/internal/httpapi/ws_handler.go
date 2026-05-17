@@ -79,9 +79,13 @@ func (h *WSHandlers) Connect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		// Faz 5: tighten OriginPatterns to known frontend origin(s).
-		// MVP: same-origin only (default behavior when OriginPatterns is nil).
-		Subprotocols: []string{"envanter.v1"},
+		// OriginPatterns: allow any localhost port so the Vite dev-server proxy
+		// (localhost:5173 → localhost:8080) and the nginx docker proxy both work.
+		// For production behind a reverse proxy, the real protection is the
+		// ticket-based auth already enforced in resolveConnectAuth above.
+		// Faz 5: tighten to known production origin(s) via env config.
+		OriginPatterns: []string{"localhost:*", "127.0.0.1:*"},
+		Subprotocols:   []string{"envanter.v1"},
 	})
 	if err != nil {
 		// websocket.Accept already wrote a response on failure.
