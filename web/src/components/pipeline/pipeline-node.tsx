@@ -8,7 +8,7 @@
  */
 
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { Box } from 'lucide-react';
+import { Box, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { PIPELINE_TYPE_ICONS, PIPELINE_TYPE_LABELS } from './pipeline-constants';
 
@@ -24,12 +24,14 @@ export interface PipelineNodeData {
   stageColor?: string;
   /** Primary lifecycle stage label */
   stageLabel?: string;
+  /** Callback to remove this node from the diagram */
+  onRemove?: (nodeId: string) => void;
   [key: string]: unknown;
 }
 
 // --- Component ---
 
-export function PipelineNode({ data, selected }: NodeProps) {
+export function PipelineNode({ data, selected, id }: NodeProps) {
   const d = data as PipelineNodeData;
   const Icon = PIPELINE_TYPE_ICONS[d.itemTypeId] ?? Box;
   const typeLabel = PIPELINE_TYPE_LABELS[d.itemTypeId] ?? 'Öğe';
@@ -37,12 +39,32 @@ export function PipelineNode({ data, selected }: NodeProps) {
   return (
     <div
       className={cn(
-        'rounded-lg border-2 bg-card shadow-sm transition-all min-w-[160px] max-w-[220px]',
+        'group/node relative rounded-lg border-2 bg-card shadow-sm transition-all min-w-[160px] max-w-[220px]',
         selected
           ? 'border-primary shadow-md ring-2 ring-primary/20'
           : 'border-border hover:border-primary/40',
       )}
     >
+      {/* Remove button — visible on hover or selected */}
+      {d.onRemove && (
+        <button
+          className={cn(
+            'absolute -right-2 -top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full',
+            'bg-destructive text-destructive-foreground shadow-sm',
+            'opacity-0 transition-opacity hover:bg-destructive/90',
+            'group-hover/node:opacity-100',
+            selected && 'opacity-100',
+          )}
+          onClick={(e) => {
+            e.stopPropagation();
+            d.onRemove!(id);
+          }}
+          title="Diyagramdan kaldır"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      )}
+
       {/* Lifecycle stage color bar */}
       {d.stageColor && (
         <div

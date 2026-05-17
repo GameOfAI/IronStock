@@ -53,6 +53,51 @@
 
   * {
     border-color: hsl(var(--border));
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+
+  /* Webkit scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+  }
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  /* ReactFlow Controls theme override */
+  .react-flow__controls {
+    background: hsl(var(--card)) !important;
+    border: 1px solid hsl(var(--border)) !important;
+    border-radius: var(--radius) !important;
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1) !important;
+  }
+  .react-flow__controls-button {
+    background: hsl(var(--card)) !important;
+    color: hsl(var(--foreground)) !important;
+    border-bottom-color: hsl(var(--border)) !important;
+    fill: hsl(var(--foreground)) !important;
+  }
+  .react-flow__controls-button:hover {
+    background: hsl(var(--accent)) !important;
+  }
+  .react-flow__controls-button svg {
+    fill: hsl(var(--muted-foreground));
+  }
+  .react-flow__controls-button:hover svg {
+    fill: hsl(var(--foreground));
   }
 
   html,

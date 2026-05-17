@@ -38,7 +38,7 @@ import '@xyflow/react/dist/style.css';
 import { PipelineNode, type PipelineNodeData } from './pipeline-node';
 import { PipelineEdge } from './pipeline-edge';
 import type { DiagramGraphResponse, LifecycleStage } from '@/api/types';
-import { useSaveDiagramLayoutMutation } from '@/api/pipeline';
+import { useSaveDiagramLayoutMutation, useRemoveDiagramNodeMutation } from '@/api/pipeline';
 import { Button } from '@/components/ui/button';
 import { LayoutDashboard, Maximize2, Save, ImageDown } from 'lucide-react';
 
@@ -75,6 +75,7 @@ function applyDagreLayout(
 function buildElements(
   graphData: DiagramGraphResponse,
   lifecycleCatalog: LifecycleStage[],
+  onRemove?: (nodeId: string) => void,
 ): { nodes: Node[]; edges: Edge[]; needsLayout: boolean } {
   // Map stage id → stage
   const stageById = new Map(lifecycleCatalog.map((s) => [s.id, s]));
@@ -99,6 +100,7 @@ function buildElements(
       label,
       stageColor: firstStage?.color,
       stageLabel: firstStage?.label,
+      onRemove,
     };
 
     return {
@@ -142,11 +144,20 @@ interface CanvasInnerProps {
 function CanvasInner({ diagramId, graphData, lifecycleCatalog, diagramName }: CanvasInnerProps) {
   const { fitView, getViewport } = useReactFlow();
   const saveLayout = useSaveDiagramLayoutMutation(diagramId);
+  const removeNode = useRemoveDiagramNodeMutation(diagramId);
+
+  const handleRemoveNode = React.useCallback(
+    (nodeId: string) => {
+      removeNode.mutate(nodeId);
+    },
+    [removeNode],
+  );
 
   // Build initial nodes/edges from graph data
   const { nodes: initialNodes, edges: initialEdges, needsLayout: initialNeedsLayout } =
     React.useMemo(
-      () => buildElements(graphData, lifecycleCatalog),
+      () => buildElements(graphData, lifecycleCatalog, handleRemoveNode),
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       [graphData, lifecycleCatalog],
     );
 
@@ -158,6 +169,7 @@ function CanvasInner({ diagramId, graphData, lifecycleCatalog, diagramName }: Ca
     const { nodes: newNodes, edges: newEdges, needsLayout } = buildElements(
       graphData,
       lifecycleCatalog,
+      handleRemoveNode,
     );
     if (needsLayout) {
       const { nodes: laid, edges: laidEdges } = applyDagreLayout(newNodes, newEdges);

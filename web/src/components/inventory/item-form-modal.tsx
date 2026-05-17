@@ -1,5 +1,5 @@
 import { useEffect, useReducer, useState } from 'react';
-import { Eye, EyeOff, Lock } from 'lucide-react';
+import { Eye, EyeOff, HelpCircle, Lock } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -229,7 +229,7 @@ export function ItemFormModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Item Düzenle' : 'Yeni Item'}</DialogTitle>
         </DialogHeader>
@@ -301,38 +301,49 @@ export function ItemFormModal({
                           </span>
                           <div className="flex-1 border-t" />
                         </div>
-                        {groupDefs.map((def) => (
-                          <FieldInput
-                            key={def.id}
-                            def={def}
-                            state={fields[def.id] ?? { value: '', visible: false }}
-                            disabled={isPending}
-                            onChangeValue={(v) => dispatchFields({ type: 'set', id: def.id, value: v })}
-                            onToggleVisible={() => dispatchFields({ type: 'toggle', id: def.id })}
-                          />
-                        ))}
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                          {groupDefs.map((def) => (
+                            <FieldInput
+                              key={def.id}
+                              def={def}
+                              state={fields[def.id] ?? { value: '', visible: false }}
+                              disabled={isPending}
+                              onChangeValue={(v) => dispatchFields({ type: 'set', id: def.id, value: v })}
+                              onToggleVisible={() => dispatchFields({ type: 'toggle', id: def.id })}
+                            />
+                          ))}
+                        </div>
                       </div>
                     );
                   })
-                : suggestedDefs.map((def) => (
-                    <FieldInput
-                      key={def.id}
-                      def={def}
-                      state={fields[def.id] ?? { value: '', visible: false }}
-                      disabled={isPending}
-                      onChangeValue={(v) => dispatchFields({ type: 'set', id: def.id, value: v })}
-                      onToggleVisible={() => dispatchFields({ type: 'toggle', id: def.id })}
-                    />
-                  ))}
+                : (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {suggestedDefs.map((def) => (
+                      <FieldInput
+                        key={def.id}
+                        def={def}
+                        state={fields[def.id] ?? { value: '', visible: false }}
+                        disabled={isPending}
+                        onChangeValue={(v) => dispatchFields({ type: 'set', id: def.id, value: v })}
+                        onToggleVisible={() => dispatchFields({ type: 'toggle', id: def.id })}
+                      />
+                    ))}
+                  </div>
+                )}
             </div>
           )}
 
 
           {/* PR-N1: Credential Expiry / Rotation */}
           <div className="space-y-3 rounded-md border border-dashed p-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Süre & Rotasyon
-            </p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Süre & Rotasyon
+              </p>
+              <span title="Credential'ın ne zaman expire olacağını ve kaç günde bir değiştirilmesi gerektiğini belirtir. Yaklaşan/geçmiş tarihler için otomatik bildirim oluşturulur.">
+                <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
+              </span>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="item-expires-at">
@@ -461,7 +472,7 @@ function FieldInput({ def, state, disabled, onChangeValue, onToggleVisible }: Fi
 
   if (def.field_type === 'multiline') {
     return (
-      <div className="space-y-1.5">
+      <div className="space-y-1.5 sm:col-span-2">
         <Label htmlFor={id}>{def.label}</Label>
         <textarea
           id={id}
