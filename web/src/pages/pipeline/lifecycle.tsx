@@ -18,7 +18,7 @@
 
 import * as React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Layers, Loader2, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Info, Layers, Loader2, RefreshCw, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { useGraphQuery } from '@/api/graph';
@@ -211,8 +211,38 @@ export default function LifecyclePage() {
     );
   }
 
+  // Onboarding banner (dismissible via localStorage)
+  const BANNER_KEY = 'ironstock:lifecycle-onboarding-dismissed';
+  const [bannerDismissed, setBannerDismissed] = React.useState(
+    () => localStorage.getItem(BANNER_KEY) === '1',
+  );
+  function dismissBanner() {
+    localStorage.setItem(BANNER_KEY, '1');
+    setBannerDismissed(true);
+  }
+
   return (
     <div className="flex h-full flex-col">
+      {/* ── Onboarding banner ────────────────────────────────────────── */}
+      {!bannerDismissed && !isLoading && (
+        <div className="flex items-start gap-3 border-b bg-blue-50 px-6 py-3 dark:bg-blue-950/30">
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
+          <p className="flex-1 text-xs text-blue-800 dark:text-blue-300">
+            Her öğeyi DevOps yaşam döngüsü aşamalarına <strong>sürükleyip bırakın</strong>.
+            Atanmamış öğeler en altta listelenir. Bir öğe birden fazla aşamada olabilir.
+            Kartın üzerindeki × butonu ile o aşamadan çıkarabilirsiniz.
+          </p>
+          <button
+            type="button"
+            className="shrink-0 rounded p-0.5 text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900"
+            onClick={dismissBanner}
+            title="Kapat"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <div className="flex shrink-0 items-center gap-3 border-b px-6 py-3">
         <Button variant="ghost" size="icon" className="h-8 w-8" asChild>

@@ -40,15 +40,15 @@ const ITEM_TYPE_COLORS: Record<number, string> = {
 };
 
 const REL_LABELS: Record<RelationshipType, string> = {
-  hosted_on: 'barındırılıyor',
-  accessed_via: 'erişiliyor',
-  part_of: 'parçası',
-  related_to: 'ilişkili',
-  depends_on: 'bağımlı',
-  uses_tool: 'araç kullanır',
-  builds_to: 'build eder',
-  scans_with: 'tarar',
-  deploys_to: 'deploy eder',
+  hosted_on: 'barındırılıyor (hosted_on)',
+  accessed_via: 'erişiliyor (accessed_via)',
+  part_of: 'parçası (part_of)',
+  related_to: 'ilişkili (related_to)',
+  depends_on: 'bağımlı (depends_on)',
+  uses_tool: 'araç kullanır (uses_tool)',
+  builds_to: 'build eder (builds_to)',
+  scans_with: 'tarar (scans_with)',
+  deploys_to: 'deploy eder (deploys_to)',
 };
 
 const REL_TYPES: RelationshipType[] = [
@@ -211,12 +211,31 @@ export function GraphPage() {
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [addingForId, setAddingForId] = React.useState<string | null>(null);
   const [search, setSearch] = React.useState('');
+  const [activeTypes, setActiveTypes] = React.useState<Set<number>>(new Set());
 
   const nodes = data?.nodes ?? [];
   const edges = data?.edges ?? [];
 
-  // Filter nodes by name, type label, or id substring
+  // Unique item type IDs present in graph
+  const presentTypes = React.useMemo(
+    () => [...new Set(nodes.map((n) => n.item_type_id))].sort(),
+    [nodes],
+  );
+
+  function toggleType(typeId: number) {
+    setActiveTypes((prev) => {
+      const next = new Set(prev);
+      if (next.has(typeId)) next.delete(typeId);
+      else next.add(typeId);
+      return next;
+    });
+  }
+
+  // Filter nodes by search text + active type chips
   const filtered = nodes.filter((n) => {
+    // Type filter (empty = show all)
+    if (activeTypes.size > 0 && !activeTypes.has(n.item_type_id)) return false;
+    // Text search
     if (!search) return true;
     const q = search.toLowerCase();
     const label = (ITEM_TYPE_LABELS[n.item_type_id] ?? '').toLowerCase();
@@ -264,13 +283,45 @@ export function GraphPage() {
         </div>
       </div>
 
-      {/* Search */}
-      <Input
-        placeholder="Ad, tip veya ID ara…"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="max-w-xs"
-      />
+      {/* Search + type filters */}
+      <div className="flex flex-col gap-2">
+        <Input
+          placeholder="Ad, tip veya ID ara…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="max-w-xs"
+        />
+        {presentTypes.length > 1 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs text-muted-foreground mr-1">Tip:</span>
+            {presentTypes.map((typeId) => {
+              const active = activeTypes.has(typeId);
+              return (
+                <Badge
+                  key={typeId}
+                  variant={active ? 'default' : 'outline'}
+                  className={cn(
+                    'cursor-pointer text-[10px] px-2 py-0.5 transition-colors select-none',
+                    active && (ITEM_TYPE_COLORS[typeId] ?? ''),
+                  )}
+                  onClick={() => toggleType(typeId)}
+                >
+                  {ITEM_TYPE_LABELS[typeId] ?? `Tip ${typeId}`}
+                </Badge>
+              );
+            })}
+            {activeTypes.size > 0 && (
+              <button
+                type="button"
+                className="text-[10px] text-muted-foreground hover:text-foreground ml-1 underline"
+                onClick={() => setActiveTypes(new Set())}
+              >
+                Temizle
+              </button>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Main content */}
       <div className="flex flex-1 gap-4 overflow-hidden">
