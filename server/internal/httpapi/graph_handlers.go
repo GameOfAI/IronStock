@@ -28,16 +28,14 @@ type GraphHandlers struct {
 }
 
 // graphNode is a graph vertex representing an item the caller can see.
-// Name is still encrypted — the client decrypts it client-side using the
-// wrapped DEK (same as the item list/detail endpoints).
+// Name is decrypted server-side (server-envelope encryption, master key
+// available on the server). Client-side E2E secret fields are not included
+// in the graph view — only metadata for visualization.
 type graphNode struct {
-	ID               string `json:"id"`
-	FolderID         string `json:"folder_id"`
-	ItemTypeID       int16  `json:"item_type_id"`
-	NameEnc          []byte `json:"name_enc"`
-	NameNonce        []byte `json:"name_nonce"`
-	ServerDEKWrapped []byte `json:"server_dek_wrapped"`
-	MasterKeyID      int16  `json:"master_key_id"`
+	ID         string `json:"id"`
+	FolderID   string `json:"folder_id"`
+	ItemTypeID int16  `json:"item_type_id"`
+	Name       string `json:"name"`
 }
 
 // graphEdge is a directed relationship between two items.
@@ -103,7 +101,7 @@ func (h *GraphHandlers) Graph(w http.ResponseWriter, r *http.Request) {
 		// Admins see everything.
 		nodeSQL = `
 			SELECT id::text, folder_id::text, item_type_id,
-			       name_enc, name_nonce, server_dek_wrapped, master_key_id
+			       name_enc, server_dek_wrapped
 			FROM items
 			ORDER BY created_at
 		`
@@ -130,7 +128,7 @@ func (h *GraphHandlers) Graph(w http.ResponseWriter, r *http.Request) {
 			    SELECT id FROM folders WHERE created_by = $1::uuid
 			)
 			SELECT i.id::text, i.folder_id::text, i.item_type_id,
-			       i.name_enc, i.name_nonce, i.server_dek_wrapped, i.master_key_id
+			       i.name_enc, i.server_dek_wrapped
 			FROM items i
 			WHERE i.created_by = $1::uuid
 			   OR i.id IN (
@@ -155,13 +153,22 @@ func (h *GraphHandlers) Graph(w http.ResponseWriter, r *http.Request) {
 	nodeIDSet := make(map[string]struct{}, 64) // for edge filtering
 	for rows.Next() {
 		var n graphNode
+		var nameEnc, dekWrapped []byte
 		if err := rows.Scan(
 			&n.ID, &n.FolderID, &n.ItemTypeID,
-			&n.NameEnc, &n.NameNonce, &n.ServerDEKWrapped, &n.MasterKeyID,
+			&nameEnc, &dekWrapped,
 		); err != nil {
 			writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
 				"Düğüm satırı okunamadı.", err)
 			return
+		}
+		// Decrypt name server-side (server-envelope encryption).
+		// On error fall back to a placeholder — graph still usable.
+		if decName, decErr := decryptItemName(h.Service, n.ID, dekWrapped, nameEnc); decErr == nil {
+			n.Name = decName
+		} else {
+			n.Name = "[?]"
+			h.Logger.Warn("graph: name decrypt failed", slog.String("item_id", n.ID), slog.Any("err", decErr))
 		}
 		nodes = append(nodes, n)
 		nodeIDSet[n.ID] = struct{}{}

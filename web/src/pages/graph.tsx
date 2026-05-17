@@ -24,6 +24,8 @@ const ITEM_TYPE_LABELS: Record<number, string> = {
   4: 'SSH Anahtarı',
   5: 'API Anahtarı',
   6: 'Genel',
+  7: 'Not',
+  8: 'Diğer',
 };
 
 const ITEM_TYPE_COLORS: Record<number, string> = {
@@ -33,6 +35,8 @@ const ITEM_TYPE_COLORS: Record<number, string> = {
   4: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
   5: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
   6: 'bg-muted text-muted-foreground',
+  7: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+  8: 'bg-muted text-muted-foreground',
 };
 
 const REL_LABELS: Record<RelationshipType, string> = {
@@ -90,7 +94,7 @@ function AddRelPanel({ sourceId, nodes, onCancel, onDone }: AddRelPanelProps) {
           <option value="">— Seçin —</option>
           {candidates.map((n) => (
             <option key={n.id} value={n.id}>
-              {ITEM_TYPE_LABELS[n.item_type_id] ?? 'Öğe'} · {n.id.slice(0, 8)}…
+              {n.name} ({ITEM_TYPE_LABELS[n.item_type_id] ?? 'Öğe'})
             </option>
           ))}
         </select>
@@ -140,7 +144,7 @@ function NodeCard({ node, edges, allNodes, selected, onClick, onDeleteEdge }: No
 
   function nodeName(id: string): string {
     const n = allNodes.find((x) => x.id === id);
-    return n ? `${ITEM_TYPE_LABELS[n.item_type_id] ?? 'Öğe'} (${id.slice(0, 6)}…)` : id.slice(0, 8);
+    return n?.name || id.slice(0, 8);
   }
 
   return (
@@ -160,10 +164,7 @@ function NodeCard({ node, edges, allNodes, selected, onClick, onDeleteEdge }: No
         >
           {ITEM_TYPE_LABELS[node.item_type_id] ?? 'Öğe'}
         </Badge>
-        <span className="font-mono text-xs text-muted-foreground">{node.id.slice(0, 12)}…</span>
-        <span className="ml-auto text-[10px] text-muted-foreground">
-          Klasör: {node.folder_id.slice(0, 8)}…
-        </span>
+        <span className="text-sm font-medium">{node.name}</span>
       </div>
 
       {outgoing.length > 0 && (
@@ -214,11 +215,16 @@ export function GraphPage() {
   const nodes = data?.nodes ?? [];
   const edges = data?.edges ?? [];
 
-  // Filter nodes by type label / id substring
+  // Filter nodes by name, type label, or id substring
   const filtered = nodes.filter((n) => {
     if (!search) return true;
+    const q = search.toLowerCase();
     const label = (ITEM_TYPE_LABELS[n.item_type_id] ?? '').toLowerCase();
-    return label.includes(search.toLowerCase()) || n.id.includes(search.toLowerCase());
+    return (
+      n.name.toLowerCase().includes(q) ||
+      label.includes(q) ||
+      n.id.includes(q)
+    );
   });
 
   const selectedNode = nodes.find((n) => n.id === selectedId) ?? null;
@@ -260,7 +266,7 @@ export function GraphPage() {
 
       {/* Search */}
       <Input
-        placeholder="Öğe tipi veya ID ara…"
+        placeholder="Ad, tip veya ID ara…"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         className="max-w-xs"
@@ -315,26 +321,58 @@ export function GraphPage() {
           )}
         </div>
 
-        {/* Detail / placeholder for future canvas */}
+        {/* Detail panel */}
         <div className="flex flex-1 items-center justify-center rounded-lg border bg-muted/20 text-center text-sm text-muted-foreground">
           {selectedNode ? (
-            <div className="flex flex-col gap-2 p-6">
-              <p className="font-semibold">
-                {ITEM_TYPE_LABELS[selectedNode.item_type_id] ?? 'Öğe'}
-              </p>
-              <p className="font-mono text-xs">{selectedNode.id}</p>
-              <p className="text-xs">Klasör: {selectedNode.folder_id}</p>
-              <p className="mt-2 text-xs text-muted-foreground">
-                Tam graf görselleştirmesi (ReactFlow) sonraki PR'da eklenecek.
-              </p>
+            <div className="flex flex-col gap-3 p-6 text-left w-full max-w-sm">
+              <div className="flex items-center gap-2">
+                <Badge className={cn('text-[10px]', ITEM_TYPE_COLORS[selectedNode.item_type_id] ?? '')}>
+                  {ITEM_TYPE_LABELS[selectedNode.item_type_id] ?? 'Öğe'}
+                </Badge>
+                <span className="font-semibold">{selectedNode.name}</span>
+              </div>
+              <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                <p><span className="font-medium text-foreground">ID:</span> <span className="font-mono">{selectedNode.id}</span></p>
+                <p><span className="font-medium text-foreground">Klasör:</span> <span className="font-mono">{selectedNode.folder_id}</span></p>
+              </div>
+              {(() => {
+                const out = edges.filter((e) => e.source_id === selectedNode.id);
+                const inc = edges.filter((e) => e.target_id === selectedNode.id);
+                const nodeMap = Object.fromEntries(nodes.map((n) => [n.id, n.name]));
+                return (
+                  <div className="flex flex-col gap-2 text-xs">
+                    {out.length > 0 && (
+                      <div>
+                        <p className="font-medium text-[10px] uppercase tracking-wide text-muted-foreground mb-1">→ Giden ilişkiler</p>
+                        {out.map((e) => (
+                          <p key={`${e.target_id}-${e.type}`} className="text-muted-foreground">
+                            <span className="text-primary font-medium">{REL_LABELS[e.type as RelationshipType]}</span>
+                            {' → '}{nodeMap[e.target_id] ?? e.target_id.slice(0, 8)}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                    {inc.length > 0 && (
+                      <div>
+                        <p className="font-medium text-[10px] uppercase tracking-wide text-muted-foreground mb-1">← Gelen ilişkiler</p>
+                        {inc.map((e) => (
+                          <p key={`${e.source_id}-${e.type}`} className="text-muted-foreground">
+                            {nodeMap[e.source_id] ?? e.source_id.slice(0, 8)}
+                            {' '}<span className="text-primary font-medium">{REL_LABELS[e.type as RelationshipType]}</span>
+                            {' → bu öğe'}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                    {out.length === 0 && inc.length === 0 && (
+                      <p className="text-muted-foreground">Bu öğenin henüz ilişkisi yok.</p>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           ) : (
-            <div className="flex flex-col items-center gap-2">
-              <p>Detay için sol listeden bir öğe seçin.</p>
-              <p className="text-xs">
-                Tam görsel harita (ReactFlow) sonraki PR'da eklenecek.
-              </p>
-            </div>
+            <p>Detay için sol listeden bir öğe seçin.</p>
           )}
         </div>
       </div>

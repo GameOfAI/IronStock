@@ -478,16 +478,13 @@ export type RelationshipType =
   | 'scans_with'
   | 'deploys_to';
 
-/** A graph node representing an item the caller can see. Name is encrypted. */
+/** A graph node representing an item the caller can see. Name is decrypted server-side. */
 export interface GraphNode {
   id: string;
   folder_id: string;
   item_type_id: number;
-  /** base64-encoded encrypted name — decrypt with server_dek_wrapped */
-  name_enc: string;
-  name_nonce: string;
-  server_dek_wrapped: string;
-  master_key_id: number;
+  /** Plaintext item name, decrypted server-side from the server-envelope. */
+  name: string;
 }
 
 /** A directed edge between two items. */
