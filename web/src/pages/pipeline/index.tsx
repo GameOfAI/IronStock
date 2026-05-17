@@ -8,8 +8,8 @@
  */
 
 import * as React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Plus, GitFork, Trash2, ArrowRight, Loader2, Network } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Plus, GitFork, Trash2, ArrowRight, Loader2, Network, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -192,10 +192,18 @@ export default function PipelineListPage() {
             DevOps altyapı mimarinizi görselleştirin
           </p>
         </div>
-        <Button className="gap-2" onClick={() => setCreateOpen(true)}>
-          <Plus className="h-4 w-4" />
-          Yeni Diyagram
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" className="gap-2" asChild>
+            <Link to="/pipeline/lifecycle">
+              <Layers className="h-4 w-4" />
+              Lifecycle Lanes
+            </Link>
+          </Button>
+          <Button className="gap-2" onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Yeni Diyagram
+          </Button>
+        </div>
       </div>
 
       {/* Content */}

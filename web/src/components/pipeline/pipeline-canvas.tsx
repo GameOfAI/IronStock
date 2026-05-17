@@ -1,5 +1,5 @@
 /**
- * PipelineCanvas — ReactFlow canvas for a single pipeline diagram (PR-F5e).
+ * PipelineCanvas — ReactFlow canvas for a single pipeline diagram (PR-F5e/g).
  *
  * Features:
  *  - Renders DiagramGraphResponse as ReactFlow nodes + edges
@@ -7,7 +7,7 @@
  *    all positions are null)
  *  - Node drag-stop saves layout (debounced 1 s)
  *  - Custom node (PipelineNode) and edge (PipelineEdge) types
- *  - Controls panel: Auto Layout, Fit View
+ *  - Controls panel: Auto Layout, Fit View, Save, Export PNG/SVG
  *  - ReactFlow Background + Controls + MiniMap
  */
 
@@ -23,6 +23,8 @@ import {
   useNodesState,
   useEdgesState,
   useReactFlow,
+  getNodesBounds,
+  getViewportForBounds,
   type Node,
   type Edge,
   type OnConnect,
@@ -30,6 +32,7 @@ import {
   BackgroundVariant,
 } from '@xyflow/react';
 import dagre from '@dagrejs/dagre';
+import { toPng, toSvg } from 'html-to-image';
 import '@xyflow/react/dist/style.css';
 
 import { PipelineNode, type PipelineNodeData } from './pipeline-node';
@@ -37,7 +40,7 @@ import { PipelineEdge } from './pipeline-edge';
 import type { DiagramGraphResponse, LifecycleStage } from '@/api/types';
 import { useSaveDiagramLayoutMutation } from '@/api/pipeline';
 import { Button } from '@/components/ui/button';
-import { LayoutDashboard, Maximize2, Save } from 'lucide-react';
+import { LayoutDashboard, Maximize2, Save, ImageDown } from 'lucide-react';
 
 // --- Dagre layout ─────────────────────────────────────────────────────────────
 
@@ -127,13 +130,16 @@ const EDGE_TYPES = { pipelineEdge: PipelineEdge };
 
 // --- Inner canvas (needs useReactFlow — must be inside ReactFlowProvider) ──────
 
+const EXPORT_PADDING = 40; // px padding around nodes in exported image
+
 interface CanvasInnerProps {
   diagramId: string;
   graphData: DiagramGraphResponse;
   lifecycleCatalog: LifecycleStage[];
+  diagramName?: string;
 }
 
-function CanvasInner({ diagramId, graphData, lifecycleCatalog }: CanvasInnerProps) {
+function CanvasInner({ diagramId, graphData, lifecycleCatalog, diagramName }: CanvasInnerProps) {
   const { fitView, getViewport } = useReactFlow();
   const saveLayout = useSaveDiagramLayoutMutation(diagramId);
 
@@ -229,6 +235,54 @@ function CanvasInner({ diagramId, graphData, lifecycleCatalog }: CanvasInnerProp
     });
   }
 
+  // Export helpers — use html-to-image on the ReactFlow viewport element
+  function getFlowViewport() {
+    return document.querySelector<HTMLElement>('.react-flow__viewport');
+  }
+
+  function buildExportTransform() {
+    if (nodes.length === 0) return null;
+    const bounds = getNodesBounds(nodes);
+    const imgWidth = bounds.width + EXPORT_PADDING * 2;
+    const imgHeight = bounds.height + EXPORT_PADDING * 2;
+    const vp = getViewportForBounds(bounds, imgWidth, imgHeight, 0.5, 2, EXPORT_PADDING);
+    return { imgWidth, imgHeight, vp };
+  }
+
+  function handleExportPng() {
+    const el = getFlowViewport();
+    const t = buildExportTransform();
+    if (!el || !t) return;
+    const { imgWidth, imgHeight, vp } = t;
+    void toPng(el, {
+      width: imgWidth,
+      height: imgHeight,
+      style: { transform: `translate(${vp.x}px, ${vp.y}px) scale(${vp.zoom})` },
+    }).then((dataUrl) => {
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = `${diagramName ?? 'pipeline'}.png`;
+      a.click();
+    });
+  }
+
+  function handleExportSvg() {
+    const el = getFlowViewport();
+    const t = buildExportTransform();
+    if (!el || !t) return;
+    const { imgWidth, imgHeight, vp } = t;
+    void toSvg(el, {
+      width: imgWidth,
+      height: imgHeight,
+      style: { transform: `translate(${vp.x}px, ${vp.y}px) scale(${vp.zoom})` },
+    }).then((dataUrl) => {
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = `${diagramName ?? 'pipeline'}.svg`;
+      a.click();
+    });
+  }
+
   if (nodes.length === 0) {
     return (
       <div className="flex h-full items-center justify-center rounded-lg border border-dashed bg-muted/10 text-sm text-muted-foreground">
@@ -301,6 +355,26 @@ function CanvasInner({ diagramId, graphData, lifecycleCatalog }: CanvasInnerProp
             {saveLayout.isPending ? 'Kaydediliyor…' : 'Kaydet'}
           </span>
         </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-8 gap-1.5 bg-background shadow-sm"
+          onClick={handleExportPng}
+          title="PNG olarak indir"
+        >
+          <ImageDown className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">PNG</span>
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-8 gap-1.5 bg-background shadow-sm"
+          onClick={handleExportSvg}
+          title="SVG olarak indir"
+        >
+          <ImageDown className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">SVG</span>
+        </Button>
       </Panel>
     </ReactFlow>
   );
@@ -312,6 +386,8 @@ export interface PipelineCanvasProps {
   diagramId: string;
   graphData: DiagramGraphResponse;
   lifecycleCatalog: LifecycleStage[];
+  /** Used as the filename for PNG/SVG exports */
+  diagramName?: string;
 }
 
 export function PipelineCanvas(props: PipelineCanvasProps) {

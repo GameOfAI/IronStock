@@ -151,6 +151,7 @@ export default function DiagramPage() {
             diagramId={id}
             graphData={graphData}
             lifecycleCatalog={lifecycleCatalog}
+            diagramName={diagramDetail?.name}
           />
         </div>
       </div>

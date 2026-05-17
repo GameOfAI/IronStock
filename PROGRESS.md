@@ -6,8 +6,8 @@ Son güncelleme: 2026-05-17
 
 - **Aktif Faz:** Post-v1.0.0 Kapsamlı Geliştirmeler (Faz 6+)
 - **Tamamlanan Faz:** Faz 0 + 1 + 2 + 3 + 4 + 5 ✅
-- **Son tamamlanan:** PR-F5f — Lifecycle Lanes View ✅ 2026-05-17
-- **Proje durumu:** MVP + kapsamlı geliştirmeler devam ediyor. Faz 6+ PRları: PR-RT-1, PR-F1, PR-N6, PR-F2a, PR-F4, PR-F6a/b/c, PR-N4, PR-F2b, PR-F5a/b, PR-N7, PR-N8, PR-N1, PR-N2, PR-N5 tamamlandı. PR-F5c/d/e/f (DevOps Lifecycle Graph backend + ReactFlow canvas + Lifecycle Lanes) tamamlandı. Kalan: PR-F5g (Export+Polish), PR-F3 (Tauri Sync), PR-N3 (Onay Workflow — Faz 5 büyük iş).
+- **Son tamamlanan:** PR-F5g — Export + Polish ✅ 2026-05-17
+- **Proje durumu:** MVP + kapsamlı geliştirmeler devam ediyor. Faz 6+ PRları: PR-RT-1, PR-F1, PR-N6, PR-F2a, PR-F4, PR-F6a/b/c, PR-N4, PR-F2b, PR-F5a/b, PR-N7, PR-N8, PR-N1, PR-N2, PR-N5, PR-F5c/d/e/f/g tamamlandı. DevOps Lifecycle Graph özelliği tamamen bitti (5 PR). Kalan: PR-F3 (Tauri Sync), PR-N3 (Onay Workflow — Faz 5 büyük iş).
 
 ## Kapsamlı Geliştirme Planı — Durum Özeti (2026-05-16)
 
@@ -34,7 +34,7 @@ Son güncelleme: 2026-05-17
 | PR-F5d | Pipeline Diagrams CRUD API | ✅ DONE |
 | PR-F5e | ReactFlow Integration + Pipeline Canvas | ✅ DONE |
 | PR-F5f | Lifecycle Lanes View | ✅ DONE |
-| PR-F5g | Export + Polish | ⏳ TODO |
+| PR-F5g | Export + Polish | ✅ DONE |
 | PR-F3 | Tauri Client Sync | ⏳ TODO |
 | PR-N3 | Onay Workflow / Dual Control | ⏳ Faz 6+ (büyük iş) |
 
@@ -79,6 +79,21 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-05-17 (Win) — PR-F5g: Export + Polish ✅
+
+**PR-F5g: PNG/SVG Export + Pipeline List Polish** ✅
+- `html-to-image@^1.11.13` paketi eklendi
+- `pipeline-canvas.tsx`: PNG ve SVG export butonları eklendi (toolbar'a)
+  - `toPng` / `toSvg` — `.react-flow__viewport` DOM elemanına `html-to-image` uygulanır
+  - `getNodesBounds` + `getViewportForBounds` ile tüm node'ları kapsayan viewport hesaplanır
+  - `diagramName` prop'u ile dosya adı belirlenir (`production-pipeline.png` gibi)
+  - `CanvasInnerProps` + `PipelineCanvasProps`'a `diagramName?: string` eklendi
+- `diagram.tsx`: `diagramName={diagramDetail?.name}` PipelineCanvas'a geçirildi
+- `pages/pipeline/index.tsx`: Header'a "Lifecycle Lanes" outline butonu eklendi (`/pipeline/lifecycle` linki)
+- **Test sonucu:** 131/131 ✅ | `tsc -b` ✅ | ESLint ✅ | build ✅
+
+**PR-F5c/d/e/f/g TAMAMLANDI** — DevOps Lifecycle Graph + Pipeline Canvas özelliği tamamen bitti.
 
 ### 2026-05-17 (Win) — PR-F5f: Lifecycle Lanes View ✅
 
