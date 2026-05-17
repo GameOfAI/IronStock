@@ -1,5 +1,5 @@
 import { useEffect, useReducer, useState } from 'react';
-import { Eye, EyeOff, HelpCircle, Lock } from 'lucide-react';
+import { Eye, EyeOff, HelpCircle, Lock, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/select';
 import { useCreateItemMutation, useUpdateItemMutation } from '@/api/items';
 import { useAuthStore } from '@/store/auth';
-import { generateDEK, encryptField, toBase64 } from '@/lib/crypto';
+import { generateDEK, encryptField, toBase64, fromBase64, openDEKWithKEK, decryptField } from '@/lib/crypto';
 import type { FieldDefinition, Item, ItemType } from '@/api/types';
 
 interface Props {
@@ -28,7 +28,10 @@ interface Props {
   folderId: string;
   fieldDefinitions: FieldDefinition[];
   itemTypes: ItemType[];
-  /** When set, we're editing an existing item (name-only edit). */
+  /**
+   * When set, we're editing an existing item.
+   * Pass the full item (with owner_dek_wrapped + fields) so we can decrypt.
+   */
   editItem?: Item | null;
   /**
    * When set, opens in CREATE mode but pre-fills name/type/fields from this
@@ -96,9 +99,13 @@ export function ItemFormModal({
   const [itemTypeId, setItemTypeId] = useState<string>('');
   const [fields, dispatchFields] = useReducer(fieldReducer, {});
   const [error, setError] = useState<string | null>(null);
+  const [decryptingFields, setDecryptingFields] = useState(false);
   // PR-N1: expiry fields
   const [expiresAt, setExpiresAt] = useState(''); // ISO date string (YYYY-MM-DD)
   const [rotationIntervalDays, setRotationIntervalDays] = useState('');
+
+  // Cached DEK for edit mode — re-used on save to avoid re-wrapping.
+  const [editDek, setEditDek] = useState<Uint8Array | null>(null);
 
   const privateKey = useAuthStore((s) => s.privateKey);
   const user = useAuthStore((s) => s.user);
@@ -109,16 +116,67 @@ export function ItemFormModal({
 
   const selectedType = itemTypes.find((t) => t.id === Number(itemTypeId));
 
+  // Decrypt existing field values when opening in edit mode.
   useEffect(() => {
-    if (!open) return;
-    if (editItem) {
-      setName(editItem.name);
-      setDescription(editItem.description ?? '');
-      setItemTypeId(String(editItem.item_type_id));
-      // Populate expiry from existing item (ISO → date input needs YYYY-MM-DD).
-      setExpiresAt(editItem.expires_at ? editItem.expires_at.slice(0, 10) : '');
-      setRotationIntervalDays(editItem.rotation_interval_days != null ? String(editItem.rotation_interval_days) : '');
-    } else if (duplicateFrom) {
+    if (!open || !editItem) return;
+    setName(editItem.name);
+    setDescription(editItem.description ?? '');
+    setItemTypeId(String(editItem.item_type_id));
+    setExpiresAt(editItem.expires_at ? editItem.expires_at.slice(0, 10) : '');
+    setRotationIntervalDays(editItem.rotation_interval_days != null ? String(editItem.rotation_interval_days) : '');
+    setError(null);
+    createMutation.reset();
+    updateMutation.reset();
+    setEditDek(null);
+
+    // Try to decrypt fields if we have the DEK and private key.
+    if (!editItem.owner_dek_wrapped || !editItem.owner_wrap_nonce || !privateKey) {
+      // Build empty field map from the item type so inputs are still shown.
+      const type = itemTypes.find((t) => t.id === editItem.item_type_id);
+      if (type) {
+        dispatchFields({ type: 'reset', fields: buildInitialFields(type.suggested_fields, fieldDefinitions) });
+      }
+      return;
+    }
+
+    setDecryptingFields(true);
+    openDEKWithKEK(
+      fromBase64(editItem.owner_dek_wrapped),
+      fromBase64(editItem.owner_wrap_nonce),
+      privateKey,
+    )
+      .then(async (dek) => {
+        setEditDek(dek);
+        const type = itemTypes.find((t) => t.id === editItem.item_type_id);
+        const initial = type
+          ? buildInitialFields(type.suggested_fields, fieldDefinitions)
+          : {};
+
+        for (const f of editItem.fields ?? []) {
+          if (!f.value_enc || !f.value_nonce) continue;
+          try {
+            const plain = await decryptField(fromBase64(f.value_enc), fromBase64(f.value_nonce), dek);
+            initial[f.field_definition_id] = { value: plain, visible: false };
+          } catch {
+            // keep empty if decrypt fails
+          }
+        }
+        dispatchFields({ type: 'reset', fields: initial });
+      })
+      .catch(() => {
+        const type = itemTypes.find((t) => t.id === editItem.item_type_id);
+        if (type) {
+          dispatchFields({ type: 'reset', fields: buildInitialFields(type.suggested_fields, fieldDefinitions) });
+        }
+      })
+      .finally(() => setDecryptingFields(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editItem]);
+
+  // Reset for create/duplicate modes.
+  useEffect(() => {
+    if (!open || editItem) return;
+    if (duplicateFrom) {
       setName(duplicateFrom.name);
       setDescription(duplicateFrom.description ?? '');
       setItemTypeId(String(duplicateFrom.itemTypeId));
@@ -130,20 +188,17 @@ export function ItemFormModal({
       setRotationIntervalDays('');
     }
     setError(null);
-    // Reset stale mutation errors from previous calls.
     createMutation.reset();
     updateMutation.reset();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editItem, duplicateFrom, itemTypes]);
 
   // Re-build the field map whenever the modal opens or the selected type
-  // changes. Including `open` in deps ensures fields fully reset on each
-  // open — even when selectedType reference is stable across opens.
+  // changes — only for create/duplicate modes.
   useEffect(() => {
     if (!open || !selectedType || isEdit) return;
     const initial = buildInitialFields(selectedType.suggested_fields, fieldDefinitions);
     if (duplicateFrom) {
-      // Prefill plaintext values from the duplicate source.
       for (const defIdStr of Object.keys(initial)) {
         const defId = Number(defIdStr);
         const v = duplicateFrom.fieldValues[defId];
@@ -163,31 +218,45 @@ export function ItemFormModal({
 
     try {
       if (isEdit && editItem) {
+        if (!privateKey) {
+          setError('Şifreleme anahtarı bulunamadı. Lütfen yeniden giriş yapın.');
+          return;
+        }
+        // Re-use existing DEK if we decrypted it, otherwise create a new one.
+        const dek = editDek ?? generateDEK();
+        const { wrapped: ownerDEKWrapped, nonce: wrapNonce } = await sealDEKWithKEK(dek, privateKey);
+
+        const encryptedFields = await Promise.all(
+          Object.entries(fields)
+            .filter(([, { value }]) => value.trim() !== '')
+            .map(async ([defIdStr, { value }], idx) => {
+              const defId = Number(defIdStr);
+              const { valueEnc, valueNonce } = await encryptField(value.trim(), dek);
+              return {
+                field_definition_id: defId,
+                value_enc: toBase64(valueEnc),
+                value_nonce: toBase64(valueNonce),
+                position: idx,
+              };
+            }),
+        );
+
         await updateMutation.mutateAsync({
           name: trimmed,
           description: description.trim() || undefined,
           expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
           rotation_interval_days: rotationIntervalDays ? Number(rotationIntervalDays) : null,
+          fields: encryptedFields,
+          owner_dek_wrapped: toBase64(ownerDEKWrapped),
+          owner_wrap_nonce: toBase64(wrapNonce),
         });
       } else {
         if (!privateKey || !user) {
           setError('Şifreleme için oturum anahtarı bulunamadı. Lütfen yeniden giriş yapın.');
           return;
         }
-        // Build public key from user's keypair to seal DEK with own public key.
-        // We derive public key from private key on the fly via generateX25519Keypair.
-        // For sealing: we need own public key. It's stored in the server keypair.
-        // Short-cut: wrap DEK with KEK instead of X25519 to keep create working
-        // until server exposes owner public key inline. This is intentional MVP
-        // simplification — when server adds GET /users/me/keypair pub_key we swap.
-        //
-        // For now, use KEK-wrapped DEK (symmetric, owner-only) as placeholder.
-        // The server just stores whatever bytes we send.
         const dek = generateDEK();
-        const { wrapped: ownerDEKWrapped, nonce: wrapNonce } = await sealDEKWithKEK(
-          dek,
-          privateKey,
-        );
+        const { wrapped: ownerDEKWrapped, nonce: wrapNonce } = await sealDEKWithKEK(dek, privateKey);
 
         const encryptedFields = await Promise.all(
           Object.entries(fields)
@@ -225,7 +294,11 @@ export function ItemFormModal({
 
   const suggestedDefs = selectedType
     ? fieldDefinitions.filter((d) => selectedType.suggested_fields.includes(d.key))
-    : [];
+    : editItem
+      ? fieldDefinitions.filter((d) =>
+          itemTypes.find((t) => t.id === editItem.item_type_id)?.suggested_fields.includes(d.key),
+        )
+      : [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -281,14 +354,24 @@ export function ItemFormModal({
             </div>
           )}
 
-          {!isEdit && suggestedDefs.length > 0 && (
+          {/* Field inputs — shown for both create and edit */}
+          {suggestedDefs.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Lock size={12} />
                 Alanlar uçtan uca şifrelenir
+                {decryptingFields && (
+                  <span className="flex items-center gap-1 ml-2">
+                    <Loader2 size={11} className="animate-spin" />
+                    Şifre çözülüyor…
+                  </span>
+                )}
               </div>
-              {selectedType?.field_groups && selectedType.field_groups.length > 0
-                ? selectedType.field_groups.map((group) => {
+              {(() => {
+                const editType = isEdit ? itemTypes.find((t) => t.id === editItem?.item_type_id) : selectedType;
+                const hasGroups = editType?.field_groups && editType.field_groups.length > 0;
+                if (hasGroups && editType?.field_groups) {
+                  return editType.field_groups.map((group) => {
                     const groupDefs = group.fields
                       .map((k) => suggestedDefs.find((d) => d.key === k))
                       .filter(Boolean) as FieldDefinition[];
@@ -307,7 +390,7 @@ export function ItemFormModal({
                               key={def.id}
                               def={def}
                               state={fields[def.id] ?? { value: '', visible: false }}
-                              disabled={isPending}
+                              disabled={isPending || decryptingFields}
                               onChangeValue={(v) => dispatchFields({ type: 'set', id: def.id, value: v })}
                               onToggleVisible={() => dispatchFields({ type: 'toggle', id: def.id })}
                             />
@@ -315,21 +398,23 @@ export function ItemFormModal({
                         </div>
                       </div>
                     );
-                  })
-                : (
+                  });
+                }
+                return (
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     {suggestedDefs.map((def) => (
                       <FieldInput
                         key={def.id}
                         def={def}
                         state={fields[def.id] ?? { value: '', visible: false }}
-                        disabled={isPending}
+                        disabled={isPending || decryptingFields}
                         onChangeValue={(v) => dispatchFields({ type: 'set', id: def.id, value: v })}
                         onToggleVisible={() => dispatchFields({ type: 'toggle', id: def.id })}
                       />
                     ))}
                   </div>
-                )}
+                );
+              })()}
             </div>
           )}
 

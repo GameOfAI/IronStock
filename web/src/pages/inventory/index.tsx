@@ -383,7 +383,7 @@ export default function InventoryPage() {
             folderId={folderId}
             fieldDefinitions={fieldDefsQuery.data?.field_definitions ?? []}
             itemTypes={itemTypesQuery.data?.item_types ?? []}
-            editItem={selectedItem}
+            editItem={fullItemQuery.data ?? selectedItem}
           />
           <ItemDeleteDialog
             open={itemModal === 'delete'}

@@ -202,6 +202,11 @@ export interface ItemUpdateRequest {
   expires_at?: string | null;
   /** "Rotate every N days" policy; null to clear (PR-N1). */
   rotation_interval_days?: number | null;
+  /** When present, fully replaces all encrypted field values (replace-all semantics). */
+  fields?: ItemFieldInput[];
+  /** Re-wrapped DEK for the owner (required when fields are updated). */
+  owner_dek_wrapped?: string;
+  owner_wrap_nonce?: string;
 }
 
 export interface Item {
