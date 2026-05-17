@@ -10,7 +10,7 @@
  */
 
 import { useState } from 'react';
-import { Loader2, MoreVertical } from 'lucide-react';
+import { KeyRound, Loader2, MoreVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -32,11 +32,22 @@ import {
   useDisableUserMutation,
   useEnableUserMutation,
   useGrantRoleMutation,
+  useResetTOTPMutation,
   useRevokeRoleMutation,
 } from '@/api/admin';
 import { useAuthStore } from '@/store/auth';
 import { ApiError } from '@/api/errors';
 import type { AdminUser } from '@/api/types';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { DisableConfirmDialog } from './disable-confirm-dialog';
 
 interface UserActionsMenuProps {
@@ -56,11 +67,13 @@ export function UserActionsMenu({ user }: UserActionsMenuProps) {
   const me = useAuthStore((s) => s.user);
   const { toast } = useToast();
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [totpResetOpen, setTotpResetOpen] = useState(false);
 
   const grantRole = useGrantRoleMutation(user.id);
   const revokeRole = useRevokeRoleMutation(user.id);
   const disableUser = useDisableUserMutation(user.id);
   const enableUser = useEnableUserMutation(user.id);
+  const resetTotp = useResetTOTPMutation(user.id);
 
   const isSelf = me?.id === user.id;
   const userRoles = new Set(user.roles);
@@ -110,6 +123,22 @@ export function UserActionsMenu({ user }: UserActionsMenuProps) {
       onError: (err) => {
         toast({
           title: 'Etkinleştirilemedi',
+          description: describeError(err),
+          variant: 'destructive',
+        });
+      },
+    });
+  }
+
+  function handleTotpReset() {
+    resetTotp.mutate(undefined, {
+      onSuccess: () => {
+        setTotpResetOpen(false);
+        toast({ title: 'TOTP sıfırlandı', description: `${user.username} bir sonraki girişte TOTP'yi yeniden kurmalı.` });
+      },
+      onError: (err) => {
+        toast({
+          title: 'TOTP sıfırlanamadı',
           description: describeError(err),
           variant: 'destructive',
         });
@@ -172,6 +201,18 @@ export function UserActionsMenu({ user }: UserActionsMenuProps) {
             );
           })}
           <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onSelect={(e) => {
+              e.preventDefault();
+              setTotpResetOpen(true);
+            }}
+            className="text-amber-600 focus:text-amber-700"
+            disabled={isSelf}
+          >
+            <KeyRound className="mr-2 h-4 w-4" />
+            TOTP Sıfırla
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
           {isDisabled ? (
             <DropdownMenuItem onSelect={handleEnable} disabled={statusPending || isSelf}>
               Etkinleştir
@@ -213,6 +254,29 @@ export function UserActionsMenu({ user }: UserActionsMenuProps) {
         onConfirm={handleDisableConfirm}
         isPending={disableUser.isPending}
       />
+
+      {/* TOTP Reset confirmation dialog */}
+      <AlertDialog open={totpResetOpen} onOpenChange={setTotpResetOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>TOTP Sıfırla</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>{user.username}</strong> kullanıcısının TOTP ayarları sıfırlanacak.
+              Bir sonraki girişte yeniden kurması gerekecek.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>İptal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleTotpReset}
+              className="bg-amber-600 text-white hover:bg-amber-700"
+              disabled={resetTotp.isPending}
+            >
+              {resetTotp.isPending ? 'Sıfırlanıyor…' : 'Sıfırla'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

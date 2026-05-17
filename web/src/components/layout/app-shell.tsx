@@ -18,7 +18,6 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   Folder,
   Shield,
-  ShieldCheck,
   FileText,
   LogOut,
   Sun,
@@ -31,7 +30,6 @@ import {
   Loader2,
   ShieldAlert,
   UserCircle,
-  Users,
   Tag,
   Bell,
   CheckCheck,
@@ -450,19 +448,7 @@ export function AppShell() {
                 <NavItem
                   to="/admin/users"
                   icon={Shield}
-                  label="Kullanıcılar"
-                  collapsed={sidebarCollapsed && !mobileOpen}
-                />
-                <NavItem
-                  to="/admin/groups"
-                  icon={Users}
-                  label="Gruplar"
-                  collapsed={sidebarCollapsed && !mobileOpen}
-                />
-                <NavItem
-                  to="/admin/roles"
-                  icon={ShieldCheck}
-                  label="Rol Yönetimi"
+                  label="Kullanıcı Yönetimi"
                   collapsed={sidebarCollapsed && !mobileOpen}
                 />
                 <NavItem

@@ -109,6 +109,19 @@ export function useEnableUserMutation(userId: string) {
   });
 }
 
+// ---------- TOTP Reset (PR-UX3) ----------
+
+export function useResetTOTPMutation(userId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      apiFetch<void>(`/api/v1/admin/users/${userId}/totp/reset`, {
+        method: 'POST',
+      }),
+    onSuccess: () => invalidateAllUserPages(queryClient),
+  });
+}
+
 // ---------- Audit log ----------
 
 /**
