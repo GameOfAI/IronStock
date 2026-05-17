@@ -6,8 +6,8 @@ Son güncelleme: 2026-05-17
 
 - **Aktif Faz:** Post-v1.0.0 Kapsamlı Geliştirmeler (Faz 6+)
 - **Tamamlanan Faz:** Faz 0 + 1 + 2 + 3 + 4 + 5 ✅
-- **Son tamamlanan:** PR-F5e — ReactFlow Integration + Pipeline Canvas ✅ 2026-05-17
-- **Proje durumu:** MVP + kapsamlı geliştirmeler devam ediyor. Faz 6+ PRları: PR-RT-1, PR-F1, PR-N6, PR-F2a, PR-F4, PR-F6a/b/c, PR-N4, PR-F2b, PR-F5a/b, PR-N7, PR-N8, PR-N1, PR-N2, PR-N5 tamamlandı. PR-F5c/d/e (DevOps Lifecycle Graph + Pipeline Diyagramları backend + canvas) tamamlandı. Kalan: PR-F5f (Lifecycle Lanes), PR-F5g (Export+Polish), PR-F3 (Tauri Sync), PR-N3 (Onay Workflow — Faz 5 büyük iş).
+- **Son tamamlanan:** PR-F5f — Lifecycle Lanes View ✅ 2026-05-17
+- **Proje durumu:** MVP + kapsamlı geliştirmeler devam ediyor. Faz 6+ PRları: PR-RT-1, PR-F1, PR-N6, PR-F2a, PR-F4, PR-F6a/b/c, PR-N4, PR-F2b, PR-F5a/b, PR-N7, PR-N8, PR-N1, PR-N2, PR-N5 tamamlandı. PR-F5c/d/e/f (DevOps Lifecycle Graph backend + ReactFlow canvas + Lifecycle Lanes) tamamlandı. Kalan: PR-F5g (Export+Polish), PR-F3 (Tauri Sync), PR-N3 (Onay Workflow — Faz 5 büyük iş).
 
 ## Kapsamlı Geliştirme Planı — Durum Özeti (2026-05-16)
 
@@ -33,7 +33,7 @@ Son güncelleme: 2026-05-17
 | PR-F5c | Lifecycle Stages + Assignment API | ✅ DONE |
 | PR-F5d | Pipeline Diagrams CRUD API | ✅ DONE |
 | PR-F5e | ReactFlow Integration + Pipeline Canvas | ✅ DONE |
-| PR-F5f | Lifecycle Lanes View | ⏳ TODO |
+| PR-F5f | Lifecycle Lanes View | ✅ DONE |
 | PR-F5g | Export + Polish | ⏳ TODO |
 | PR-F3 | Tauri Client Sync | ⏳ TODO |
 | PR-N3 | Onay Workflow / Dual Control | ⏳ Faz 6+ (büyük iş) |
@@ -79,6 +79,19 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-05-17 (Win) — PR-F5f: Lifecycle Lanes View ✅
+
+**PR-F5f: Lifecycle Lanes Frontend** ✅
+- `graph_handlers.go`: `graphResponse` struct'ına `LifecycleStages map[string][]int32` eklendi; tek SQL sorgusu ile tüm visible item'ların stage atamaları `ANY($1::uuid[])` ile çekiliyor
+- `shared/pkg/src/api/types.ts`: `GraphResponse` interface'ine `lifecycle_stages: Record<string, number[]>` eklendi
+- `lifecycle-lane.tsx` (YENİ): Tek lifecycle şerit bileşeni — stage header (renk+sayaç), HTML5 native drag-and-drop drop zone, item kartları (sürüklenebilir, × kaldırma butonu)
+- `pages/pipeline/lifecycle.tsx` (YENİ): `/pipeline/lifecycle` route — 8 aşama yatay swimlane, "Atanmamış" öğeler alt bölüm, `LifecycleStageBridge` pattern (hook'u event handler içinde çağırma sınırlamasını aşmak için custom DOM event köprüsü), yenile butonu
+- `App.tsx`: `/pipeline/lifecycle` route eklendi (`/pipeline/:id`'den önce — react-router çakışmaması)
+- `app-shell.tsx`: "Lifecycle Lanes" nav linki (Layers icon) eklendi
+- **Test sonucu:** 131/131 ✅ | `tsc -b` ✅ | ESLint ✅ | build ✅
+
+**Sıradaki:** PR-F5g (Export + Polish)
 
 ### 2026-05-17 (Win) — PR-F5e: ReactFlow Integration + Pipeline Canvas ✅
 

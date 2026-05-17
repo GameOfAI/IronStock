@@ -50,8 +50,9 @@ type graphEdge struct {
 
 // graphResponse is the full graph payload.
 type graphResponse struct {
-	Nodes []graphNode `json:"nodes"`
-	Edges []graphEdge `json:"edges"`
+	Nodes           []graphNode        `json:"nodes"`
+	Edges           []graphEdge        `json:"edges"`
+	LifecycleStages map[string][]int32 `json:"lifecycle_stages"` // item_id → stage IDs
 }
 
 // addRelationshipRequest is the POST /items/{id}/relationships body.
@@ -238,7 +239,32 @@ func (h *GraphHandlers) Graph(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, graphResponse{Nodes: nodes, Edges: edges})
+	// --- Fetch lifecycle stage assignments for visible nodes ---
+	lifecycleStages := make(map[string][]int32, len(nodes))
+	if len(nodes) > 0 {
+		nodeIDs := make([]string, len(nodes))
+		for i, n := range nodes {
+			nodeIDs[i] = n.ID
+		}
+		lsRows, lsErr := h.Service.DB.Query(ctx, `
+			SELECT item_id::text, lifecycle_stage_id
+			FROM item_lifecycle_stages
+			WHERE item_id = ANY($1::uuid[])
+			ORDER BY item_id, lifecycle_stage_id
+		`, nodeIDs)
+		if lsErr == nil {
+			defer lsRows.Close()
+			for lsRows.Next() {
+				var itemID string
+				var stageID int32
+				if scanErr := lsRows.Scan(&itemID, &stageID); scanErr == nil {
+					lifecycleStages[itemID] = append(lifecycleStages[itemID], stageID)
+				}
+			}
+		}
+	}
+
+	writeJSON(w, http.StatusOK, graphResponse{Nodes: nodes, Edges: edges, LifecycleStages: lifecycleStages})
 }
 
 // AddRelationship implements POST /api/v1/items/{id}/relationships.

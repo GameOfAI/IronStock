@@ -37,6 +37,7 @@ import {
   CheckCheck,
   GitBranch,
   Network,
+  Layers,
   AlertOctagon,
   X,
 } from 'lucide-react';
@@ -436,6 +437,12 @@ export function AppShell() {
               to="/pipeline"
               icon={Network}
               label="Pipeline Diyagramları"
+              collapsed={sidebarCollapsed && !mobileOpen}
+            />
+            <NavItem
+              to="/pipeline/lifecycle"
+              icon={Layers}
+              label="Lifecycle Lanes"
               collapsed={sidebarCollapsed && !mobileOpen}
             />
             {isAdmin && (

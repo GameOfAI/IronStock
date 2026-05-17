@@ -501,6 +501,8 @@ export interface GraphEdge {
 export interface GraphResponse {
   nodes: GraphNode[];
   edges: GraphEdge[];
+  /** item_id → list of lifecycle_stage_id values assigned to that item */
+  lifecycle_stages: Record<string, number[]>;
 }
 
 export interface AddRelationshipRequest {
