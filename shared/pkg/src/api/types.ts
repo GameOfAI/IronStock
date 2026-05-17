@@ -610,3 +610,107 @@ export interface ShareLinkViewResponse {
   expires_at: string; // RFC 3339
   views_left: number;
 }
+
+// --- Lifecycle Stages (PR-F5c) ---
+
+/** A single DevOps lifecycle stage (catalog entry). */
+export interface LifecycleStage {
+  id: number;
+  key: string;
+  label: string;
+  sort_order: number;
+  color: string;
+}
+
+/** Response for GET /api/v1/lifecycle-stages */
+export interface LifecycleStagesResponse {
+  stages: LifecycleStage[];
+}
+
+/** Response for GET /api/v1/items/{id}/lifecycle-stages */
+export interface ItemLifecycleStagesResponse {
+  stage_ids: number[];
+}
+
+/** Request body for POST /api/v1/items/{id}/lifecycle-stages */
+export interface SetItemLifecycleStagesRequest {
+  stage_ids: number[];
+}
+
+// --- Pipeline Diagrams (PR-F5d) ---
+
+/** Diagram metadata (list view). */
+export interface PipelineDiagramMeta {
+  id: string;
+  name: string;
+  description?: string | null;
+  folder_id?: string | null;
+  layout_data: Record<string, unknown>;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** A node within a diagram (item + position). */
+export interface PipelineDiagramNode {
+  item_id: string;
+  position_x?: number | null;
+  position_y?: number | null;
+  custom_label?: string | null;
+}
+
+/** Full diagram detail (meta + nodes). */
+export interface PipelineDiagramDetail extends PipelineDiagramMeta {
+  nodes: PipelineDiagramNode[];
+}
+
+export interface PipelineDiagramsListResponse {
+  diagrams: PipelineDiagramMeta[];
+}
+
+export interface CreatePipelineDiagramRequest {
+  name: string;
+  description?: string;
+  folder_id?: string;
+}
+
+export interface UpdatePipelineDiagramRequest {
+  name?: string;
+  description?: string;
+}
+
+export interface AddDiagramNodesRequest {
+  item_ids: string[];
+}
+
+export interface SaveDiagramLayoutRequest {
+  nodes: { item_id: string; position_x: number | null; position_y: number | null }[];
+  viewport?: Record<string, unknown>;
+}
+
+/** Response for GET /pipeline-diagrams/{id}/graph */
+export interface DiagramGraphNode {
+  id: string;
+  folder_id: string;
+  item_type_id: number;
+  name_enc: string;
+  name_nonce: string;
+  server_dek_wrapped: string;
+  master_key_id: number;
+  position_x?: number | null;
+  position_y?: number | null;
+  custom_label?: string | null;
+}
+
+export interface DiagramGraphEdge {
+  source_id: string;
+  target_id: string;
+  type: RelationshipType;
+  metadata?: Record<string, unknown>;
+}
+
+export interface DiagramGraphResponse {
+  nodes: DiagramGraphNode[];
+  edges: DiagramGraphEdge[];
+  lifecycle_stages: Record<string, number[]>;
+}

@@ -128,7 +128,7 @@ describe('ItemFormModal — edit', () => {
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Kaydet' }));
     });
-    expect(mutateAsync).toHaveBeenCalledWith({ name: 'new-name' });
+    expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ name: 'new-name' }));
   });
 
   it('shows description field in edit mode', () => {

@@ -26,6 +26,8 @@ const (
 	ErrCodeAccountPendingMFA = "account_pending_totp"
 	ErrCodeMFARequired       = "mfa_required"
 	ErrCodeRateLimited       = "rate_limited"
+	ErrCodeForbidden         = "forbidden"
+	ErrCodeValidation        = "validation_error"
 	ErrCodeNotFound          = "not_found"
 	ErrCodeConflict          = "conflict"
 	ErrCodeInternal          = "internal_error"

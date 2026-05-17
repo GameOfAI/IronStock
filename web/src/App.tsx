@@ -21,6 +21,8 @@ import AdminRolesPage from '@/pages/admin/roles';
 import AdminGroupsPage from '@/pages/admin/groups';
 import TagsPage from '@/pages/tags';
 import { GraphPage } from '@/pages/graph';
+import PipelineListPage from '@/pages/pipeline/index';
+import DiagramPage from '@/pages/pipeline/diagram';
 import AdminSetupPage from '@/pages/admin-setup';
 import AdminLoginPage from '@/pages/admin-login';
 import ChangePasswordPage from '@/pages/change-password';
@@ -98,6 +100,8 @@ export default function App() {
                   <Route path="/inventory/*" element={<InventoryPage />} />
                   <Route path="/tags" element={<TagsPage />} />
                   <Route path="/graph" element={<GraphPage />} />
+                  <Route path="/pipeline" element={<PipelineListPage />} />
+                  <Route path="/pipeline/:id" element={<DiagramPage />} />
                   <Route path="/profile" element={<ProfilePage />} />
 
                   {/* Admin */}

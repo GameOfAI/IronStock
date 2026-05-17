@@ -2,7 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-vi.mock('@/api/items', () => ({ useItem: vi.fn() }));
+vi.mock('@/api/items', () => ({
+  useItem: vi.fn(),
+  useRecordRotationMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+}));
 vi.mock('@/api/attachments', () => ({
   useAttachments: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useInitUploadMutation: vi.fn().mockReturnValue({ mutateAsync: vi.fn(), isPending: false }),

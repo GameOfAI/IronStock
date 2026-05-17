@@ -36,6 +36,7 @@ import {
   Bell,
   CheckCheck,
   GitBranch,
+  Network,
   AlertOctagon,
   X,
 } from 'lucide-react';
@@ -429,6 +430,12 @@ export function AppShell() {
               to="/graph"
               icon={GitBranch}
               label="İlişki Haritası"
+              collapsed={sidebarCollapsed && !mobileOpen}
+            />
+            <NavItem
+              to="/pipeline"
+              icon={Network}
+              label="Pipeline Diyagramları"
               collapsed={sidebarCollapsed && !mobileOpen}
             />
             {isAdmin && (

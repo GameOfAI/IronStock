@@ -1,13 +1,13 @@
 # İlerleyiş
 
-Son güncelleme: 2026-05-16
+Son güncelleme: 2026-05-17
 
 ## Mevcut Durum
 
 - **Aktif Faz:** Post-v1.0.0 Kapsamlı Geliştirmeler (Faz 6+)
 - **Tamamlanan Faz:** Faz 0 + 1 + 2 + 3 + 4 + 5 ✅
-- **Son tamamlanan:** PR-N5 — One-Time Share Links ✅ 2026-05-16
-- **Proje durumu:** MVP + kapsamlı geliştirmeler devam ediyor. Faz 6+ PRları: PR-RT-1, PR-F1, PR-N6, PR-F2a, PR-F4, PR-F6a/b/c, PR-N4, PR-F2b, PR-F5a/b, PR-N7, PR-N8, PR-N1, PR-N2, PR-N5 tamamlandı. Kalan: PR-F3 (Tauri Sync), PR-N3 (Onay Workflow — Faz 5 büyük iş).
+- **Son tamamlanan:** PR-F5e — ReactFlow Integration + Pipeline Canvas ✅ 2026-05-17
+- **Proje durumu:** MVP + kapsamlı geliştirmeler devam ediyor. Faz 6+ PRları: PR-RT-1, PR-F1, PR-N6, PR-F2a, PR-F4, PR-F6a/b/c, PR-N4, PR-F2b, PR-F5a/b, PR-N7, PR-N8, PR-N1, PR-N2, PR-N5 tamamlandı. PR-F5c/d/e (DevOps Lifecycle Graph + Pipeline Diyagramları backend + canvas) tamamlandı. Kalan: PR-F5f (Lifecycle Lanes), PR-F5g (Export+Polish), PR-F3 (Tauri Sync), PR-N3 (Onay Workflow — Faz 5 büyük iş).
 
 ## Kapsamlı Geliştirme Planı — Durum Özeti (2026-05-16)
 
@@ -30,6 +30,11 @@ Son güncelleme: 2026-05-16
 | PR-N1 | Credential Expiry / TTL + Rotation Hatırlatıcısı | ✅ DONE |
 | PR-N2 | Secret Versioning (10 versiyon) | ✅ DONE |
 | PR-N5 | One-Time Paylaşım Linki | ✅ DONE |
+| PR-F5c | Lifecycle Stages + Assignment API | ✅ DONE |
+| PR-F5d | Pipeline Diagrams CRUD API | ✅ DONE |
+| PR-F5e | ReactFlow Integration + Pipeline Canvas | ✅ DONE |
+| PR-F5f | Lifecycle Lanes View | ⏳ TODO |
+| PR-F5g | Export + Polish | ⏳ TODO |
 | PR-F3 | Tauri Client Sync | ⏳ TODO |
 | PR-N3 | Onay Workflow / Dual Control | ⏳ Faz 6+ (büyük iş) |
 
@@ -74,6 +79,46 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-05-17 (Win) — PR-F5e: ReactFlow Integration + Pipeline Canvas ✅
+
+**PR-F5e: ReactFlow + Dagre Pipeline Canvas (Frontend)** ✅
+- `web/package.json`: `@xyflow/react@^12.3.6` + `@dagrejs/dagre@^1.0.4` eklendi
+- `pipeline-constants.ts` (YENİ): `PIPELINE_TYPE_ICONS`, `PIPELINE_TYPE_LABELS`, `REL_LABELS` — react-refresh uyumluluğu için constants dosyası
+- `pipeline-node.tsx` (YENİ): Custom ReactFlow node — lifecycle stage renk barı, item type icon, tür etiketi, Handle'lar
+- `pipeline-edge.tsx` (YENİ): Animated bezier edge — `dashdraw` CSS animasyonu, ilişki tipi etiketi, EdgeLabelRenderer
+- `pipeline-canvas.tsx` (YENİ): ReactFlow canvas — `ReactFlowProvider` + `CanvasInner` pattern, dagre LR auto-layout (konumsuz node'larda otomatik), debounced drag-stop save (1s), Background/Controls/MiniMap, toolbar (Auto Layout / Fit View / Save)
+- `diagram-sidebar.tsx` (YENİ): Item picker — `useGraphQuery` ile mevcut item'lar listelenir, already-in-diagram filtreleme, search, "Ekle" + "Tümünü ekle"
+- `pages/pipeline/index.tsx` (YENİ): Diyagram listesi (`/pipeline`) — CreateDiagramModal, DiagramCard, AlertDialog ile silme
+- `pages/pipeline/diagram.tsx` (YENİ): Tekil diyagram sayfası (`/pipeline/:id`) — breadcrumb, stats (node/edge sayısı), sidebar + canvas
+- `App.tsx`: `/pipeline` + `/pipeline/:id` route'ları eklendi
+- `app-shell.tsx`: "Pipeline Diyagramları" nav linki (Network icon)
+- **Pre-existing bug fix:** `apiFetch` headers+JSON.stringify sorunu (`pipeline.ts`, `graph.ts`, `lifecycle.ts`), `OnNodeDrag` tip fix, `is_break_glass` fixture eksikliği, `useRecordRotationMutation` mock eksikliği, `expect.objectContaining` fix
+- **Test sonucu:** 25 dosya, 131 test ✅ all pass | `tsc -b` ✅ | ESLint ✅ | `npm run build` ✅
+
+**Sıradaki:** PR-F5f (Lifecycle Lanes View — Frontend)
+
+### 2026-05-17 (Win) — PR-F5c/d: DevOps Lifecycle Stages + Pipeline Diagrams Backend ✅
+
+**PR-F5c: Lifecycle Stages + Assignment API** ✅
+- Migration 00032: `lifecycle_stages` sabit katalog (8 DevOps aşaması: plan→code→build→test→release→deploy→operate→monitor) + `item_lifecycle_stages` many-to-many
+- `lifecycle_handlers.go`: ListStages (GET catalog), GetItemStages (GET assigned), SetItemStages (POST upsert — delete+insert TX, write permission required)
+- Router + main.go wiring
+- TypeScript types: `LifecycleStage`, `LifecycleStagesResponse`, `ItemLifecycleStagesResponse`, `SetItemLifecycleStagesRequest`
+- Web API hooks: `useLifecycleStagesQuery`, `useItemLifecycleStagesQuery`, `useSetItemLifecycleStagesMutation`
+
+**PR-F5d: Pipeline Diagrams CRUD API** ✅
+- Migration 00033: `pipeline_diagrams` (id, name, description, folder_id, layout_data JSONB, created_by) + `pipeline_diagram_nodes` (diagram_id, item_id, position_x/y, custom_label)
+- `pipeline_handlers.go`: Full CRUD (List/Create/Get/Update/Delete) + AddNodes + RemoveNode + SaveLayout + DiagramGraph
+- DiagramGraph: filtered nodes+edges (only items in the diagram) + lifecycle_stages map per item
+- Ownership-based access control (owner or admin)
+- Router + main.go wiring
+- TypeScript types: `PipelineDiagramMeta`, `PipelineDiagramNode`, `PipelineDiagramDetail`, `DiagramGraphNode/Edge/Response`, request types
+- Web API hooks: `usePipelineDiagramsQuery`, `usePipelineDiagramQuery`, `useDiagramGraphQuery`, + 5 mutation hooks
+
+**Bug fix:** `ErrCodeForbidden` + `ErrCodeValidation` constants eklenmiş (error.go'da eksikti, graph_handlers.go kullanıyordu).
+
+**Sıradaki:** PR-F5e (ReactFlow Integration + Pipeline Canvas — Frontend)
 
 ### 2026-05-16 (Win) — PR-F2b: Trusted Device ✅
 

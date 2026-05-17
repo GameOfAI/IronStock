@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-05-16 (**Post-v1.0.0 Kapsamlı Geliştirmeler devam ediyor** — PR-RT-1..PR-N5 tamamlandı. Kalan: PR-F3 + PR-N3.)
+Son güncelleme: 2026-05-17 (**Post-v1.0.0 Kapsamlı Geliştirmeler devam ediyor** — PR-RT-1..PR-N5 + PR-F5c + PR-F5d tamamlandı. Kalan: PR-F5e/f/g + PR-F3 + PR-N3.)
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 
@@ -617,6 +617,8 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 - [x] **PR-F2b** — Trusted Device: 30 günlük "Bu cihazı hatırla". `trusted_devices` tablosu, SHA-256 cookie token, rolling TTL. Login flow entegrasyonu. Web: login checkbox + profile TrustedDevicesCard.
 - [x] **PR-F5a** — Graph Handler: `GET /api/v1/graph` (RBAC-filtered nodes+edges), `POST/DELETE /items/{id}/relationships`. item_rel_type_chk genişletildi (uses_tool, builds_to, scans_with, deploys_to).
 - [x] **PR-F5b** — Graph UI: `/graph` sayfası, node kartları (type badge + edges), ilişki ekleme/silme, arama. Nav sidebar'a GitBranch linki.
+- [x] **PR-F5c** — Lifecycle Stages Backend: `lifecycle_stages` + `item_lifecycle_stages` tablosu (migration 00032). `GET /lifecycle-stages`, `GET/POST /items/{id}/lifecycle-stages` endpoint'leri. `LifecycleHandlers` struct.
+- [x] **PR-F5d** — Pipeline Diagrams CRUD Backend: `pipeline_diagrams` + `pipeline_diagram_nodes` tablosu (migration 00033). 9 endpoint (diagram CRUD + node management + layout save + filtered graph). `PipelineHandlers` struct. TypeScript tipleri `shared/pkg/src/api/types.ts`'e eklendi. React Query hook'ları (`web/src/api/pipeline.ts` + `web/src/api/lifecycle.ts`).
 - [x] **PR-N7** — Tags + Favoriler: `tags`, `item_tags`, `user_favorites` tablosu. 9 endpoint. Web: inventory left panel favoriler, item detail tag chip'leri, ItemTagsPanel, FavoritesPage.
 - [x] **PR-N8** — Notification Sistemi: `notifications` tablosu + partial index (unread). `notify.Writer` (sync + async). WS `notification.created` event. Web: TopBar bell badge + popover list + mark-all-read.
 - [x] **PR-N1** — Credential Expiry/Rotation: `items.expires_at`, `rotation_interval_days`, `last_rotated_at`. Nightly scanner goroutine (1h tick, 7-gün penceresi, idempotent). Item detail expiry/rotation section. `POST /items/{id}/rotate`.
@@ -625,6 +627,9 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 
 ### ⏳ Kalan
 
+- [ ] **PR-F5e** — ReactFlow Integration + Pipeline Canvas (Frontend): `@xyflow/react` + `@dagrejs/dagre` kurulumu. `/pipeline` diyagram listesi sayfası, `/pipeline/:id` ReactFlow canvas. Custom node (item card + lifecycle stage rengi + handle'lar), custom edge (relationship type etiketi + animated). Dagre LR auto-layout. Sol sidebar item picker. Layout kaydetme.
+- [ ] **PR-F5f** — Lifecycle Lanes View (Frontend): Yatay swimlane görünümü. `lifecycle.tsx` sayfası. Her lane bir aşama (plan/code/build/…). Item'ları sürükleyip lane'ler arası taşıma (PUT lifecycle-stages). Tüm item'ların lifecycle konumu üstten bakış.
+- [ ] **PR-F5g** — Pipeline Export + Polish: PNG/SVG export (ReactFlow `toPng`/`toSvg`). MiniMap entegrasyonu. Dark mode uyumu. Empty state + onboarding (ilk diyagram wizard). App shell'e "Pipeline Diyagramları" nav linki.
 - [ ] **PR-F3** — Tauri Client Sync: Rust keyring `bootstrap_pk_store/load/delete` komutları. Login'de Tauri path'te keyring'e kek_store. Bootstrap'ta keyring'den yükle.
 - [ ] **PR-N3** — Onay Workflow / Dual Control: `access_requests` tablosu. Kritik item için erişim isteği → admin onayı → zaman-sınırlı görüntüleme. WS event'lar. **Büyük iş — Faz 6+ ayrı plan gerekir.**
 

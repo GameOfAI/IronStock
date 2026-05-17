@@ -32,8 +32,7 @@ export function useAddRelationshipMutation(itemId: string) {
     mutationFn: (req: AddRelationshipRequest) =>
       apiFetch<void>(`/api/v1/items/${itemId}/relationships`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(req),
+        body: req,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: graphKey });

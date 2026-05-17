@@ -84,7 +84,7 @@ Envanter_App/
 
 **Stack kararları (Faz 3):** ADR-0009 — Zustand + TanStack Query + Tailwind 4 + shadcn/ui + argon2-browser + WS subprotocol auth.
 
-**Migration sayısı (2026-05-16):** En son migration `00031_share_links.sql`. Yeni migration eklerken sıradaki numara `00032`.
+**Migration sayısı (2026-05-17):** En son migration `00033_pipeline_diagrams.sql`. Yeni migration eklerken sıradaki numara `00034`.
 
 ## Her Session'da Yapılacaklar
 

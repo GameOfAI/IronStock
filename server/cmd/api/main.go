@@ -254,6 +254,14 @@ func run() error {
 		Service: authSvc,
 		Logger:  logger,
 	}
+	lifecycleHandlers := &httpapi.LifecycleHandlers{
+		Service: authSvc,
+		Logger:  logger,
+	}
+	pipelineHandlers := &httpapi.PipelineHandlers{
+		Service: authSvc,
+		Logger:  logger,
+	}
 	wsHandlers := &httpapi.WSHandlers{
 		Service: authSvc,
 		Hub:     hub,
@@ -316,6 +324,8 @@ func run() error {
 		Catalog:      catalogHandlers,
 		WS:           wsHandlers,
 		ShareLink:    shareLinkHandlers,
+		Lifecycle:    lifecycleHandlers,
+		Pipeline:     pipelineHandlers,
 	})
 
 	srv := &http.Server{

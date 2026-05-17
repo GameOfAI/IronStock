@@ -46,6 +46,8 @@ type Deps struct {
 	Notification *NotificationHandlers
 	Graph        *GraphHandlers
 	ShareLink    *ShareLinkHandlers
+	Lifecycle    *LifecycleHandlers
+	Pipeline     *PipelineHandlers
 }
 
 // NewRouter builds a chi router with the standard middleware stack.
@@ -282,6 +284,33 @@ func NewRouter(d Deps) http.Handler {
 			r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
 				Delete("/api/v1/items/{id}/relationships/{target_id}/{rel_type}", d.Graph.DeleteRelationship)
 		}
+	}
+
+	// Lifecycle stage routes (PR-F5c) — DevOps lifecycle categorization.
+	if d.Lifecycle != nil && d.Auth != nil {
+		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+			Get("/api/v1/lifecycle-stages", d.Lifecycle.ListStages)
+		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+			Get("/api/v1/items/{id}/lifecycle-stages", d.Lifecycle.GetItemStages)
+		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+			Post("/api/v1/items/{id}/lifecycle-stages", d.Lifecycle.SetItemStages)
+	}
+
+	// Pipeline diagram routes (PR-F5d).
+	if d.Pipeline != nil && d.Auth != nil {
+		r.Route("/api/v1/pipeline-diagrams", func(pr chi.Router) {
+			pr.Use(timeoutMW)
+			pr.Use(RequireAccessToken(d.Auth.Service.JWT))
+			pr.Get("/", d.Pipeline.ListDiagrams)
+			pr.Post("/", d.Pipeline.CreateDiagram)
+			pr.Get("/{id}", d.Pipeline.GetDiagram)
+			pr.Put("/{id}", d.Pipeline.UpdateDiagram)
+			pr.Delete("/{id}", d.Pipeline.DeleteDiagram)
+			pr.Post("/{id}/nodes", d.Pipeline.AddNodes)
+			pr.Delete("/{id}/nodes/{item_id}", d.Pipeline.RemoveNode)
+			pr.Put("/{id}/layout", d.Pipeline.SaveLayout)
+			pr.Get("/{id}/graph", d.Pipeline.DiagramGraph)
+		})
 	}
 
 	// Notification routes (PR-N8).
