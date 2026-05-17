@@ -16,7 +16,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-
 // Action constants — keep these dot-namespaced and exhaustive for grep-ability.
 const (
 	ActionAuthRegister     = "auth.register"
@@ -54,9 +53,9 @@ const (
 
 	// Read-event audit (PR-N6). Written async so hot-path latency is unaffected.
 	// Vault/CyberArk model: every read is traceable in the audit log.
-	ActionItemViewed   = "item.viewed"    // GET /items/{id} — full item + encrypted fields
-	ActionItemListed   = "item.listed"    // GET /items?folder_id=... — item list in folder
-	ActionFolderListed = "folder.listed"  // GET /folders?parent_id=... — tree navigation
+	ActionItemViewed   = "item.viewed"   // GET /items/{id} — full item + encrypted fields
+	ActionItemListed   = "item.listed"   // GET /items?folder_id=... — item list in folder
+	ActionFolderListed = "folder.listed" // GET /folders?parent_id=... — tree navigation
 
 	// Admin actions (PR-10).
 	ActionAdminUserDisabled = "admin.user_disabled"
@@ -83,10 +82,10 @@ const (
 	ActionGroupMemberRemoved = "group.member_removed"
 
 	// Tags + favorites (PR-N7).
-	ActionTagCreated   = "tag.created"
-	ActionTagDeleted   = "tag.deleted"
-	ActionItemTagged   = "item.tagged"
-	ActionItemUntagged = "item.untagged"
+	ActionTagCreated      = "tag.created"
+	ActionTagDeleted      = "tag.deleted"
+	ActionItemTagged      = "item.tagged"
+	ActionItemUntagged    = "item.untagged"
 	ActionItemFavorited   = "item.favorited"
 	ActionItemUnfavorited = "item.unfavorited"
 
@@ -114,8 +113,8 @@ const (
 
 	// One-time share links (PR-N5).
 	ActionShareLinkCreated = "item.share_link_created"
-	ActionShareLinkViewed  = "item.share_link_viewed"   // public endpoint hit + view_count++
-	ActionShareLinkExpired = "item.share_link_expired"  // view_limit or TTL reached
+	ActionShareLinkViewed  = "item.share_link_viewed"  // public endpoint hit + view_count++
+	ActionShareLinkExpired = "item.share_link_expired" // view_limit or TTL reached
 	ActionShareLinkRevoked = "item.share_link_revoked"
 )
 

@@ -457,9 +457,9 @@ func (h *ItemHandlers) List(w http.ResponseWriter, r *http.Request) {
 		Action:       audit.ActionItemListed,
 		ResourceType: audit.ResourceItem,
 		Details: map[string]any{
-			"folder_id":   folderID,
+			"folder_id":    folderID,
 			"result_count": len(out),
-			"searched":    q != "",
+			"searched":     q != "",
 		},
 		IPAddress: parseIP(r.RemoteAddr),
 		UserAgent: r.UserAgent(),

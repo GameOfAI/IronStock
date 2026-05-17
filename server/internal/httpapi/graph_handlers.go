@@ -63,15 +63,15 @@ type addRelationshipRequest struct {
 }
 
 var validRelTypes = map[string]bool{
-	"hosted_on":   true,
+	"hosted_on":    true,
 	"accessed_via": true,
-	"part_of":     true,
-	"related_to":  true,
-	"depends_on":  true,
-	"uses_tool":   true,
-	"builds_to":   true,
-	"scans_with":  true,
-	"deploys_to":  true,
+	"part_of":      true,
+	"related_to":   true,
+	"depends_on":   true,
+	"uses_tool":    true,
+	"builds_to":    true,
+	"scans_with":   true,
+	"deploys_to":   true,
 }
 
 // Graph implements GET /api/v1/graph.
@@ -413,4 +413,3 @@ func (h *GraphHandlers) DeleteRelationship(w http.ResponseWriter, r *http.Reques
 
 	w.WriteHeader(http.StatusNoContent)
 }
-

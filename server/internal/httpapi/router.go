@@ -32,16 +32,16 @@ type DBPinger interface {
 // Auth, Folder, Item, WS are optional: when nil their routes are not mounted
 // (useful for foundation tests that don't exercise those flows).
 type Deps struct {
-	Logger     *slog.Logger
-	DB         DBPinger
-	Auth       *AuthHandlers
-	Folder     *FolderHandlers
-	Item       *ItemHandlers
-	Attachment *AttachmentHandlers
-	Admin      *AdminHandlers
-	Group      *GroupHandlers
-	Catalog    *CatalogHandlers
-	WS         *WSHandlers
+	Logger       *slog.Logger
+	DB           DBPinger
+	Auth         *AuthHandlers
+	Folder       *FolderHandlers
+	Item         *ItemHandlers
+	Attachment   *AttachmentHandlers
+	Admin        *AdminHandlers
+	Group        *GroupHandlers
+	Catalog      *CatalogHandlers
+	WS           *WSHandlers
 	Tag          *TagHandlers
 	Notification *NotificationHandlers
 	Graph        *GraphHandlers
@@ -192,7 +192,7 @@ func NewRouter(d Deps) http.Handler {
 			ir.Delete("/{id}", d.Item.Delete)
 			ir.Post("/{id}/shares", d.Item.Share)
 			ir.Delete("/{id}/shares/{user_id}", d.Item.Unshare)
-			ir.Post("/{id}/rotate", d.Item.RecordRotation) // PR-N1
+			ir.Post("/{id}/rotate", d.Item.RecordRotation)                           // PR-N1
 			ir.Get("/{id}/fields/{field_def_id}/versions", d.Item.ListFieldVersions) // PR-N2
 
 			// PR-N7 tag + favorite routes under /items/{id}

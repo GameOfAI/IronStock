@@ -39,10 +39,10 @@ type groupListResponse struct {
 }
 
 type groupMemberRow struct {
-	UserID    string `json:"user_id"`
-	Username  string `json:"username"`
-	AddedBy   string `json:"added_by,omitempty"`
-	AddedAt   string `json:"added_at"`
+	UserID   string `json:"user_id"`
+	Username string `json:"username"`
+	AddedBy  string `json:"added_by,omitempty"`
+	AddedAt  string `json:"added_at"`
 }
 
 // --- Group CRUD ---
@@ -362,9 +362,9 @@ func (h *GroupHandlers) GrantFolderGroupPermission(w http.ResponseWriter, r *htt
 	groupID := chi.URLParam(r, "id")
 
 	var req struct {
-		FolderID           string `json:"folder_id"`
-		Permission         string `json:"permission"`
-		InheritToChildren  bool   `json:"inherit_to_children"`
+		FolderID          string `json:"folder_id"`
+		Permission        string `json:"permission"`
+		InheritToChildren bool   `json:"inherit_to_children"`
 	}
 	if !decodeJSON(w, r, h.Logger, &req) {
 		return

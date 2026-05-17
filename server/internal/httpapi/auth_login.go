@@ -29,7 +29,7 @@ import (
 type loginRequest struct {
 	Username       string `json:"username"`
 	Password       string `json:"master_password"`
-	TOTPCode       string `json:"totp_code"`        // optional; required only when TOTP is configured
+	TOTPCode       string `json:"totp_code"`       // optional; required only when TOTP is configured
 	RememberDevice bool   `json:"remember_device"` // PR-F2b: if true, issue a 30-day trusted-device cookie
 }
 
@@ -421,9 +421,9 @@ func (s *AuthHandlers) recordLoginFail(ctx context.Context, r *http.Request, use
 
 // emitBreakGlassAlert runs asynchronously after a break-glass login (PR-N4).
 // It:
-//   1. Writes an auth.break_glass audit entry.
-//   2. Publishes the EventBreakGlassLogin WS event (all admins see the alert banner).
-//   3. Creates an in-app notification for every admin user.
+//  1. Writes an auth.break_glass audit entry.
+//  2. Publishes the EventBreakGlassLogin WS event (all admins see the alert banner).
+//  3. Creates an in-app notification for every admin user.
 func (s *AuthHandlers) emitBreakGlassAlert(userID, remoteAddr, userAgent string) {
 	ctx := context.Background()
 

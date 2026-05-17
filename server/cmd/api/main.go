@@ -310,14 +310,14 @@ func run() error {
 
 	// --- HTTP layer ---
 	router := httpapi.NewRouter(httpapi.Deps{
-		Logger:     logger,
-		DB:         pool,
-		Auth:       authHandlers,
-		Folder:     folderHandlers,
-		Item:       itemHandlers,
-		Attachment: attachmentHandlers,
-		Admin:      adminHandlers,
-		Group:      groupHandlers,
+		Logger:       logger,
+		DB:           pool,
+		Auth:         authHandlers,
+		Folder:       folderHandlers,
+		Item:         itemHandlers,
+		Attachment:   attachmentHandlers,
+		Admin:        adminHandlers,
+		Group:        groupHandlers,
 		Tag:          tagHandlers,
 		Notification: notificationHandlers,
 		Graph:        graphHandlers,

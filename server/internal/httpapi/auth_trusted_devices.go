@@ -5,10 +5,12 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
 	"net/http"
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
 
 	"envanter.app/server/internal/audit"
 	"envanter.app/server/internal/auth"
@@ -99,8 +101,11 @@ func verifyTrustedDevice(ctx context.Context, db auth.DBExec, userID, rawCookie 
 		hash, userID, int(trustedDeviceTTL.Seconds()),
 	).Scan(&deviceID)
 	if err != nil {
-		// pgx.ErrNoRows means not found/expired — not a real error.
-		return "", false, nil
+		if errors.Is(err, pgx.ErrNoRows) {
+			// Not found or expired — not a real error.
+			return "", false, nil
+		}
+		return "", false, err
 	}
 	return deviceID, true, nil
 }

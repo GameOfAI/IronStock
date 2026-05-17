@@ -290,10 +290,10 @@ type shareLinkViewField struct {
 }
 
 type shareLinkViewResponse struct {
-	ItemName      string               `json:"item_name"`       // server-decrypted
+	ItemName      string               `json:"item_name"` // server-decrypted
 	ItemTypeLabel string               `json:"item_type_label"`
 	Fields        []shareLinkViewField `json:"fields"`
-	DEKWrapped    []byte               `json:"dek_wrapped"`     // base64; encrypted with link_key
+	DEKWrapped    []byte               `json:"dek_wrapped"` // base64; encrypted with link_key
 	ExpiresAt     string               `json:"expires_at"`
 	ViewsLeft     int                  `json:"views_left"`
 }

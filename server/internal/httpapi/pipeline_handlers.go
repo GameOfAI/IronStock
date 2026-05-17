@@ -640,8 +640,8 @@ func (h *PipelineHandlers) DiagramGraph(w http.ResponseWriter, r *http.Request) 
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"nodes":           nodes,
-		"edges":           edges,
+		"nodes":            nodes,
+		"edges":            edges,
 		"lifecycle_stages": lifecycleMap,
 	})
 }

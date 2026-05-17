@@ -50,19 +50,19 @@ export default function ChangePasswordPage() {
   const mustChangePassword = useAuthStore((s) => s.mustChangePassword);
   const clear = useAuthStore((s) => s.clear);
 
+  // All hooks must be called unconditionally before any early return.
+  const mut = useChangePasswordMutation();
+  const [currentPassword, setCurrentPassword] = React.useState('');
+  const [newPassword, setNewPassword] = React.useState('');
+  const [newPasswordConfirm, setNewPasswordConfirm] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
+
   // Render-time guard: if the user navigates here directly (mustChangePassword=false),
   // bounce to /inventory. This cannot fire during the clear() transition because
   // AuthGate unmounts us before we re-render (isAuthed=false → AuthGate returns <Navigate>).
   if (!mustChangePassword) {
     return <Navigate to="/inventory" replace />;
   }
-
-  const mut = useChangePasswordMutation();
-
-  const [currentPassword, setCurrentPassword] = React.useState('');
-  const [newPassword, setNewPassword] = React.useState('');
-  const [newPasswordConfirm, setNewPasswordConfirm] = React.useState('');
-  const [busy, setBusy] = React.useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();

@@ -166,4 +166,3 @@ func (h *NotificationHandlers) UnreadCount(w http.ResponseWriter, r *http.Reques
 	}
 	writeJSON(w, http.StatusOK, map[string]int{"unread_count": count})
 }
-
