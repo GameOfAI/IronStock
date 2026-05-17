@@ -113,6 +113,16 @@ export default function LifecyclePage() {
   const stagesQuery = useLifecycleStagesQuery();
   const [pendingSet, setPendingSet] = React.useState<Set<string>>(new Set());
 
+  // Onboarding banner — must be before any conditional return (Rules of Hooks)
+  const BANNER_KEY = 'ironstock:lifecycle-onboarding-dismissed';
+  const [bannerDismissed, setBannerDismissed] = React.useState(
+    () => localStorage.getItem(BANNER_KEY) === '1',
+  );
+  function dismissBanner() {
+    localStorage.setItem(BANNER_KEY, '1');
+    setBannerDismissed(true);
+  }
+
   const isLoading = graphQuery.isLoading || stagesQuery.isLoading;
   const isError = graphQuery.isError || stagesQuery.isError;
 
@@ -209,16 +219,6 @@ export default function LifecyclePage() {
         </Button>
       </div>
     );
-  }
-
-  // Onboarding banner (dismissible via localStorage)
-  const BANNER_KEY = 'ironstock:lifecycle-onboarding-dismissed';
-  const [bannerDismissed, setBannerDismissed] = React.useState(
-    () => localStorage.getItem(BANNER_KEY) === '1',
-  );
-  function dismissBanner() {
-    localStorage.setItem(BANNER_KEY, '1');
-    setBannerDismissed(true);
   }
 
   return (

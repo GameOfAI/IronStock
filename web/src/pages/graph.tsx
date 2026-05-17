@@ -213,8 +213,8 @@ export function GraphPage() {
   const [search, setSearch] = React.useState('');
   const [activeTypes, setActiveTypes] = React.useState<Set<number>>(new Set());
 
-  const nodes = data?.nodes ?? [];
-  const edges = data?.edges ?? [];
+  const nodes = React.useMemo(() => data?.nodes ?? [], [data]);
+  const edges = React.useMemo(() => data?.edges ?? [], [data]);
 
   // Unique item type IDs present in graph
   const presentTypes = React.useMemo(
