@@ -85,7 +85,7 @@ type saveLayoutRequest struct {
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 // ownerOrAdmin checks that the claims user is diagram owner or admin.
-func (h *PipelineHandlers) ownerOrAdmin(claims *auth.Claims, ownerID string) bool {
+func (_ *PipelineHandlers) ownerOrAdmin(claims *auth.Claims, ownerID string) bool {
 	if claims.Subject == ownerID {
 		return true
 	}

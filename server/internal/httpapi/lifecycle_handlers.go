@@ -235,5 +235,5 @@ func (h *LifecycleHandlers) SetItemStages(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	writeJSON(w, http.StatusOK, itemLifecycleStagesResponse{StageIDs: req.StageIDs})
+	writeJSON(w, http.StatusOK, itemLifecycleStagesResponse(req))
 }
