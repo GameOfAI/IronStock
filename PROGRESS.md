@@ -1,12 +1,12 @@
 # İlerleyiş
 
-Son güncelleme: 2026-05-17
+Son güncelleme: 2026-05-17 (mock data seed)
 
 ## Mevcut Durum
 
 - **Aktif Faz:** Post-v1.0.0 Kapsamlı Geliştirmeler (Faz 6+)
 - **Tamamlanan Faz:** Faz 0 + 1 + 2 + 3 + 4 + 5 ✅
-- **Son tamamlanan:** PR-F5g — Export + Polish ✅ 2026-05-17
+- **Son tamamlanan:** PR-F5g — Export + Polish ✅ 2026-05-17 | Mock data seed scripti oluşturuldu ✅ 2026-05-17
 - **Proje durumu:** MVP + kapsamlı geliştirmeler devam ediyor. Faz 6+ PRları: PR-RT-1, PR-F1, PR-N6, PR-F2a, PR-F4, PR-F6a/b/c, PR-N4, PR-F2b, PR-F5a/b, PR-N7, PR-N8, PR-N1, PR-N2, PR-N5, PR-F5c/d/e/f/g tamamlandı. DevOps Lifecycle Graph özelliği tamamen bitti (5 PR). Kalan: PR-F3 (Tauri Sync), PR-N3 (Onay Workflow — Faz 5 büyük iş).
 
 ## Kapsamlı Geliştirme Planı — Durum Özeti (2026-05-16)
