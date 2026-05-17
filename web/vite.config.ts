@@ -15,11 +15,14 @@ export default defineConfig({
     port: 5173,
     host: '0.0.0.0',
     proxy: {
-      '/api': 'http://localhost:8080',
-      '/ws': {
+      // WebSocket endpoint must be declared BEFORE the generic /api rule
+      // so Vite applies the ws:true upgrade for /api/v1/ws connections.
+      '/api/v1/ws': {
         target: 'ws://localhost:8080',
         ws: true,
+        rewriteWsOrigin: true,
       },
+      '/api': 'http://localhost:8080',
     },
   },
 });

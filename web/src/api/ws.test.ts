@@ -73,7 +73,7 @@ describe('WsClient', () => {
   it('onStatus registers and unregisters listeners', () => {
     const client = new WsClient();
     const statuses: string[] = [];
-    const unsub = client.onStatus((s) => statuses.push(s));
+    const unsub = client.onStatus((d) => statuses.push(d.status));
     unsub();
     // Listeners unregistered — no status changes should arrive
     client.destroy();

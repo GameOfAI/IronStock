@@ -4,18 +4,26 @@
  * Renders nothing; side-effect only. Placed inside <AuthGate> so it only
  * runs with a valid accessToken. Destroys the client on logout/unmount.
  *
- * Connection status is exposed via the useWsStatus hook for UI indicators.
+ * Connection status + error detail is exposed via useWsDetail hook.
  */
 
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '@/store/auth';
-import { WsClient, WsStatus } from '@/api/ws';
+import { WsClient, WsStatusDetail } from '@/api/ws';
 
-const WsStatusContext = createContext<WsStatus>('offline');
+const OFFLINE_DETAIL: WsStatusDetail = { status: 'offline', attempt: 0 };
+
+const WsDetailContext = createContext<WsStatusDetail>(OFFLINE_DETAIL);
 
 // eslint-disable-next-line react-refresh/only-export-components
-export function useWsStatus(): WsStatus {
-  return useContext(WsStatusContext);
+export function useWsDetail(): WsStatusDetail {
+  return useContext(WsDetailContext);
+}
+
+// Backwards-compat shim used by existing callers.
+// eslint-disable-next-line react-refresh/only-export-components
+export function useWsStatus() {
+  return useContext(WsDetailContext).status;
 }
 
 interface Props {
@@ -24,22 +32,22 @@ interface Props {
 
 export function WsProvider({ children }: Props) {
   const accessToken = useAuthStore((s) => s.accessToken);
-  const [wsStatus, setWsStatus] = useState<WsStatus>('offline');
+  const [detail, setDetail] = useState<WsStatusDetail>(OFFLINE_DETAIL);
   const clientRef = useRef<WsClient | null>(null);
 
   useEffect(() => {
     if (!accessToken) {
       clientRef.current?.destroy();
       clientRef.current = null;
-      setWsStatus('offline');
+      setDetail(OFFLINE_DETAIL);
       return;
     }
 
     const client = new WsClient();
     clientRef.current = client;
-    setWsStatus(client.getStatus());
+    setDetail(client.getDetail());
 
-    const unsub = client.onStatus((s) => setWsStatus(s));
+    const unsub = client.onStatus((d) => setDetail({ ...d }));
     return () => {
       unsub();
       client.destroy();
@@ -47,5 +55,5 @@ export function WsProvider({ children }: Props) {
     };
   }, [accessToken]);
 
-  return <WsStatusContext.Provider value={wsStatus}>{children}</WsStatusContext.Provider>;
+  return <WsDetailContext.Provider value={detail}>{children}</WsDetailContext.Provider>;
 }

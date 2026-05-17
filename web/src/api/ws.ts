@@ -24,6 +24,16 @@ import { queryClient, queryKeys } from './query';
 
 export type WsStatus = 'connecting' | 'connected' | 'reconnecting' | 'offline';
 
+export interface WsStatusDetail {
+  status: WsStatus;
+  /** Human-readable reason for the last failure (Turkish). */
+  errorReason?: string;
+  /** Reconnect attempt count (0 = first connect). */
+  attempt: number;
+  /** Seconds until next reconnect attempt. */
+  nextRetryIn?: number;
+}
+
 export interface WsEvent {
   type: string;
   resource_id: string;
@@ -31,7 +41,7 @@ export interface WsEvent {
   timestamp: string;
 }
 
-type StatusListener = (status: WsStatus) => void;
+type StatusListener = (detail: WsStatusDetail) => void;
 
 const BACKOFF_BASE_MS = 1_000;
 const BACKOFF_MAX_MS = 30_000;
@@ -116,23 +126,27 @@ export class WsClient {
   private socket: WebSocket | null = null;
   private attempt = 0;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
+  private retryCountdown: ReturnType<typeof setInterval> | null = null;
   private destroyed = false;
   private statusListeners: Set<StatusListener> = new Set();
-  private status: WsStatus = 'connecting';
+  private detail: WsStatusDetail = { status: 'connecting', attempt: 0 };
 
   constructor() {
     // Kick off async ticket fetch + connect immediately.
-    // Status starts as 'connecting' so the UI shows the right indicator.
     this.connect();
   }
 
-  private setStatus(s: WsStatus) {
-    this.status = s;
-    this.statusListeners.forEach((cb) => cb(s));
+  private setDetail(d: Partial<WsStatusDetail>) {
+    this.detail = { ...this.detail, ...d };
+    this.statusListeners.forEach((cb) => cb(this.detail));
   }
 
   getStatus(): WsStatus {
-    return this.status;
+    return this.detail.status;
+  }
+
+  getDetail(): WsStatusDetail {
+    return this.detail;
   }
 
   onStatus(cb: StatusListener): () => void {
@@ -140,33 +154,52 @@ export class WsClient {
     return () => this.statusListeners.delete(cb);
   }
 
+  private clearCountdown() {
+    if (this.retryCountdown !== null) {
+      clearInterval(this.retryCountdown);
+      this.retryCountdown = null;
+    }
+  }
+
   private async connect() {
     if (this.destroyed) return;
-    this.setStatus(this.attempt === 0 ? 'connecting' : 'reconnecting');
+    this.clearCountdown();
+    this.setDetail({
+      status: this.attempt === 0 ? 'connecting' : 'reconnecting',
+      nextRetryIn: undefined,
+      attempt: this.attempt,
+    });
 
     // Fetch a fresh single-use ticket for this connect attempt.
     let ticket: string;
     try {
       ticket = await fetchWsTicket();
-    } catch {
-      // Ticket fetch failed (e.g. network error, access token expired).
-      // Schedule reconnect; the refresh interceptor will renew the token.
-      this.scheduleReconnect();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const reason = msg.includes('401') || msg.includes('Oturum')
+        ? 'Oturum geçersiz — ticket alınamadı (401)'
+        : msg.includes('404')
+          ? 'Ticket endpoint bulunamadı (404)'
+          : msg.includes('500')
+            ? 'Sunucu hatası — ticket alınamadı (500)'
+            : `Ağ hatası — ticket alınamadı: ${msg}`;
+      this.scheduleReconnect(reason);
       return;
     }
 
-    if (this.destroyed) return; // may have been destroyed while fetching ticket
+    if (this.destroyed) return;
 
     try {
       this.socket = new WebSocket(buildWsUrl(ticket), [SUBPROTOCOL]);
-    } catch {
-      this.scheduleReconnect();
+    } catch (err) {
+      this.scheduleReconnect(`WebSocket açılamadı: ${err instanceof Error ? err.message : String(err)}`);
       return;
     }
 
     this.socket.onopen = () => {
       this.attempt = 0;
-      this.setStatus('connected');
+      this.clearCountdown();
+      this.setDetail({ status: 'connected', errorReason: undefined, nextRetryIn: undefined, attempt: 0 });
     };
 
     this.socket.onmessage = (e: MessageEvent<string>) => {
@@ -178,28 +211,57 @@ export class WsClient {
       }
     };
 
-    this.socket.onclose = () => {
-      if (!this.destroyed) this.scheduleReconnect();
+    this.socket.onclose = (ev) => {
+      if (this.destroyed) return;
+      const reason = ev.reason
+        ? `Bağlantı kapandı: ${ev.reason} (kod: ${ev.code})`
+        : ev.code === 1006
+          ? 'Bağlantı anormal şekilde kapandı (ağ sorunu olabilir)'
+          : ev.code === 4001
+            ? 'Kimlik doğrulama hatası — ticket geçersiz veya süresi doldu'
+            : ev.code === 4003
+              ? 'Yetkisiz — oturumu yenileyin'
+              : `Bağlantı kapandı (kod: ${ev.code})`;
+      this.scheduleReconnect(reason);
     };
 
     this.socket.onerror = () => {
-      // onerror is always followed by onclose; reconnect handled there.
+      // onerror is always followed by onclose; error reason captured there.
     };
   }
 
-  private scheduleReconnect() {
+  private scheduleReconnect(reason?: string) {
     if (this.destroyed) return;
-    this.setStatus('reconnecting');
     const delay = backoffDelay(this.attempt);
+    const nextRetryIn = Math.round(delay / 1000);
     this.attempt++;
+    this.setDetail({
+      status: 'reconnecting',
+      errorReason: reason,
+      nextRetryIn,
+      attempt: this.attempt,
+    });
+
+    // Countdown timer — updates nextRetryIn every second for the tooltip.
+    let remaining = nextRetryIn;
+    this.retryCountdown = setInterval(() => {
+      remaining--;
+      if (remaining <= 0) {
+        this.clearCountdown();
+      } else {
+        this.setDetail({ nextRetryIn: remaining });
+      }
+    }, 1_000);
+
     this.retryTimer = setTimeout(() => this.connect(), delay);
   }
 
   destroy() {
     this.destroyed = true;
+    this.clearCountdown();
     if (this.retryTimer !== null) clearTimeout(this.retryTimer);
     this.socket?.close();
-    this.setStatus('offline');
+    this.setDetail({ status: 'offline', nextRetryIn: undefined });
     this.statusListeners.clear();
   }
 }

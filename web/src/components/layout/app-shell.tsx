@@ -25,7 +25,6 @@ import {
   Monitor,
   KeyRound,
   Menu,
-  Wifi,
   WifiOff,
   Loader2,
   ShieldAlert,
@@ -49,7 +48,7 @@ import { ChangePasswordDialog } from '@/components/change-password-dialog';
 import { useAuthStore, selectIsAdmin, selectIsBootstrap } from '@/store/auth';
 import { useUIStore } from '@/store/ui';
 import { useLogoutMutation } from '@/api/auth';
-import { useWsStatus } from '@/components/ws-provider';
+import { useWsDetail } from '@/components/ws-provider';
 import {
   useNotificationsQuery,
   useMarkReadMutation,
@@ -82,37 +81,73 @@ function ThemeToggle() {
 // --- WS status indicator ---
 
 function WsStatusDot() {
-  const status = useWsStatus();
+  const { status, errorReason, attempt, nextRetryIn } = useWsDetail();
+  const [open, setOpen] = React.useState(false);
 
   if (status === 'connected') return null; // Silent when healthy.
 
+  const isOffline = status === 'offline';
+  const label =
+    status === 'connecting'
+      ? 'Canlı bağlantı kuruluyor…'
+      : status === 'reconnecting'
+        ? `Yeniden bağlanılıyor… (deneme ${attempt})`
+        : 'Gerçek zamanlı bağlantı yok';
+
   return (
-    <span
-      aria-label={
-        status === 'connecting'
-          ? 'Sunucuya bağlanılıyor'
-          : status === 'reconnecting'
-            ? 'Yeniden bağlanılıyor'
-            : 'Çevrimdışı'
-      }
-      title={
-        status === 'connecting'
-          ? 'Canlı bağlantı kuruluyor…'
-          : status === 'reconnecting'
-            ? 'Bağlantı kesildi, yeniden deneniyor…'
-            : 'Gerçek zamanlı bağlantı yok'
-      }
-      className="flex items-center"
-    >
-      {status === 'offline' ? (
-        <WifiOff className="h-4 w-4 text-destructive" />
-      ) : (
-        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-      )}
-      {status === 'offline' && (
-        <Wifi className="h-3 w-3 text-destructive opacity-0 absolute" aria-hidden />
-      )}
-    </span>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="flex items-center rounded p-0.5 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label={label}
+          title={label}
+        >
+          {isOffline ? (
+            <WifiOff className="h-4 w-4 text-destructive" />
+          ) : (
+            <Loader2 className="h-4 w-4 animate-spin text-amber-500" />
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent side="bottom" align="end" className="w-72 p-3 text-sm space-y-2">
+        <div className="flex items-center gap-2 font-medium">
+          {isOffline ? (
+            <WifiOff className="h-4 w-4 text-destructive shrink-0" />
+          ) : (
+            <Loader2 className="h-4 w-4 animate-spin text-amber-500 shrink-0" />
+          )}
+          <span>{label}</span>
+        </div>
+
+        {errorReason && (
+          <div className="rounded-md bg-destructive/10 px-2.5 py-2 text-xs text-destructive">
+            <p className="font-semibold mb-0.5">Son hata:</p>
+            <p>{errorReason}</p>
+          </div>
+        )}
+
+        {nextRetryIn !== undefined && nextRetryIn > 0 && (
+          <p className="text-xs text-muted-foreground">
+            {nextRetryIn} saniye sonra tekrar denenecek…
+          </p>
+        )}
+
+        <div className="text-xs text-muted-foreground space-y-1 border-t pt-2">
+          <p className="font-medium text-foreground">Olası nedenler:</p>
+          <ul className="list-disc list-inside space-y-0.5">
+            <li>Sunucu kapalı veya ağ bağlantısı yok</li>
+            <li>Oturum süresi dolmuş (token geçersiz)</li>
+            <li>WebSocket proxy yanlış yapılandırılmış</li>
+            <li>Tarayıcı uzantısı bağlantıyı engelliyor</li>
+          </ul>
+        </div>
+
+        <p className="text-xs text-muted-foreground">
+          Not: Gerçek zamanlı bağlantı olmadan da uygulama çalışır; veriler manuel yenileme ile güncellenir.
+        </p>
+      </PopoverContent>
+    </Popover>
   );
 }
 
