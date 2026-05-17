@@ -395,7 +395,7 @@ export default function InventoryPage() {
           <ItemShareModal
             open={itemModal === 'share'}
             onOpenChange={(v) => !v && setItemModal(null)}
-            item={selectedItem}
+            item={fullItemQuery.data ?? selectedItem}
           />
         </>
       )}
