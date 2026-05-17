@@ -6,6 +6,7 @@
  */
 
 import * as React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Plus, Tag, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,6 +38,7 @@ function HexColorPreview({ color }: { color: string }) {
 }
 
 export default function TagsPage() {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const { data, isLoading } = useTagsQuery();
   const createMut = useCreateTagMutation();
@@ -141,8 +143,10 @@ export default function TagsPage() {
               )}
               <Badge
                 variant="secondary"
-                className="flex-1 justify-start font-normal"
+                className="flex-1 justify-start font-normal cursor-pointer hover:opacity-80 transition-opacity"
                 style={tag.color ? { backgroundColor: `${tag.color}22`, color: tag.color } : undefined}
+                onClick={() => navigate(`/inventory?tag=${tag.id}`)}
+                title="Bu etiketle filtrelenmiş envantere git"
               >
                 {tag.name}
               </Badge>

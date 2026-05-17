@@ -6,10 +6,9 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Clock, Info, Loader2, MousePointerClick, Package, RefreshCw, Star, StarOff, Tag as TagIcon } from 'lucide-react';
+import { AlertTriangle, Clock, Info, Loader2, MousePointerClick, Package, RefreshCw, Star, StarOff } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import type { FieldDefinition, ItemType } from '@/api/types';
 import { useItem, useRecordRotationMutation } from '@/api/items';
@@ -17,10 +16,10 @@ import {
   useAddFavoriteMutation,
   useRemoveFavoriteMutation,
   useFavoriteStatusQuery,
-  useItemTagsQuery,
 } from '@/api/tags';
 import { useAuthStore } from '@/store/auth';
 import { fromBase64, openDEKWithKEK, decryptField } from '@/lib/crypto';
+import { ItemTagPicker } from './item-tag-picker';
 import { PermissionBadge } from './permission-badge';
 import { ItemFieldRow } from './item-field-row';
 import { ItemAttachmentPanel } from './item-attachment-panel';
@@ -62,7 +61,6 @@ export function ItemDetail({ itemId, fieldDefinitions, itemTypes }: ItemDetailPr
   const isFavorited = favData === true;
   const addFav = useAddFavoriteMutation(itemId ?? '');
   const removeFav = useRemoveFavoriteMutation(itemId ?? '');
-  const { data: tagsData } = useItemTagsQuery(itemId);
 
   const item = itemQuery.data;
 
@@ -203,20 +201,10 @@ export function ItemDetail({ itemId, fieldDefinitions, itemTypes }: ItemDetailPr
               <span aria-hidden>·</span>
               <PermissionBadge permission={item.permission} />
             </div>
-            {/* Item tags (PR-N7) */}
-            {(tagsData?.tags ?? []).length > 0 && (
-              <div className="flex flex-wrap items-center gap-1 pt-1">
-                <TagIcon className="h-3 w-3 text-muted-foreground" />
-                {(tagsData?.tags ?? []).map((tag) => (
-                  <Badge
-                    key={tag.id}
-                    variant="secondary"
-                    className="px-1.5 py-0 text-[10px]"
-                    style={tag.color ? { backgroundColor: `${tag.color}22`, color: tag.color } : undefined}
-                  >
-                    {tag.name}
-                  </Badge>
-                ))}
+            {/* Item tags — interactive picker (PR-UX2) */}
+            {itemId && (
+              <div className="pt-1">
+                <ItemTagPicker itemId={itemId} />
               </div>
             )}
           </div>
