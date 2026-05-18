@@ -1,13 +1,31 @@
 # İlerleyiş
 
-Son güncelleme: 2026-05-17 (UI/UX iyileştirmeleri PR-UX1~5)
+Son güncelleme: 2026-05-18 (Item full edit + WS fix + telemetri dot + CI test fix'leri)
 
 ## Mevcut Durum
 
 - **Aktif Faz:** Post-v1.0.0 Kapsamlı Geliştirmeler (Faz 6+)
 - **Tamamlanan Faz:** Faz 0 + 1 + 2 + 3 + 4 + 5 ✅
-- **Son tamamlanan:** PR-UX1~5 — Kapsamlı UI/UX İyileştirmeleri ✅ 2026-05-17
-- **Proje durumu:** MVP + kapsamlı geliştirmeler devam ediyor. Faz 6+ PRları: PR-RT-1, PR-F1, PR-N6, PR-F2a, PR-F4, PR-F6a/b/c, PR-N4, PR-F2b, PR-F5a/b, PR-N7, PR-N8, PR-N1, PR-N2, PR-N5, PR-F5c/d/e/f/g, PR-UX1~5 tamamlandı. Kalan: PR-F3 (Tauri Sync), PR-N3 (Onay Workflow — Faz 5 büyük iş).
+- **Son tamamlanan:** Item tam alan düzenleme + WS proxy/origin fix + renkli telemetri dot + CI test düzeltmeleri ✅ 2026-05-18
+- **Proje durumu:** MVP + kapsamlı geliştirmeler devam ediyor. Faz 6+ PRları: PR-RT-1, PR-F1, PR-N6, PR-F2a, PR-F4, PR-F6a/b/c, PR-N4, PR-F2b, PR-F5a/b, PR-N7, PR-N8, PR-N1, PR-N2, PR-N5, PR-F5c/d/e/f/g, PR-UX1~5 tamamlandı. Sonrasında: item düzenleme fix, WS altyapısı fix, telemetri görünürlük. Kalan: PR-F3 (Tauri Sync), PR-N3 (Onay Workflow — Faz 5 büyük iş).
+
+## Uygulama Olgunluk Özeti (2026-05-18)
+
+### Ne İyi Çalışıyor ✅
+- **Backend:** Tam fonksiyonel. Auth (login/TOTP/trusted device/recovery), RBAC 3 katmanlı, item CRUD + E2E şifreleme, klasör ACL + grup ACL, bildirimler, etiketler, favoriler, expiry scanner, pipeline/lifecycle backend, WS hub, audit log — hepsi production-ready.
+- **Web Admin UI:** Envanter CRUD (oluştur/oku/sil + artık tam düzenleme de), item paylaşımı (DEK re-wrap), etiket yönetimi, bildirim çanı, pipeline diyagramları, lifecycle swimlane, grafik haritası, admin konsolidasyonu (tabbed), TOTP yönetimi, break-glass banner — genel olarak kullanılabilir durumda.
+- **CI/CD:** GitHub Actions (Go test + Web test + Docker build/push + k8s image tag güncelleme) çalışıyor. Test coverage 131 test, 25 dosya.
+- **k8s:** Sealed Secrets, Ingress+TLS, NetworkPolicy, Prometheus metrics, resource limits, PDB — production-grade deploy.
+- **Tauri Client:** Temel inventory CRUD + E2E şifreleme + Windows Credential Manager keyring + system tray + auto-lock.
+
+### Bilinen Açık Uçlar / Sonraki Adaylar
+- **PR-F3 (Tauri Sync):** Rust keyring bootstrap pk store/load/delete — client henüz tam senkron değil.
+- **PR-N3 (Onay Workflow):** Kritik item erişiminde dual-control / approval workflow — büyük iş, ayrı plan gerekir.
+- **WS prod origin:** `ws_handler.go`'daki `OriginPatterns: []string{"localhost:*"}` geliştirme için eklendi; production'da env-config ile gerçek origin'e daraltılmalı (Faz 5 notu).
+- **Share modal grup desteği:** Şu an sadece kullanıcı bazlı paylaşım; grup bazlı backend genişletme gerekir.
+- **Item arama:** HMAC blind index sadece tam eşleşme; full-text / prefix arama yok.
+- **Tauri client admin sayfaları:** Client'ta admin sayfaları yok; web-only.
+- **UX polish devamı:** UX planındaki küçük iyileştirmeler (ilişki haritasında klasör filtresi, lifecycle banner dismiss persistence) yapıldı ama daha ince detaylar olabilir.
 
 ## Kapsamlı Geliştirme Planı — Durum Özeti (2026-05-16)
 
@@ -84,6 +102,119 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-05-18 (Win) — CI test fix'leri ✅
+
+**Sorun:** CI #72 ve #73 başarısız oldu. İki bağımsız test hatası:
+
+1. **`ws-provider.test.tsx` — `client.getDetail is not a function`**
+   - Neden: `WsProvider`, `WsStatusDetail` döndüren `client.getDetail()` çağırmaya başladı (PR-UX5/realtime refactor'da), ancak test mock'u güncellenmemişti.
+   - Düzeltme: Mock'a `getDetail: vi.fn().mockReturnValue({ status: 'connecting', attempt: 0 })` eklendi; `_emit` de `WsStatusDetail` nesnesi geçecek şekilde güncellendi.
+
+2. **`item-form-modal.test.tsx` — edit modunda `mutateAsync` çağrılmadı**
+   - Neden: Edit save'i artık async crypto (DEK re-wrap + field encrypt) yapıyor. Test `act()` ile bekliyordu — async crypto React scheduler dışında tamamlanıyor.
+   - Düzeltme: Create testi ile aynı pattern'a geçildi: `waitFor(() => expect(mutateAsync).toHaveBeenCalledOnce(), { timeout: 3000 })`.
+   - `act` import'u kaldırıldı (artık kullanılmıyor).
+
+**Sonuç:** 25 test dosyası, 131 test — tümü geçiyor. CI #74 başarılı olmalı.
+
+---
+
+### 2026-05-17 (Win) — Renkli WS telemetri dot ✅
+
+**Sorun:** WS bağlantı indikatörü her zaman dönen spinner gösteriyordu; bağlantı kurulduğunda da döndüğünden kullanıcı telemetrinin çalışıp çalışmadığını anlayamıyordu. Bağlantı kurulamazsa neden anlaşılamıyordu.
+
+**Çözüm — `WsStatusDot` component'i yeniden yazıldı (`app-shell.tsx`):**
+- **Yeşil sabit nokta** (`bg-green-500`): bağlı (connected)
+- **Amber titreyen nokta** (`bg-amber-400 animate-ping`): bağlanıyor / yeniden bağlanıyor
+- **Kırmızı sabit nokta** (`bg-destructive`): çevrimdışı
+- **Tıklanabilir Popover:** status label, son hata mesajı (Türkçe), saniye geri sayım ("X saniye sonra tekrar denenecek"), olası nedenler listesi
+- Spinner ve `WifiOff` icon kaldırıldı; sade 8px renkli daire
+
+**Arka planda `WsStatusDetail` altyapısı:**
+- `ws.ts`: `WsStatusDetail` interface (`status`, `errorReason`, `attempt`, `nextRetryIn`)
+- `WsClient.onStatus` callback tipi `string` → `WsStatusDetail`
+- Close code 1006/4001/4003 için Türkçe hata mesajları
+- Countdown timer: `setInterval` ile `nextRetryIn` her saniye güncellenir
+- `ws-provider.tsx`: `WsDetailContext` + `useWsDetail()` + `useWsStatus()` (compat shim)
+- `ws.test.ts`: callback tipi güncellendi
+
+---
+
+### 2026-05-17 (Win) — WS proxy + origin fix ✅
+
+**Sorun:** `localhost:5173` üzerinden WebSocket bağlantısı close code 1006 ile başarısız oluyordu. İki katmanlı problem:
+
+1. **Vite proxy routing:** `/api/v1/ws` Vite'de `/api` (HTTP-only) kuralı tarafından yakalanıyordu — WS upgrade hiç gerçekleşmiyordu.
+   - Düzeltme (`vite.config.ts`): `/api/v1/ws` için ayrı `ws: true` kural eklendi, `/api` kuralından önce.
+
+2. **`coder/websocket` origin check:** `localhost:5173` origin'i `localhost:8080` host'una eşit değil → HTTP 403 → bağlantı 1006 ile düştü.
+   - Düzeltme (`ws_handler.go`): `OriginPatterns: []string{"localhost:*", "127.0.0.1:*"}` eklendi.
+
+**Doğrulama:** Sunucu logu `ws conn registered, total_conns: 1` mesajını gösterdi.
+
+---
+
+### 2026-05-17 (Win) — Item tam alan düzenleme ✅
+
+**Sorun:** Item düzenleme modalı sadece isim/açıklama/expiry düzenlemesine izin veriyordu. Alan değerleri (şifreler, URL'ler vb.) düzenlenemiyordu — kasıtlı olarak bloke edilmişti çünkü server `owner_dek_wrapped` expose etmiyordu (PR-13 bunu çözdü). Ancak frontend bunu yakalamayı bırakmamıştı.
+
+**Düzeltme:**
+
+- `shared/pkg/src/api/types.ts`: `ItemUpdateRequest`'e `fields?`, `owner_dek_wrapped?`, `owner_wrap_nonce?` alanları eklendi.
+- `web/src/components/inventory/item-form-modal.tsx` — edit modu yeniden yazıldı:
+  - Modal açılınca: `openDEKWithKEK` + `decryptField` ile mevcut alan değerleri çözümlenir; yüklenirken "Alanlar yükleniyor..." spinner gösterilir.
+  - Kaydet'e basınca: `sealDEKWithKEK(editDek, privateKey)` + tüm alanlar `encryptField` ile re-encrypt edilir + update request içinde gönderilir.
+  - `editDek` state olarak saklanır (her alan için yeniden çözümleme gerekmiyor).
+- `web/src/pages/inventory/index.tsx`: `editItem` prop'una tam item data geçmek için `fullItemQuery.data` kullanılıyor (DEK + encrypted fields içeren).
+
+---
+
+### 2026-05-17 (Win) — Lokal geliştirme ortamı düzeltmesi ✅
+
+**Sorun:** `localhost:5173`'de HTTP 500 hatası. Vite proxy `http://server:8080` hedefine işaret ediyordu — bu hostname Docker ağı içinde çözümlenebilir, host makinesinden değil.
+
+- **Düzeltme:** `vite.config.ts`'de `'http://server:8080'` → `'http://localhost:8080'` olarak değiştirildi.
+- Birden fazla Vite process'i aynı anda çalışıyordu (5173→5174→5175 port drift); PowerShell ile kill edildi.
+- Docker Compose servisleri temizlendi; k8s_* container'larının Docker Desktop Kubernetes'e ait olduğu ve docker compose ile ilgisiz olduğu belirlendi.
+
+---
+
+### 2026-05-17 (Win) — PR-UX1~5: Kapsamlı UI/UX İyileştirmeleri ✅
+
+**PR-UX1 — Tema + Scrollbar + Modal + Pipeline node delete:**
+- `web/src/index.css`: Webkit + Firefox özel scrollbar CSS (`@layer base`)
+- ReactFlow Controls tema uyumu (CSS class override, `hsl(var(--card))` renkleri)
+- `pipeline-node.tsx`: `group-hover` ile X silme butonu + `data.onRemove` callback
+- `item-form-modal.tsx`: `sm:max-w-lg` → `sm:max-w-3xl`, 2-sütunlu grid layout
+- Süre & Rotasyon alanlarına açıklayıcı tooltip eklendi
+
+**PR-UX2 — İnteraktif etiket sistemi:**
+- `item-tag-picker.tsx` (YENİ): Popover+Command pattern, mevcut etiketler badge olarak + × kaldır, "+" ekle, yeni etiket oluştur seçeneği
+- `item-detail.tsx`: read-only badge'ler `<ItemTagPicker>` ile değiştirildi
+- `/tags` sayfasında tag badge'lerine tıklama → envantere filtreli yönlendirme
+
+**PR-UX3 — Admin konsolidasyonu + TOTP sıfırlama:**
+- `admin/users.tsx`: shadcn `Tabs` bileşeni — Kullanıcılar | Gruplar | Roller, URL `?tab=` ile senkron
+- Sidebar: 3 ayrı admin link → tek "Kullanıcı Yönetimi" linki
+- `user-actions-menu.tsx`: "TOTP Sıfırla" menü öğesi + onay dialog
+- `totp-reset-dialog.tsx` (YENİ): onay dialog + `useResetTOTPMutation` hook
+- `/admin/groups` + `/admin/roles` → `/admin/users?tab=groups/roles` redirect
+
+**PR-UX4 — İlişki haritası filtreleme + Lifecycle onboarding:**
+- `/graph` sayfası: tip filtre chip'leri (Tümü/Sunucu/URL/Veritabanı/SSH/API/Genel), ReactFlow Controls tema fix
+- `diagram-sidebar.tsx`: tip filtre chip'leri eklendi
+- `lifecycle.tsx`: kapatılabilir onboarding banner (localStorage dismiss state)
+
+**PR-UX5 — Item paylaşım modalı tam implementasyon:**
+- `item-share-modal.tsx`: hardcoded `throw` kaldırıldı; DEK re-wrap flow (openDEKWithKEK → recipientPublicKey → sealed box)
+- Raw UUID input → Combobox kullanıcı picker (`useAllUsersQuery` ile)
+- `admin.ts`: `useAllUsersQuery` hook eklendi
+
+**CI fix — PR-UX3 sonrası:**
+- `user-table.test.tsx`: eksik `useResetTOTPMutation` mock'u eklendi
+
+---
 
 ### 2026-05-17 (Win) — PR-F5g: Export + Polish ✅
 

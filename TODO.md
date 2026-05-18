@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-05-17 (**Post-v1.0.0 Kapsamlı Geliştirmeler devam ediyor** — PR-RT-1..PR-N5 + PR-F5c/d/e/f/g tamamlandı. Kalan: PR-F3 + PR-N3.)
+Son güncelleme: 2026-05-18 (**Post-v1.0.0 Kapsamlı Geliştirmeler** — PR-RT-1..PR-UX5 + prod fix'ler tamamlandı. Kalan: PR-F3, PR-N3, prod hardening.)
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 
@@ -628,10 +628,37 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 - [x] **PR-N2** — Secret Versioning: `item_field_versions` tablosu (max 10, FIFO). Trigger-benzeri hook field update'te. `GET /items/{id}/fields/{field_def_id}/versions` endpoint. Web: field history modal + restore.
 - [x] **PR-N5** — One-Time Paylaşım Linki: `item_share_links` tablosu (token_hash SHA-256, dek_wrapped, view_limit 1-10, TTL). Public `GET /api/v1/share/{token}` (no auth, atomic view_count++, 410 Gone). E2E: link_key URL fragment'ta, asla sunucuya gitmez. Web: ShareLinkDialog + public SharePage.
 
+### ✅ Son Tamamlananlar (2026-05-17~18)
+
+- [x] **PR-UX1~5** — Kapsamlı UI/UX İyileştirmeleri (scrollbar, modal 2-col, pipeline node delete, etiket picker, admin tab, TOTP reset, graf filtre, lifecycle onboarding, paylaşım modal fix) ✅ 2026-05-17
+- [x] **Item tam alan düzenleme** — edit modda DEK çözümleme + alan decrypt + re-encrypt on save ✅ 2026-05-17
+- [x] **WS proxy + origin fix** — Vite proxy WS rule + `coder/websocket` OriginPatterns ✅ 2026-05-17
+- [x] **Renkli telemetri dot** — yeşil/amber/kırmızı WS status indicator + hata detayı popover ✅ 2026-05-17
+- [x] **CI test fix'leri** — `ws-provider.test` getDetail mock + `item-form-modal.test` waitFor pattern ✅ 2026-05-18
+
 ### ⏳ Kalan
 
 - [ ] **PR-F3** — Tauri Client Sync: Rust keyring `bootstrap_pk_store/load/delete` komutları. Login'de Tauri path'te keyring'e kek_store. Bootstrap'ta keyring'den yükle.
 - [ ] **PR-N3** — Onay Workflow / Dual Control: `access_requests` tablosu. Kritik item için erişim isteği → admin onayı → zaman-sınırlı görüntüleme. WS event'lar. **Büyük iş — Faz 6+ ayrı plan gerekir.**
+
+### 🎯 Önerilen Sonraki Adaylar (Öncelik Sırası)
+
+**Kısa vadeli (günler):**
+- [ ] **WS origin prod config** — `ws_handler.go` `OriginPatterns` env-config üzerinden alınmalı (şu an hardcoded `localhost:*`). Production'da gerçek domain'e daraltılmalı.
+- [ ] **PR-F3 (Tauri Sync)** — Yukarıda detaylı. Tauri client henüz tam senkron değil.
+- [ ] **Item arama iyileştirmesi** — HMAC blind index sadece tam eşleşme. Prefix arama için bigram/trigram hash veya Postgres `ILIKE` fallback (plaintext metadata için).
+- [ ] **Share modal grup desteği** — Backend: item_shares tablosuna `group_id` sütunu + `ResolveItemPermission` CTE'ye group path. Frontend: kullanıcı picker'a grup tab'ı.
+
+**Orta vadeli (hafta):**
+- [ ] **PR-N3 (Onay Workflow)** — Büyük iş, ayrı plan session gerekir.
+- [ ] **Bulk import/export** — CSV veya KeePassXC .kdbx import — takım geçişleri için kritik.
+- [ ] **CLI client** — `ironstock` komutu: grep/find, copy-to-clipboard, script-friendly. DevOps entegrasyonu için önemli.
+- [ ] **Vault backend (PR-K6)** — `server/internal/vault` package + item endpoint passthrough. Parking lot'tan çıkarılabilir.
+
+**Uzun vadeli:**
+- [ ] **OIDC SSO** — Azure AD / Okta entegrasyonu. Kurumsal müşteriler için.
+- [ ] **Mobile client** — Tauri 2 mobile (iOS/Android).
+- [ ] **Terraform provider** — IaC ile envanter yönetimi.
 
 ### ⏸ Ertelenen (Deferred)
 
