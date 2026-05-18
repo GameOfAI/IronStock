@@ -8,15 +8,18 @@ vi.mock('@/store/auth', () => ({
 }));
 
 vi.mock('@/api/ws', () => {
-  const listeners = new Set<(s: string) => void>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const listeners = new Set<(d: any) => void>();
   const mockClient = {
     getStatus: vi.fn().mockReturnValue('connecting'),
-    onStatus: vi.fn((cb: (s: string) => void) => {
+    getDetail: vi.fn().mockReturnValue({ status: 'connecting', attempt: 0 }),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onStatus: vi.fn((cb: (d: any) => void) => {
       listeners.add(cb);
       return () => listeners.delete(cb);
     }),
     destroy: vi.fn(),
-    _emit: (s: string) => listeners.forEach((cb) => cb(s)),
+    _emit: (status: string) => listeners.forEach((cb) => cb({ status, attempt: 0 })),
   };
   return {
     WsClient: vi.fn().mockReturnValue(mockClient),

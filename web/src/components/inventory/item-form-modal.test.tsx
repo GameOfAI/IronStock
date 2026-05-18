@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 vi.mock('@/api/items', () => ({
@@ -125,9 +125,10 @@ describe('ItemFormModal — edit', () => {
     renderModal({ editItem });
 
     fireEvent.change(screen.getByDisplayValue('old-name'), { target: { value: 'new-name' } });
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Kaydet' }));
-    });
+    fireEvent.click(screen.getByRole('button', { name: 'Kaydet' }));
+    // Async crypto (key wrap + field encryption) completes outside React's scheduler;
+    // waitFor polls until mutateAsync is called.
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledOnce(), { timeout: 3000 });
     expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ name: 'new-name' }));
   });
 
