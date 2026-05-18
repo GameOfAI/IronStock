@@ -25,8 +25,6 @@ import {
   Monitor,
   KeyRound,
   Menu,
-  WifiOff,
-  Loader2,
   ShieldAlert,
   UserCircle,
   Tag,
@@ -84,39 +82,46 @@ function WsStatusDot() {
   const { status, errorReason, attempt, nextRetryIn } = useWsDetail();
   const [open, setOpen] = React.useState(false);
 
-  if (status === 'connected') return null; // Silent when healthy.
+  const dotColor =
+    status === 'connected'
+      ? 'bg-green-500'
+      : status === 'connecting' || status === 'reconnecting'
+        ? 'bg-amber-400'
+        : 'bg-destructive'; // offline / unknown
 
-  const isOffline = status === 'offline';
+  const pulse = status === 'connecting' || status === 'reconnecting';
+
   const label =
-    status === 'connecting'
-      ? 'Canlı bağlantı kuruluyor…'
-      : status === 'reconnecting'
-        ? `Yeniden bağlanılıyor… (deneme ${attempt})`
-        : 'Gerçek zamanlı bağlantı yok';
+    status === 'connected'
+      ? 'Canlı bağlantı aktif'
+      : status === 'connecting'
+        ? 'Canlı bağlantı kuruluyor…'
+        : status === 'reconnecting'
+          ? `Yeniden bağlanılıyor… (deneme ${attempt})`
+          : 'Gerçek zamanlı bağlantı yok';
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="flex items-center rounded p-0.5 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex items-center gap-1.5 rounded px-1.5 py-1 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           aria-label={label}
           title={label}
         >
-          {isOffline ? (
-            <WifiOff className="h-4 w-4 text-destructive" />
-          ) : (
-            <Loader2 className="h-4 w-4 animate-spin text-amber-500" />
-          )}
+          <span className="relative flex h-2.5 w-2.5 items-center justify-center">
+            {pulse && (
+              <span
+                className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-60 ${dotColor}`}
+              />
+            )}
+            <span className={`relative inline-flex h-2 w-2 rounded-full ${dotColor}`} />
+          </span>
         </button>
       </PopoverTrigger>
       <PopoverContent side="bottom" align="end" className="w-72 p-3 text-sm space-y-2">
         <div className="flex items-center gap-2 font-medium">
-          {isOffline ? (
-            <WifiOff className="h-4 w-4 text-destructive shrink-0" />
-          ) : (
-            <Loader2 className="h-4 w-4 animate-spin text-amber-500 shrink-0" />
-          )}
+          <span className={`inline-flex h-2.5 w-2.5 rounded-full ${dotColor} shrink-0`} />
           <span>{label}</span>
         </div>
 
@@ -133,19 +138,26 @@ function WsStatusDot() {
           </p>
         )}
 
-        <div className="text-xs text-muted-foreground space-y-1 border-t pt-2">
-          <p className="font-medium text-foreground">Olası nedenler:</p>
-          <ul className="list-disc list-inside space-y-0.5">
-            <li>Sunucu kapalı veya ağ bağlantısı yok</li>
-            <li>Oturum süresi dolmuş (token geçersiz)</li>
-            <li>WebSocket proxy yanlış yapılandırılmış</li>
-            <li>Tarayıcı uzantısı bağlantıyı engelliyor</li>
-          </ul>
-        </div>
+        {status !== 'connected' && (
+          <div className="text-xs text-muted-foreground space-y-1 border-t pt-2">
+            <p className="font-medium text-foreground">Olası nedenler:</p>
+            <ul className="list-disc list-inside space-y-0.5">
+              <li>Sunucu kapalı veya ağ bağlantısı yok</li>
+              <li>Oturum süresi dolmuş (token geçersiz)</li>
+              <li>WebSocket proxy yanlış yapılandırılmış</li>
+              <li>Tarayıcı uzantısı bağlantıyı engelliyor</li>
+            </ul>
+            <p className="pt-1">
+              Not: Gerçek zamanlı bağlantı olmadan da uygulama çalışır; veriler manuel yenileme ile güncellenir.
+            </p>
+          </div>
+        )}
 
-        <p className="text-xs text-muted-foreground">
-          Not: Gerçek zamanlı bağlantı olmadan da uygulama çalışır; veriler manuel yenileme ile güncellenir.
-        </p>
+        {status === 'connected' && (
+          <p className="text-xs text-muted-foreground">
+            Sunucudan anlık güncellemeler alınıyor.
+          </p>
+        )}
       </PopoverContent>
     </Popover>
   );
