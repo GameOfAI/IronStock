@@ -641,24 +641,42 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 - [ ] **PR-F3** — Tauri Client Sync: Rust keyring `bootstrap_pk_store/load/delete` komutları. Login'de Tauri path'te keyring'e kek_store. Bootstrap'ta keyring'den yükle.
 - [ ] **PR-N3** — Onay Workflow / Dual Control: `access_requests` tablosu. Kritik item için erişim isteği → admin onayı → zaman-sınırlı görüntüleme. WS event'lar. **Büyük iş — Faz 6+ ayrı plan gerekir.**
 
-### 🎯 Önerilen Sonraki Adaylar (Öncelik Sırası)
+### 🎯 Önerilen Sonraki Adaylar (Devolutions analizi + öncelik sırası)
 
-**Kısa vadeli (günler):**
-- [ ] **WS origin prod config** — `ws_handler.go` `OriginPatterns` env-config üzerinden alınmalı (şu an hardcoded `localhost:*`). Production'da gerçek domain'e daraltılmalı.
-- [ ] **PR-F3 (Tauri Sync)** — Yukarıda detaylı. Tauri client henüz tam senkron değil.
-- [ ] **Item arama iyileştirmesi** — HMAC blind index sadece tam eşleşme. Prefix arama için bigram/trigram hash veya Postgres `ILIKE` fallback (plaintext metadata için).
-- [ ] **Share modal grup desteği** — Backend: item_shares tablosuna `group_id` sütunu + `ResolveItemPermission` CTE'ye group path. Frontend: kullanıcı picker'a grup tab'ı.
+> Devolutions Server karşılaştırması sonrası yeniden önceliklendirme yapıldı (2026-05-19).
+> Detaylı karşılaştırma tablosu ve "kopyalanabilir" analizi için PROGRESS.md'ye bakınız.
 
-**Orta vadeli (hafta):**
-- [ ] **PR-N3 (Onay Workflow)** — Büyük iş, ayrı plan session gerekir.
-- [ ] **Bulk import/export** — CSV veya KeePassXC .kdbx import — takım geçişleri için kritik.
-- [ ] **CLI client** — `ironstock` komutu: grep/find, copy-to-clipboard, script-friendly. DevOps entegrasyonu için önemli.
-- [ ] **Vault backend (PR-K6)** — `server/internal/vault` package + item endpoint passthrough. Parking lot'tan çıkarılabilir.
+**Zorunlu / Teknik borç:**
+- [ ] **WS origin prod config** — `OriginPatterns` hardcoded `localhost:*`; env-config'den alınmalı. Production riski.
+- [ ] **PR-F3 (Tauri Sync)** — Rust keyring bootstrap pk store/load/delete. Client senkron değil.
 
-**Uzun vadeli:**
-- [ ] **OIDC SSO** — Azure AD / Okta entegrasyonu. Kurumsal müşteriler için.
+**Kolay kazanımlar — Devolutions'dan ilham (günler):**
+- [ ] **Log forwarding** — Audit log event'larından Syslog (UDP/TCP) + Slack webhook entegrasyonu. SOC/SIEM için kritik. `POST /api/v1/admin/log-forwarding` config endpoint + background forwarder goroutine.
+- [ ] **Scheduled export** — `GET /api/v1/admin/export?format=json|csv` endpoint. Felaket kurtarma + migration için. Alanlar: item meta (şifreli alanlar hariç).
+- [ ] **Zaman bazlı erişim** — `item_shares` + `folder_permissions`'a `valid_from TIMESTAMPTZ`, `valid_until TIMESTAMPTZ` alanları. `ResolveItemPermission` CTE'ye `AND (valid_until IS NULL OR valid_until > NOW())` eklenir. Migration + UI.
+- [ ] **Item arama iyileştirmesi** — HMAC blind index sadece tam eşleşme. Prefix için bigram HMAC array veya Postgres `ILIKE` (plaintext metadata).
+
+**Orta vadeli — kritik gaplar (hafta):**
+- [ ] **SSO / OIDC entegrasyonu** — Azure AD (Entra ID) ve Okta. Kurumsal ortamlarda AD zorunlu; bu olmadan enterprise satışı güç. SAML 2.0 + OIDC. Backend: `POST /auth/sso/callback` + `users.external_id` kolonu. Önce Entra ID, sonra Okta.
+- [ ] **PR-N3 (Onay/Checkout Workflow)** — Kritik credential erişimi → onay isteği → admin onayı → zaman-sınırlı görüntüleme. `access_requests` tablosu. WS event'lar. Büyük iş, ayrı plan session.
+- [ ] **Bağlı kayıtlar (Linked Entries)** — `item_links` tablosu: `source_item_id → target_item_id, field_def_id`. Kaynak alan güncellenince bağlı item'lar da güncellenir (re-encrypt). Örn: tek SSH key birden fazla sunucuda kullanılıyor.
+- [ ] **Bulk import/export** — CSV + KeePassXC .kdbx import parser (Go `keepassxc-go` library). Takım geçişleri için şart.
+- [ ] **Share modal grup desteği** — `item_shares`'e `group_id` sütunu + `ResolveItemPermission` CTE'ye group path. Frontend: kullanıcı picker'a "Gruplar" tab'ı.
+
+**Uzun vadeli — büyük özellikler (ay):**
+- [ ] **Otomatik parola rotasyonu** — Rotation scheduler + agent/runner ile SSH/API üzerinden credential push. Backend'de rotation policy engine. Devolutions'da PAM add-on; IronStock'ta built-in olabilir.
+- [ ] **WebAuthn / YubiKey MFA** — TOTP ötesi donanım anahtarı. `webauthn-go` library. `user_credentials` tablosu. TOTP'a alternatif/ek.
+- [ ] **Tauri offline cache** — SQLite local cache + sync-on-connect. Ağ kesildiğinde client çalışmaya devam eder.
+- [ ] **CLI client** — `ironstock` komutu: credential fetch, copy-to-clipboard, script-friendly. DevOps pipeline entegrasyonu.
+- [ ] **Vault backend (PR-K6)** — HashiCorp Vault proxy (parking lot'tan çıkarılabilir). Büyük enterprise için.
+- [ ] **OIDC SSO** — Azure AD / Okta / Keycloak (yukarıdaki kısa vadeli sonrası genişletme).
 - [ ] **Mobile client** — Tauri 2 mobile (iOS/Android).
 - [ ] **Terraform provider** — IaC ile envanter yönetimi.
+
+**Kopyalanmayacak (misyon dışı):**
+- Session recording (video/stream — çok büyük altyapı)
+- RADIUS authentication (niche)
+- JIT privilege elevation (tam PAM ürünü kapsamı; IronStack için erken)
 
 ### ⏸ Ertelenen (Deferred)
 

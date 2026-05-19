@@ -1,31 +1,108 @@
 # İlerleyiş
 
-Son güncelleme: 2026-05-18 (Item full edit + WS fix + telemetri dot + CI test fix'leri)
+Son güncelleme: 2026-05-19 (Devolutions rekabet analizi + olgunluk güncellemesi)
 
 ## Mevcut Durum
 
 - **Aktif Faz:** Post-v1.0.0 Kapsamlı Geliştirmeler (Faz 6+)
 - **Tamamlanan Faz:** Faz 0 + 1 + 2 + 3 + 4 + 5 ✅
 - **Son tamamlanan:** Item tam alan düzenleme + WS proxy/origin fix + renkli telemetri dot + CI test düzeltmeleri ✅ 2026-05-18
-- **Proje durumu:** MVP + kapsamlı geliştirmeler devam ediyor. Faz 6+ PRları: PR-RT-1, PR-F1, PR-N6, PR-F2a, PR-F4, PR-F6a/b/c, PR-N4, PR-F2b, PR-F5a/b, PR-N7, PR-N8, PR-N1, PR-N2, PR-N5, PR-F5c/d/e/f/g, PR-UX1~5 tamamlandı. Sonrasında: item düzenleme fix, WS altyapısı fix, telemetri görünürlük. Kalan: PR-F3 (Tauri Sync), PR-N3 (Onay Workflow — Faz 5 büyük iş).
+- **Proje durumu:** MVP + kapsamlı geliştirmeler devam ediyor. PR-UX5'e kadar tüm planlı PR'lar tamamlandı. Kalan zorunlu: PR-F3 (Tauri Sync), PR-N3 (Onay Workflow). Yeni yön: PAM özellikleri (Devolutions analizi sonrası — bakınız aşağıdaki rekabet analizi).
 
-## Uygulama Olgunluk Özeti (2026-05-18)
+---
 
-### Ne İyi Çalışıyor ✅
-- **Backend:** Tam fonksiyonel. Auth (login/TOTP/trusted device/recovery), RBAC 3 katmanlı, item CRUD + E2E şifreleme, klasör ACL + grup ACL, bildirimler, etiketler, favoriler, expiry scanner, pipeline/lifecycle backend, WS hub, audit log — hepsi production-ready.
-- **Web Admin UI:** Envanter CRUD (oluştur/oku/sil + artık tam düzenleme de), item paylaşımı (DEK re-wrap), etiket yönetimi, bildirim çanı, pipeline diyagramları, lifecycle swimlane, grafik haritası, admin konsolidasyonu (tabbed), TOTP yönetimi, break-glass banner — genel olarak kullanılabilir durumda.
-- **CI/CD:** GitHub Actions (Go test + Web test + Docker build/push + k8s image tag güncelleme) çalışıyor. Test coverage 131 test, 25 dosya.
-- **k8s:** Sealed Secrets, Ingress+TLS, NetworkPolicy, Prometheus metrics, resource limits, PDB — production-grade deploy.
-- **Tauri Client:** Temel inventory CRUD + E2E şifreleme + Windows Credential Manager keyring + system tray + auto-lock.
+## Uygulama Olgunluk Özeti (2026-05-19)
 
-### Bilinen Açık Uçlar / Sonraki Adaylar
-- **PR-F3 (Tauri Sync):** Rust keyring bootstrap pk store/load/delete — client henüz tam senkron değil.
-- **PR-N3 (Onay Workflow):** Kritik item erişiminde dual-control / approval workflow — büyük iş, ayrı plan gerekir.
-- **WS prod origin:** `ws_handler.go`'daki `OriginPatterns: []string{"localhost:*"}` geliştirme için eklendi; production'da env-config ile gerçek origin'e daraltılmalı (Faz 5 notu).
-- **Share modal grup desteği:** Şu an sadece kullanıcı bazlı paylaşım; grup bazlı backend genişletme gerekir.
-- **Item arama:** HMAC blind index sadece tam eşleşme; full-text / prefix arama yok.
-- **Tauri client admin sayfaları:** Client'ta admin sayfaları yok; web-only.
-- **UX polish devamı:** UX planındaki küçük iyileştirmeler (ilişki haritasında klasör filtresi, lifecycle banner dismiss persistence) yapıldı ama daha ince detaylar olabilir.
+### Credential Vault Özellikleri — Karşılaştırmalı Tablo
+
+| Özellik | IronStock | Devolutions Server | Not |
+|---------|-----------|-------------------|-----|
+| Self-hosted deployment | ✅ k8s | ✅ Windows/Linux IIS | IronStock daha cloud-native |
+| E2E client-side şifreleme | ✅ AES-GCM + X25519 | ❌ server-side only | **IronStock kritik avantaj** |
+| Credential CRUD | ✅ | ✅ | Eşit |
+| Dinamik alan tipleri | ✅ field_definitions | ✅ | Eşit |
+| Klasör/hiyerarşi | ✅ | ✅ multi-vault | Devolutions vault'ları ayrı; IronStock klasör-bazlı |
+| RBAC (rol tabanlı) | ✅ 3 katman | ✅ | Eşit |
+| Grup bazlı ACL | ✅ | ✅ AD/LDAP groups | Devolutions'da AD entegrasyonu var |
+| TOTP / MFA | ✅ TOTP RFC 6238 | ✅ TOTP+YubiKey+SMS+Duo+RADIUS | Devolutions daha geniş MFA |
+| SSO / OIDC | ❌ (parking lot) | ✅ Entra ID / Okta / PingOne | **IronStock'ta yok — önemli gap** |
+| Güvenilir cihaz | ✅ 30 gün cookie | ✅ | Eşit |
+| Audit log | ✅ | ✅ + Syslog/Slack/SIEM forward | Devolutions log forwarding var |
+| Bildirim sistemi | ✅ in-app + WS | ✅ | Eşit |
+| Etiket sistemi | ✅ | ❌ (tag yok) | **IronStock avantaj** |
+| Item versiyonlama | ✅ 10 versiyon | ❌ | **IronStock avantaj** |
+| Expiry / rotation takibi | ✅ + scanner | ❌ (sadece RDM entegrasyonu) | **IronStock avantaj** |
+| One-time share link | ✅ E2E | ❌ | **IronStock avantaj** |
+| Pipeline/lifecycle görselleştirme | ✅ ReactFlow | ❌ | **IronStock benzersiz özellik** |
+| İlişki haritası (graph) | ✅ | ❌ | **IronStock benzersiz özellik** |
+| Native client (Tauri) | ✅ Windows+macOS | ✅ RDM (ayrı ücretli ürün) | IronStock'ta ücretsiz dahil |
+| Tauri offline cache | ❌ | ✅ RDM local cache | **IronStock'ta yok** |
+| Otomatik parola rotasyonu | ❌ | ✅ PAM add-on | **IronStock'ta yok — önemli gap** |
+| Session kaydı | ❌ | ✅ | **IronStock'ta yok** |
+| Secure session brokering | ❌ (ilişki türü var ama brokering yok) | ✅ Devolutions Gateway | **IronStock'ta yok — büyük gap** |
+| JIT privilege elevation | ❌ | ✅ PAM add-on | **IronStock'ta yok** |
+| Onay/checkout workflow | ⏳ PR-N3 planlı | ✅ | Planlı |
+| Zaman bazlı erişim | ❌ | ✅ | **IronStock'ta yok** |
+| GeoIP kısıtlama | ❌ | ✅ | **IronStock'ta yok** |
+| Programatik erişim (API/CLI) | ✅ REST API | ✅ REST + PowerShell | Eşit seviye |
+| Toplu import/export | ❌ | ✅ PowerShell scheduled export | **IronStock'ta yok** |
+| Log forwarding (Syslog/SIEM) | ❌ | ✅ Syslog, Slack, Sentinel | **IronStock'ta yok** |
+| Linked entries (bağlı kayıtlar) | ❌ | ✅ | **IronStock'ta yok** |
+| Break-glass acil erişim | ✅ + WS alert | ❌ | **IronStock avantaj** |
+| Prometheus metrics | ✅ | ❌ | **IronStock avantaj** |
+| Veritabanı | PostgreSQL | MSSQL | IronStock bağımsız, MSSQL lisans maliyeti yok |
+| Fiyatlandırma | İçeride geliştirme (maliyet yok) | Per-seat ticari lisans | IronStock avantaj |
+
+### IronStock'un Net Güçlü Yanları
+1. **Client-side E2E şifreleme** — Devolutions'da yok. Server plaintext'i asla görmez. Bu kritik bir güven farklılığı.
+2. **Kubernetes-native** — Devolutions Windows Server + IIS bağımlı. IronStock cloud-agnostic.
+3. **PostgreSQL** — MSSQL lisans maliyeti ve bağımlılığı yok.
+4. **Item versiyonlama + expiry tracking** — Devolutions'da credential lifecycle takibi zayıf.
+5. **Pipeline/lifecycle görselleştirme** — Pazarda benzeri yok. DevOps için özgün değer.
+6. **One-time E2E share link** — Devolutions'da yok.
+7. **Break-glass + anlık uyarı** — Devolutions'da yok.
+8. **Prometheus/Grafana** — Gözlemlenebilirlik built-in.
+9. **Etiket + favori sistemi** — Devolutions'da yok.
+
+### IronStock'un Kapatması Gereken Önemli Gaplar
+1. **SSO/OIDC (Azure AD/Okta)** — Kurumsal ortamlarda AD/Entra ID zorunlu. En acil gap.
+2. **Otomatik parola rotasyonu** — Scheduler var ama rotasyonu fiilen yapmıyor; sadece takip ediyor.
+3. **Log forwarding (Syslog/SIEM)** — SOC entegrasyonu için kritik.
+4. **Tauri offline cache** — Ağ kesildiğinde client çalışmıyor.
+5. **Toplu import/export** — Mevcut sistemden geçiş için şart.
+6. **Zaman bazlı erişim** — "Sadece mesai saatlerinde" gibi politikalar.
+7. **Onay/checkout workflow (PR-N3)** — Kritik credential'lar için dual-control.
+8. **WebAuthn/YubiKey MFA** — TOTP ötesi donanım anahtarı desteği.
+9. **Bağlı kayıtlar (linked entries)** — Tek şifre değişikliği tüm referansları günceller.
+
+### Ne Kopyalanabilir (Öncelik Sırası)
+
+**Kolay (günler — mimari değişiklik gerektirmez):**
+- Log forwarding: Syslog + Slack webhook (audit log event'larından)
+- Scheduled export: JSON/CSV export endpoint + cron trigger
+- Zaman bazlı erişim: `item_shares`/`folder_permissions`'a `valid_from/valid_until` alanları
+
+**Orta (hafta — yeni tablo + UI gerekir):**
+- SSO/OIDC — Azure AD / Okta entegrasyonu (Entra ID önce, SAML sonra)
+- Bağlı kayıtlar — `item_links` tablosu, kaynak güncellenince hedef DEK'leri de yenile
+- Toplu import — CSV + KeePassXC .kdbx import parser
+- Tauri offline cache — SQLite local cache + sync-on-connect
+
+**Büyük (ay — ayrı plan gerekir):**
+- Otomatik parola rotasyonu — Agent/runner ile SSH/API üzerinden credential push
+- Onay/checkout workflow (PR-N3 zaten planlandı)
+- WebAuthn/YubiKey MFA
+- Secure session brokering (basit SSH/RDP proxy)
+
+**Kopyalanmayacak (misyon dışı / fazla karmaşık):**
+- Session recording — video/stream kaydı çok büyük altyapı gerektirir
+- RADIUS authentication — niche, öncelik düşük
+- JIT privilege elevation — PAM ürünü için; IronStock'un kapsamını aşıyor şimdilik
+
+### Rekabetçi Konumlandırma Özeti
+IronStock şu an **"güvenli credential vault + DevOps görselleştirme"** kesişiminde özgün bir noktada. Devolutions'un baskın olduğu alan **"session management + enterprise AD integration"**; IronStock'un baskın olduğu alan **"client-side E2E güvenlik + pipeline/lifecycle bağlamı + modern cloud-native deploy"**. İki ürün farklı müşteri ihtiyaçlarına hizmet ediyor — tam rakip değil, tamamlayıcı olabilir.
+
+---
 
 ## Kapsamlı Geliştirme Planı — Durum Özeti (2026-05-16)
 
