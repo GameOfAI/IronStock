@@ -33,6 +33,8 @@ let inflightRefresh: Promise<string> | null = null;
 
 /** Kaydedilmiş base URL — setBaseUrl() ile AppShell/ConnectionGate tarafından set edilir. */
 let _baseUrl = '';
+/** TLS skip-verify flag — geliştirme ortamında self-signed sertifikalar için. */
+let _tlsSkipVerify = false;
 
 export function setBaseUrl(url: string): void {
   _baseUrl = url.replace(/\/$/, '');
@@ -40,6 +42,38 @@ export function setBaseUrl(url: string): void {
 
 export function getBaseUrl(): string {
   return _baseUrl;
+}
+
+export function setTlsSkipVerify(value: boolean): void {
+  _tlsSkipVerify = value;
+}
+
+/**
+ * TLS bypass desteği olan fetch wrapper.
+ *
+ * Tauri ortamında `_tlsSkipVerify` aktifse self-signed sertifikalı sunuculara
+ * Rust reqwest üzerinden bağlanır. Aksi hâlde standart browser `fetch()` kullanılır.
+ */
+export async function rawFetch(url: string, init: RequestInit = {}): Promise<Response> {
+  if (_tlsSkipVerify && typeof window !== 'undefined' && '__TAURI__' in window) {
+    const { invoke } = await import('@tauri-apps/api/core');
+    const headers: Record<string, string> = {};
+    if (init.headers) {
+      for (const [k, v] of Object.entries(init.headers as Record<string, string>)) {
+        headers[k] = v;
+      }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = (await invoke('tls_fetch', {
+      url,
+      method: init.method ?? 'GET',
+      headers,
+      body: (init.body as string | null | undefined) ?? null,
+      tlsSkipVerify: true,
+    })) as { status: number; body: string };
+    return new Response(result.body || null, { status: result.status });
+  }
+  return fetch(url, init);
 }
 
 function emitLogout(reason: string) {
@@ -77,7 +111,7 @@ async function refreshOnce(): Promise<string> {
   if (!refresh) {
     throw new ApiError(401, { code: ErrCode.Unauthorized, message: 'Oturum sona erdi.' });
   }
-  const res = await fetch(`${_baseUrl}/api/v1/auth/refresh`, {
+  const res = await rawFetch(`${_baseUrl}/api/v1/auth/refresh`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ refresh_token: refresh }),
@@ -127,7 +161,7 @@ export async function apiFetch<T = unknown>(
   const url = buildURL(path, query);
   let res: Response;
   try {
-    res = await fetch(url, init);
+    res = await rawFetch(url, init);
   } catch (err) {
     throw new ApiError(0, {
       code: 'network_error',

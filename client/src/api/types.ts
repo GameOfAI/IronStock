@@ -40,4 +40,10 @@ export type {
   AttachmentInitRequest,
   AttachmentInitResponse,
   AttachmentDownloadURLResponse,
+  Tag,
+  TagListResponse,
+  ItemTagsResponse,
+  Notification,
+  NotificationsListResponse,
+  UnreadCountResponse,
 } from '@envanter/shared/api/types';

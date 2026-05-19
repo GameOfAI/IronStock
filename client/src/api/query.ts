@@ -31,6 +31,7 @@ export const queryKeys = {
     all: ['items'] as const,
     byFolder: (folderId: string, q?: string) => ['items', { folderId, q }] as const,
     detail: (id: string) => ['items', id] as const,
+    tags: (id: string) => ['items', id, 'tags'] as const,
   },
   catalog: {
     fieldDefinitions: ['catalog', 'field-definitions'] as const,

@@ -29,6 +29,7 @@ pub fn run() {
             commands::kek_delete,
             commands::activity_ping,
             commands::set_inactivity_timeout,
+            commands::tls_fetch,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

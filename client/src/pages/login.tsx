@@ -108,6 +108,9 @@ export default function LoginPage() {
       // KEK'i OS keyring'e kaydet (Tauri ortamında; browser'da no-op).
       await kekStore(username.toLowerCase(), toBase64(kek));
 
+      // Son kullanıcı adını kaydet → uygulama yeniden başlatılınca bootstrap için.
+      localStorage.setItem('envanter.last_username', username.toLowerCase());
+
       navigate(fromPath ?? '/inventory', { replace: true });
     } catch (err) {
       setSubstep('idle');

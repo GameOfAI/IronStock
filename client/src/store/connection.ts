@@ -13,7 +13,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { setBaseUrl } from '@/api/client';
+import { setBaseUrl, setTlsSkipVerify } from '@/api/client';
 
 interface ConnectionState {
   serverUrl: string;
@@ -31,11 +31,13 @@ export const useConnectionStore = create<ConnectionState>()(
       setConnection(serverUrl, tlsSkipVerify = false) {
         const url = serverUrl.replace(/\/$/, '');
         setBaseUrl(url);
+        setTlsSkipVerify(tlsSkipVerify);
         set({ serverUrl: url, tlsSkipVerify });
       },
 
       clearConnection() {
         setBaseUrl('');
+        setTlsSkipVerify(false);
         set({ serverUrl: '', tlsSkipVerify: false });
       },
     }),
@@ -45,6 +47,7 @@ export const useConnectionStore = create<ConnectionState>()(
       onRehydrateStorage: () => (state) => {
         // Hydration sonrası api/client'ı güncelle.
         if (state?.serverUrl) setBaseUrl(state.serverUrl);
+        if (state?.tlsSkipVerify) setTlsSkipVerify(state.tlsSkipVerify);
       },
     },
   ),

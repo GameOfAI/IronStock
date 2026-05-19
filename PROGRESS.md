@@ -1,13 +1,13 @@
 # İlerleyiş
 
-Son güncelleme: 2026-05-19 (PR-UX4..UX9 tamamlandı — envanter tip filtreleri, ikon-satır listesi, Admin Dashboard, item şablon galerisi)
+Son güncelleme: 2026-05-19 (PR-F3 Tauri KeyringBootstrap + TLS skip-verify + client item-detail parity tamamlandı)
 
 ## Mevcut Durum
 
 - **Aktif Faz:** Post-v1.0.0 Kapsamlı Geliştirmeler (Faz 6+)
 - **Tamamlanan Faz:** Faz 0 + 1 + 2 + 3 + 4 + 5 ✅
-- **Son tamamlanan:** PR-UX4..UX9 — tip filtre chip'leri, ikon-satır ItemList, Admin Dashboard (6 widget), item form şablon galerisi ✅ 2026-05-19
-- **Proje durumu:** MVP + tüm UX PR'ları tamamlandı. Kalan zorunlu: PR-F3 (Tauri Sync), PR-N3 (Onay Workflow). Yeni yön: PAM özellikleri (Devolutions analizi sonrası — bakınız aşağıdaki rekabet analizi).
+- **Son tamamlanan:** PR-F3 (Tauri KeyringBootstrap + TLS skip-verify), client item-detail parity (expiry/tags), API hooks (tags + notifications) ✅ 2026-05-19
+- **Proje durumu:** MVP + tüm UX PR'ları + PR-F3 tamamlandı. Kalan zorunlu: PR-N3 (Onay Workflow, büyük iş). Güvenlik iyileştirme adayları var (kullanıcı gündemi).
 
 ---
 
@@ -139,7 +139,7 @@ IronStock şu an **"güvenli credential vault + DevOps görselleştirme"** kesi�
 | PR-UX7 | Item Detail 5-tab layout (Genel/Alanlar/İlişkiler/Yaşam/Geçmiş) | ✅ DONE |
 | PR-UX8 | Admin Dashboard (6 widget: güvenlik skoru, expiry, user stats, audit) | ✅ DONE |
 | PR-UX9 | Item form şablon galerisi (11 quickstart şablonu) | ✅ DONE |
-| PR-F3 | Tauri Client Sync | ⏳ TODO |
+| PR-F3 | Tauri Client Sync | ✅ DONE |
 | PR-N3 | Onay Workflow / Dual Control | ⏳ Faz 6+ (büyük iş) |
 
 ## Faz Durumu
@@ -183,6 +183,28 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-05-19 (Win) — PR-F3 Tauri KeyringBootstrap + TLS skip-verify + Client parity ✅
+
+**PR-F3 KeyringBootstrap:**
+- `client/src/pages/login.tsx`: Başarılı login sonrası `localStorage.setItem('envanter.last_username', ...)` eklendi. Bootstrap akışı için son kullanıcı adı persist ediliyor.
+- `client/src/App.tsx`: `HydrateBoot` → `KeyringBootstrap` component'ine dönüştürüldü. Tam akış: `refreshToken` varlığı kontrolü → `rawFetch` ile JWT yenileme → `kekLoad(lastUsername)` → `fetchMe` + `fetchMyKeypair` paralel → `decryptPrivateKey` → `setSession`. Her adımda hata → sessizce login ekranına düş.
+- Uygulama yeniden başlatıldığında kullanıcı login ekranı görmeden envantere yönleniyor.
+
+**TLS skip-verify (geliştirme ortamı):**
+- `client/src-tauri/Cargo.toml`: `reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }` eklendi.
+- `client/src-tauri/src/commands.rs`: `tls_fetch` async Tauri komutu eklendi (`url, method, headers, body, tls_skip_verify` parametreleri, `danger_accept_invalid_certs(tls_skip_verify)` ile reqwest).
+- `client/src-tauri/src/lib.rs`: `tls_fetch` komutu `invoke_handler`'a eklendi.
+- `client/src/api/client.ts`: `setTlsSkipVerify()` export edildi, `rawFetch()` helper eklendi (Tauri + tlsSkipVerify aktifse `tls_fetch` invoke, aksi hâlde standart `fetch()`). `apiFetch` + `refreshOnce` → `rawFetch` kullanıyor.
+- `client/src/api/me.ts`: `fetchMyKeypair` + `fetchMe` → `rawFetch` kullanıyor.
+- `client/src/store/connection.ts`: `setConnection` + `clearConnection` + `onRehydrateStorage` → `setTlsSkipVerify` çağrısı eklendi.
+
+**Client item-detail parity:**
+- `client/src/components/inventory/item-detail.tsx`: Expiry/rotation bölümü (renk kodlamalı: kırmızı expired, amber 7gün, yeşil) + read-only tag badge'leri eklendi.
+- `client/src/api/tags.ts`: `useItemTagsQuery(itemId)` hook oluşturuldu.
+- `client/src/api/notifications.ts`: `useNotificationsQuery`, `useUnreadCountQuery`, `useMarkAllReadMutation`, `useMarkReadMutation` hook'ları oluşturuldu.
+- `client/src/api/types.ts`: `Tag`, `TagListResponse`, `ItemTagsResponse`, `Notification`, `NotificationsListResponse`, `UnreadCountResponse` re-export'ları eklendi.
+- `client/src/api/query.ts`: `queryKeys.items.tags` eklendi.
 
 ### 2026-05-19 (Win) — WS origin prod config + Admin metadata export ✅
 

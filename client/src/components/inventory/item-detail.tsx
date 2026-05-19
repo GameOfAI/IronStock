@@ -8,10 +8,12 @@
  */
 
 import * as React from 'react';
-import { Check, Copy, Eye, EyeOff, Loader2, Lock, MousePointerClick, Package } from 'lucide-react';
+import { AlertTriangle, Check, Clock, Copy, Eye, EyeOff, Loader2, Lock, MousePointerClick, Package, RefreshCw, Tag } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 import type { FieldDefinition, ItemFieldOutput, ItemType } from '@/api/types';
 import { useItem } from '@/api/items';
+import { useItemTagsQuery } from '@/api/tags';
 import { useAuthStore } from '@/store/auth';
 import { openDEKWithKEK, decryptField, fromBase64 } from '@/lib/crypto';
 import { PermissionBadge } from './permission-badge';
@@ -34,6 +36,12 @@ function buildFieldDefMap(defs: FieldDefinition[]): Map<number, FieldDefinition>
   const map = new Map<number, FieldDefinition>();
   for (const d of defs) map.set(d.id, d);
   return map;
+}
+
+/** Expiry tarihinden kalan gün sayısı (negatif = geçmiş). */
+function daysUntil(isoDate: string): number {
+  const diff = new Date(isoDate).getTime() - Date.now();
+  return Math.ceil(diff / 86_400_000);
 }
 
 type DecryptState =
@@ -141,6 +149,7 @@ function FieldRow({ field, definition, decryptedValue, canDecrypt }: FieldRowPro
 
 export function ItemDetail({ itemId, fieldDefinitions, itemTypes }: ItemDetailProps) {
   const itemQuery = useItem(itemId);
+  const tagsQuery = useItemTagsQuery(itemId);
   const privateKey = useAuthStore((s) => s.privateKey);
   const [decryptState, setDecryptState] = React.useState<DecryptState>({ status: 'idle' });
 
@@ -263,6 +272,68 @@ export function ItemDetail({ itemId, fieldDefinitions, itemTypes }: ItemDetailPr
           <p className="whitespace-pre-wrap rounded-md border bg-muted/30 px-3 py-2 text-sm text-foreground">
             {item.description}
           </p>
+        </section>
+      )}
+
+      {/* Expiry / rotation */}
+      {(item.expires_at || item.rotation_interval_days) && (() => {
+        const days = item.expires_at ? daysUntil(item.expires_at) : null;
+        const isExpired = days !== null && days < 0;
+        const isSoon = days !== null && days >= 0 && days <= 7;
+        return (
+          <section aria-label="Süre & Rotasyon">
+            <h3 className="mb-1.5 text-sm font-medium">Süre & Rotasyon</h3>
+            <div className="space-y-1.5">
+              {item.expires_at && (
+                <div className={`flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs ${isExpired ? 'border-destructive/40 bg-destructive/5 text-destructive' : isSoon ? 'border-amber-400/40 bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400' : 'bg-muted/30'}`}>
+                  {isExpired ? (
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  ) : (
+                    <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  )}
+                  <span className="font-medium">Son geçerlilik:</span>
+                  <span>
+                    {isExpired ? `${Math.abs(days!)} gün önce doldu` : days === 0 ? 'Bugün doluyor' : `${days} gün kaldı`}
+                    {' '}(<RelativeTime iso={item.expires_at} />)
+                  </span>
+                </div>
+              )}
+              {item.rotation_interval_days && (
+                <div className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-1.5 text-xs">
+                  <RefreshCw className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                  <span className="font-medium">Rotasyon:</span>
+                  <span>Her {item.rotation_interval_days} günde bir</span>
+                  {item.last_rotated_at && (
+                    <span className="text-muted-foreground">
+                      · Son: <RelativeTime iso={item.last_rotated_at} />
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          </section>
+        );
+      })()}
+
+      {/* Etiketler (read-only) */}
+      {tagsQuery.data && tagsQuery.data.tags.length > 0 && (
+        <section aria-label="Etiketler">
+          <div className="mb-1.5 flex items-center gap-1.5">
+            <Tag className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+            <h3 className="text-sm font-medium">Etiketler</h3>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {tagsQuery.data.tags.map((tag) => (
+              <Badge
+                key={tag.id}
+                variant="outline"
+                className="text-xs"
+                style={tag.color ? { borderColor: tag.color, color: tag.color } : undefined}
+              >
+                {tag.name}
+              </Badge>
+            ))}
+          </div>
         </section>
       )}
 

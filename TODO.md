@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-05-19 (**Post-v1.0.0 Kapsamlı Geliştirmeler** — tüm PR-UX1..UX9 + WS origin fix + PR-Export tamamlandı. Kalan: PR-F3, PR-N3, prod hardening.)
+Son güncelleme: 2026-05-19 (**Post-v1.0.0 Kapsamlı Geliştirmeler** — tüm PR-UX1..UX9 + WS origin fix + PR-Export + PR-F3 tamamlandı. Kalan: PR-N3, login güvenlik iyileştirmeleri, prod hardening.)
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 
@@ -642,7 +642,7 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 
 ### ⏳ Kalan
 
-- [ ] **PR-F3** — Tauri Client Sync: Rust keyring `bootstrap_pk_store/load/delete` komutları. Login'de Tauri path'te keyring'e kek_store. Bootstrap'ta keyring'den yükle.
+- [x] **PR-F3** — Tauri Client Sync: KeyringBootstrap (sessiz yeniden oturum), TLS skip-verify (reqwest), client item-detail parity (expiry/tags), tags + notifications API hooks. ✅ 2026-05-19
 - [ ] **PR-N3** — Onay Workflow / Dual Control: `access_requests` tablosu. Kritik item için erişim isteği → admin onayı → zaman-sınırlı görüntüleme. WS event'lar. **Büyük iş — Faz 6+ ayrı plan gerekir.**
 
 ### 🎯 Önerilen Sonraki Adaylar (Devolutions analizi + öncelik sırası)
@@ -652,7 +652,7 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 
 **Zorunlu / Teknik borç:**
 - [x] **WS origin prod config** — `ENVANTER_WS_ALLOWED_ORIGINS` env var eklendi. WSHandlers.AllowedOrigins wired. ✅ 2026-05-19
-- [ ] **PR-F3 (Tauri Sync)** — Rust keyring bootstrap pk store/load/delete. Client senkron değil.
+- [x] **PR-F3 (Tauri Sync)** — KeyringBootstrap + TLS skip-verify + client item-detail parity. ✅ 2026-05-19
 
 **Kolay kazanımlar — Devolutions'dan ilham (günler):**
 - [ ] **Log forwarding** — Audit log event'larından Syslog (UDP/TCP) + Slack webhook entegrasyonu. SOC/SIEM için kritik. `POST /api/v1/admin/log-forwarding` config endpoint + background forwarder goroutine.
