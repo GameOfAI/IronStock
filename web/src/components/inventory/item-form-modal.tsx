@@ -1,6 +1,6 @@
 import { useEffect, useReducer, useState } from 'react';
 import { ChevronDown, ChevronRight, Eye, EyeOff, HelpCircle, Lock, Loader2 } from 'lucide-react';
-import { TemplateGallery, ITEM_TEMPLATES } from './item-form-templates';
+import { TemplateGallery } from './item-form-templates';
 import type { ItemTemplate } from './item-form-templates';
 import {
   Dialog,

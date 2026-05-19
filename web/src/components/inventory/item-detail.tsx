@@ -23,7 +23,6 @@ import {
   RefreshCw,
   Star,
   StarOff,
-  Trash2,
   X,
   Lock,
   History,
@@ -110,7 +109,7 @@ function buildFieldDefMap(defs: FieldDefinition[]): Map<number, FieldDefinition>
 // Main component
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function ItemDetail({ itemId, fieldDefinitions, itemTypes }: ItemDetailProps) {
+export function ItemDetail({ itemId, fieldDefinitions, itemTypes: _itemTypes }: ItemDetailProps) {
   const itemQuery = useItem(itemId);
   const privateKey = useAuthStore((s) => s.privateKey);
   const [decryption, setDecryption] = useState<DecryptionState>({ status: 'idle' });
