@@ -98,7 +98,7 @@ services:
       dockerfile: web/Dockerfile.dev
     restart: unless-stopped
     ports:
-      - "5175:5173"
+      - "5173:5173"
     environment:
       VITE_API_URL: "http://localhost:8080"
     depends_on:
