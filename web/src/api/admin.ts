@@ -12,6 +12,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from './client';
+import { getAccessToken } from './token-storage';
 import { queryKeys } from './query';
 import type {
   AdminUser,
@@ -149,4 +150,36 @@ export function useAuditLog(filters: AuditLogFilters) {
         query: buildAuditQuery(filters),
       }),
   });
+}
+
+// ---------- Export (PR-Export) ----------
+
+export type ExportFormat = 'json' | 'csv';
+
+/**
+ * Triggers a metadata export download.
+ * Uses native fetch (not apiFetch) so we can handle the binary/text
+ * response as a Blob and create a download link.
+ */
+export async function downloadAdminExport(format: ExportFormat = 'json'): Promise<void> {
+  const token = getAccessToken();
+  const res = await fetch(`/api/v1/admin/export?format=${format}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error((body as { message?: string }).message ?? `Export başarısız (${res.status})`);
+  }
+  const blob = await res.blob();
+  const ext = format === 'csv' ? 'csv' : 'json';
+  const date = new Date().toISOString().slice(0, 10);
+  const filename = `ironstock-export-${date}.${ext}`;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }

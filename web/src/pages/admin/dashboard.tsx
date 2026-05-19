@@ -12,7 +12,7 @@
  * Tüm veri mevcut API hook'larından; yeni backend endpoint gerekmez.
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AlertTriangle,
@@ -21,8 +21,10 @@ import {
   CheckCircle2,
   ChevronRight,
   Clock,
+  Download,
   FileText,
   KeyRound,
+  Loader2,
   ShieldAlert,
   ShieldCheck,
   Users,
@@ -31,8 +33,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useUsers } from '@/api/admin';
-import { useAuditLog } from '@/api/admin';
+import { useUsers, useAuditLog, downloadAdminExport, type ExportFormat } from '@/api/admin';
 import { useNotificationsQuery } from '@/api/notifications';
 import { RelativeTime } from '@/components/common/relative-time';
 import { cn } from '@/lib/cn';
@@ -159,6 +160,18 @@ export default function AdminDashboardPage() {
   const usersQuery = useUsers({ limit: 500, offset: 0 });
   const auditQuery = useAuditLog({ limit: 5, offset: 0 });
   const notifQuery = useNotificationsQuery();
+
+  // Export state
+  const [exporting, setExporting] = useState<ExportFormat | null>(null);
+  async function handleExport(fmt: ExportFormat) {
+    if (exporting) return;
+    setExporting(fmt);
+    try {
+      await downloadAdminExport(fmt);
+    } finally {
+      setExporting(null);
+    }
+  }
 
   // User stats
   const userStats = useMemo(() => {
@@ -418,7 +431,7 @@ export default function AdminDashboardPage() {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">Hızlı Erişim</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
               <nav className="space-y-1">
                 {[
                   { to: '/admin/users', icon: Users, label: 'Kullanıcı Yönetimi' },
@@ -438,6 +451,34 @@ export default function AdminDashboardPage() {
                   </Link>
                 ))}
               </nav>
+
+              {/* Metadata Export */}
+              <div className="border-t pt-2">
+                <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Metadata Export
+                </p>
+                <div className="flex gap-1.5">
+                  {(['json', 'csv'] as const).map((fmt) => (
+                    <button
+                      key={fmt}
+                      type="button"
+                      disabled={exporting !== null}
+                      onClick={() => handleExport(fmt)}
+                      className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-slate-700 bg-slate-900/60 px-2 py-1.5 font-mono text-[11px] uppercase tracking-wider text-slate-400 transition hover:border-slate-500 hover:text-slate-200 disabled:opacity-50"
+                    >
+                      {exporting === fmt ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Download className="h-3 w-3" />
+                      )}
+                      {fmt.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-1 text-[10px] text-muted-foreground">
+                  Şifreli alanlar dahil edilmez.
+                </p>
+              </div>
             </CardContent>
           </Card>
         </div>

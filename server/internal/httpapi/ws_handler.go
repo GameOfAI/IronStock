@@ -13,10 +13,11 @@ import (
 
 // WSHandlers groups the WebSocket-related HTTP handlers.
 type WSHandlers struct {
-	Service *auth.Service
-	Hub     *ws.Hub
-	Tickets *ws.TicketStore
-	Logger  *slog.Logger
+	Service        *auth.Service
+	Hub            *ws.Hub
+	Tickets        *ws.TicketStore
+	Logger         *slog.Logger
+	AllowedOrigins []string // coder/websocket OriginPatterns; defaults to localhost:* if nil
 }
 
 // IssueTicket implements POST /api/v1/ws/ticket.
@@ -78,13 +79,16 @@ func (h *WSHandlers) Connect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	origins := h.AllowedOrigins
+	if len(origins) == 0 {
+		// Fallback for tests / zero-value construction.
+		origins = []string{"localhost:*", "127.0.0.1:*"}
+	}
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		// OriginPatterns: allow any localhost port so the Vite dev-server proxy
-		// (localhost:5173 → localhost:8080) and the nginx docker proxy both work.
-		// For production behind a reverse proxy, the real protection is the
-		// ticket-based auth already enforced in resolveConnectAuth above.
-		// Faz 5: tighten to known production origin(s) via env config.
-		OriginPatterns: []string{"localhost:*", "127.0.0.1:*"},
+		// OriginPatterns is populated from ENVANTER_WS_ALLOWED_ORIGINS.
+		// Dev default: localhost:* / 127.0.0.1:* (permissive for Vite proxy).
+		// Production: set the env var to the real frontend origin(s).
+		OriginPatterns: origins,
 		Subprotocols:   []string{"envanter.v1"},
 	})
 	if err != nil {

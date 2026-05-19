@@ -74,6 +74,8 @@ const (
 
 	// Admin TOTP reset (PR-F2a).
 	ActionAdminTOTPReset = "admin.totp_reset"
+	// Admin metadata export (PR-Export).
+	ActionAdminExport = "admin.export"
 
 	// Group lifecycle (PR-F6a).
 	ActionGroupCreated       = "group.created"

@@ -62,6 +62,13 @@ type Config struct {
 	// printed to stdout ONCE. Set this for repeatable deployments.
 	// ENVANTER_DEFAULT_ADMIN_PASSWORD — optional.
 	DefaultAdminPassword string // ENVANTER_DEFAULT_ADMIN_PASSWORD
+
+	// WSAllowedOrigins is a comma-separated list of glob patterns passed to
+	// coder/websocket AcceptOptions.OriginPatterns.
+	// Default "localhost:*,127.0.0.1:*" (dev-only).
+	// Production MUST set ENVANTER_WS_ALLOWED_ORIGINS to the real frontend
+	// origin, e.g. "app.example.com,*.example.com".
+	WSAllowedOrigins []string // ENVANTER_WS_ALLOWED_ORIGINS
 }
 
 // Load reads config from environment, applies defaults, and validates.
@@ -88,6 +95,7 @@ func Load() (*Config, error) {
 		MinioBucket:           envOr("ENVANTER_MINIO_BUCKET", "envanter"),
 		BootstrapEnabled:      envBoolOr("ENVANTER_BOOTSTRAP_ENABLED", false),
 		DefaultAdminPassword:  os.Getenv("ENVANTER_DEFAULT_ADMIN_PASSWORD"),
+		WSAllowedOrigins:      envStringSliceOr("ENVANTER_WS_ALLOWED_ORIGINS", []string{"localhost:*", "127.0.0.1:*"}),
 	}
 	if err := cfg.Validate(); err != nil {
 		return nil, err
@@ -194,4 +202,24 @@ func envBoolOr(key string, def bool) bool {
 		}
 	}
 	return def
+}
+
+// envStringSliceOr splits the env value on commas and trims each element.
+// Returns def when the variable is unset or empty.
+func envStringSliceOr(key string, def []string) []string {
+	v := os.Getenv(key)
+	if v == "" {
+		return def
+	}
+	parts := strings.Split(v, ",")
+	result := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if trimmed := strings.TrimSpace(p); trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	if len(result) == 0 {
+		return def
+	}
+	return result
 }

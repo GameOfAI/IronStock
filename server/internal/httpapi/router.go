@@ -43,6 +43,7 @@ type Deps struct {
 	Catalog      *CatalogHandlers
 	WS           *WSHandlers
 	Tag          *TagHandlers
+	Export       *ExportHandlers
 	Notification *NotificationHandlers
 	Graph        *GraphHandlers
 	ShareLink    *ShareLinkHandlers
@@ -232,6 +233,10 @@ func NewRouter(d Deps) http.Handler {
 			ar.Post("/users/{id}/totp/reset", d.Admin.AdminResetTOTP)
 			// Break-glass toggle (PR-N4).
 			ar.Post("/users/{id}/break-glass", d.Admin.SetBreakGlass)
+			// Export (PR-Export) — registered inside this block so auth/role MW applies.
+			if d.Export != nil {
+				ar.Get("/export", d.Export.Export)
+			}
 		})
 	}
 

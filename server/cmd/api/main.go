@@ -263,9 +263,15 @@ func run() error {
 		Logger:  logger,
 	}
 	wsHandlers := &httpapi.WSHandlers{
+		Service:        authSvc,
+		Hub:            hub,
+		Tickets:        tickets,
+		Logger:         logger,
+		AllowedOrigins: cfg.WSAllowedOrigins,
+	}
+	exportHandlers := &httpapi.ExportHandlers{
 		Service: authSvc,
-		Hub:     hub,
-		Tickets: tickets,
+		Audit:   auditWriter,
 		Logger:  logger,
 	}
 
@@ -326,6 +332,7 @@ func run() error {
 		ShareLink:    shareLinkHandlers,
 		Lifecycle:    lifecycleHandlers,
 		Pipeline:     pipelineHandlers,
+		Export:       exportHandlers,
 	})
 
 	srv := &http.Server{
