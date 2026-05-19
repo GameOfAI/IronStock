@@ -47,10 +47,14 @@ type loginResponse struct {
 	// default seed admin. Frontend redirects to /change-password and blocks
 	// all other routes until the password is updated.
 	MustChangePassword bool `json:"must_change_password,omitempty"`
-	// TmpToken is set instead of AccessToken when the user has totp_required=true
-	// but no verified TOTP secret yet. Frontend uses this to call /totp/init.
-	// Purpose: PurposeTOTPEnroll, lifetime: 15 minutes.
-	TmpToken string `json:"tmp_token,omitempty"`
+	// MustSetupTOTP signals that the user's session is valid but they must
+	// complete TOTP enrollment before accessing the application.
+	// Set when totp_required=true and the user has no verified TOTP secret.
+	// Frontend MustSetupTOTPGate redirects to /totp/setup and blocks all
+	// other routes until enrollment is complete.
+	// Note: when MustChangePassword=true, MustSetupTOTP is false — the
+	// password gate fires first; TOTP gate activates on the next login.
+	MustSetupTOTP bool `json:"must_setup_totp,omitempty"`
 }
 
 // Login implements POST /api/v1/auth/login.
@@ -140,36 +144,90 @@ func (s *AuthHandlers) Login(w http.ResponseWriter, r *http.Request) {
 	var trustedDeviceID string    // ID of the device row that was used (for audit)
 	hasTOTP := err == nil         // true when user has an active TOTP secret
 
-	// PR-SEC1: 3-way branch based on TOTP enrollment and per-user requirement.
+	// PR-SEC1/SEC2: 3-way branch based on TOTP enrollment and per-user requirement.
 	//
 	// Cases:
 	//   A) hasTOTP=true                                → mevcut TOTP verify akışı (B'ye düşer)
-	//   B) hasTOTP=false && totp_required=true         → tmp_token (PurposeTOTPEnroll) dön,
-	//                                                     frontend /totp/setup'a yönlendirir
+	//   B) hasTOTP=false && totp_required=true         → full session + must_setup_totp=true
+	//                                                     Frontend MustSetupTOTPGate → /totp/setup
 	//   C) hasTOTP=false && totp_required=false        → şifre yeterli (knowledge-only)
 	if !hasTOTP && userRow.TOTPRequired {
-		// User must set up TOTP before getting a session. Reset failed counter and
-		// audit a partial success; tmp_token gates /totp/init + /totp/verify.
-		_ = recordLoginSuccess(ctx, s.Service.DB, userRow.ID)
-		tmp, tmpErr := s.Service.JWT.IssueTmp(userRow.ID, auth.PurposeTOTPEnroll)
-		if tmpErr != nil {
+		// PR-SEC2: Issue a full session (not a tmp_token). The frontend gate blocks all
+		// routes except /totp/setup until the user completes TOTP enrollment.
+		// must_setup_totp is only set when must_change_password is false — if both
+		// conditions are true, the password gate fires first; on the next login after
+		// password change, must_change_password=false and must_setup_totp=true.
+		enrollRefresh, enrollErr := auth.GenerateRefresh()
+		if enrollErr != nil {
 			writeError(w, s.Logger, http.StatusInternalServerError, ErrCodeInternal,
-				"TOTP enrollment token üretilemedi.", tmpErr)
+				"Refresh token üretilemedi.", enrollErr)
 			return
 		}
+
+		enrollTx, enrollTxErr := s.Service.DB.Begin(ctx)
+		if enrollTxErr != nil {
+			writeError(w, s.Logger, http.StatusInternalServerError, ErrCodeInternal,
+				"Veritabanı hatası.", enrollTxErr)
+			return
+		}
+		defer func() { _ = enrollTx.Rollback(ctx) }()
+
+		if err := recordLoginSuccess(ctx, enrollTx, userRow.ID); err != nil {
+			writeError(w, s.Logger, http.StatusInternalServerError, ErrCodeInternal,
+				"Login durumu güncellenemedi.", err)
+			return
+		}
+
+		enrollSessionID, enrollSessErr := auth.CreateSession(ctx, enrollTx,
+			userRow.ID, enrollRefresh.Hash,
+			r.UserAgent(), parseIP(r.RemoteAddr),
+			enrollRefresh.ExpiresAt,
+		)
+		if enrollSessErr != nil {
+			writeError(w, s.Logger, http.StatusInternalServerError, ErrCodeInternal,
+				"Oturum oluşturulamadı.", enrollSessErr)
+			return
+		}
+
+		enrollRoles, enrollRolesErr := fetchUserRoles(ctx, enrollTx, userRow.ID)
+		if enrollRolesErr != nil {
+			writeError(w, s.Logger, http.StatusInternalServerError, ErrCodeInternal,
+				"Roller okunamadı.", enrollRolesErr)
+			return
+		}
+
+		if err := enrollTx.Commit(ctx); err != nil {
+			writeError(w, s.Logger, http.StatusInternalServerError, ErrCodeInternal,
+				"İşlem tamamlanamadı.", err)
+			return
+		}
+
+		enrollAccessToken, enrollATErr := s.Service.JWT.IssueAccess(userRow.ID, enrollSessionID, enrollRoles)
+		if enrollATErr != nil {
+			writeError(w, s.Logger, http.StatusInternalServerError, ErrCodeInternal,
+				"Access token üretilemedi.", enrollATErr)
+			return
+		}
+
 		_ = s.Audit.Write(ctx, audit.Entry{
 			ActorUserID:  userRow.ID,
 			Action:       audit.ActionAuthLogin,
-			ResourceType: audit.ResourceUser,
-			ResourceID:   userRow.ID,
+			ResourceType: audit.ResourceSession,
+			ResourceID:   enrollSessionID,
 			Details:      map[string]any{"stage": "totp_enroll_required"},
 			IPAddress:    parseIP(r.RemoteAddr),
 			UserAgent:    r.UserAgent(),
 		})
+
 		writeJSON(w, http.StatusOK, loginResponse{
-			TmpToken:           tmp,
+			AccessToken:        enrollAccessToken,
+			RefreshToken:       enrollRefresh.Token,
+			ExpiresIn:          int(auth.AccessTokenLifetime.Seconds()),
+			TokenType:          "Bearer",
 			UserID:             userRow.ID,
+			Roles:              enrollRoles,
 			MustChangePassword: userRow.MustChangePassword,
+			MustSetupTOTP:      !userRow.MustChangePassword,
 		})
 		return
 	}

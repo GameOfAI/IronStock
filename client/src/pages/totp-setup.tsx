@@ -1,14 +1,19 @@
 /**
  * TOTP kurulum sihirbazı — web/src/pages/totp-setup.tsx ile aynı mantık.
  *
- * Buraya route state ile tmpToken gelir:
- *   navigate('/totp/setup', { state: { tmpToken } })
+ * İki mod:
+ *
+ * 1. tmp_token modu: navigate('/totp/setup', { state: { tmpToken } }) ile ulaşılır.
+ *    Kurulum tamamlandığında /login'e yönlendirilir.
+ *
+ * 2. Gate modu (PR-SEC2): Kullanıcı giriş yapmış, MustSetupTOTPGate /totp/setup'a yönlendirdi.
+ *    accessToken store'dan okunur. Kurulum tamamlandığında mustSetupTOTP temizlenir → /inventory.
  *
  * Adımlar:
  *   1. POST /auth/totp/init   → otpauth_uri + secret_base32
  *   2. QR / secret göster + kullanıcı kodu girer
  *   3. POST /auth/totp/verify → 10 recovery code (tek gösterim)
- *   4. Kodları onayla → /login
+ *   4. Kodları onayla → yönlendir
  */
 
 import * as React from 'react';
@@ -20,6 +25,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { useTOTPInitMutation, useTOTPVerifyMutation } from '@/api/auth';
 import { TOTPQRCode } from '@/components/auth/totp-qr';
+import { useAuthStore } from '@/store/auth';
 
 export default function TOTPSetupPage() {
   const navigate = useNavigate();
@@ -28,17 +34,26 @@ export default function TOTPSetupPage() {
   const initMut = useTOTPInitMutation();
   const verifyMut = useTOTPVerifyMutation();
 
+  // Auth store — gate mode
+  const mustSetupTOTP = useAuthStore((s) => s.mustSetupTOTP);
+  const accessToken = useAuthStore((s) => s.accessToken);
+  const clearMustSetupTOTP = useAuthStore((s) => s.clearMustSetupTOTP);
+
   const [phase, setPhase] = React.useState<'enroll' | 'verify' | 'recovery_codes'>('enroll');
   const [otpAuthUrl, setOtpAuthUrl] = React.useState('');
   const [secretBase32, setSecretBase32] = React.useState('');
   const [code, setCode] = React.useState('');
   const [recoveryCodes, setRecoveryCodes] = React.useState<string[]>([]);
 
-  const tmpToken = (location.state as { tmpToken?: string } | null)?.tmpToken;
+  const tmpToken = (location.state as { tmpToken?: string } | null)?.tmpToken ?? null;
+
+  // Gate modu: kullanıcı giriş yapmış ama TOTP kurulmamış.
+  const isGateMode = mustSetupTOTP && !tmpToken;
+  const token = isGateMode ? (accessToken ?? '') : (tmpToken ?? '');
 
   React.useEffect(() => {
-    if (!tmpToken || phase !== 'enroll') return;
-    initMut.mutate(tmpToken, {
+    if (!token || phase !== 'enroll') return;
+    initMut.mutate(token, {
       onSuccess: (res) => {
         setOtpAuthUrl(res.otpauth_uri);
         setSecretBase32(res.secret_base32);
@@ -49,15 +64,15 @@ export default function TOTPSetupPage() {
       },
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, tmpToken]);
+  }, [phase, token]);
 
-  if (!tmpToken) return <Navigate to="/login" replace />;
+  if (!tmpToken && !isGateMode) return <Navigate to="/login" replace />;
 
   async function onVerify(e: React.FormEvent) {
     e.preventDefault();
-    if (!code || !tmpToken) return;
+    if (!code || !token) return;
     try {
-      const res = await verifyMut.mutateAsync({ tmpToken, code });
+      const res = await verifyMut.mutateAsync({ token, code });
       setRecoveryCodes(res.recovery_codes);
       setPhase('recovery_codes');
     } catch (err) {
@@ -70,8 +85,14 @@ export default function TOTPSetupPage() {
   }
 
   function onConfirmSavedCodes() {
-    toast({ title: 'TOTP kurulumu tamamlandı', description: 'Şimdi giriş yapabilirsiniz.' });
-    navigate('/login', { replace: true });
+    if (isGateMode) {
+      clearMustSetupTOTP();
+      toast({ title: 'TOTP kurulumu tamamlandı', description: 'Envanter\'e hoş geldiniz.' });
+      navigate('/inventory', { replace: true });
+    } else {
+      toast({ title: 'TOTP kurulumu tamamlandı', description: 'Şimdi giriş yapabilirsiniz.' });
+      navigate('/login', { replace: true });
+    }
   }
 
   return (
@@ -80,7 +101,9 @@ export default function TOTPSetupPage() {
         <CardHeader>
           <CardTitle>TOTP Kurulumu</CardTitle>
           <CardDescription>
-            Authenticator uygulamanızda QR kodu tarayın ve ilk kodu girin.
+            {isGateMode
+              ? 'Bu hesap için TOTP zorunludur. Authenticator uygulamanızda QR kodu tarayın.'
+              : 'Authenticator uygulamanızda QR kodu tarayın ve ilk kodu girin.'}
           </CardDescription>
         </CardHeader>
         <CardContent>

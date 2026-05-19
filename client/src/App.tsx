@@ -8,7 +8,7 @@ import { useConnectionStore } from '@/store/connection';
 import { ThemeProvider } from '@/components/layout/theme-provider';
 import { AppShell } from '@/components/layout/app-shell';
 import { Toaster } from '@/components/ui/toaster';
-import { AuthGate } from '@/routes/auth-gate';
+import { AuthGate, MustSetupTOTPGate } from '@/routes/auth-gate';
 import { ConnectionGate } from '@/routes/connection-gate';
 import { useInactivityLock } from '@/hooks/use-inactivity-lock';
 import { WsProvider } from '@/components/ws-provider';
@@ -153,16 +153,22 @@ export default function App() {
             <Route element={<ConnectionGate />}>
               {/* Public */}
               <Route path="/login" element={<LoginPage />} />
-              <Route path="/totp/setup" element={<TOTPSetupPage />} />
               {/* Bootstrap admin (TOTP-free) — ADR-0010 */}
               <Route path="/admin-setup" element={<AdminSetupPage />} />
               <Route path="/admin-login" element={<AdminLoginPage />} />
 
               {/* Authenticated */}
               <Route element={<AuthGate />}>
-                <Route element={<WsProvider><AppShell /></WsProvider>}>
-                  <Route index element={<Navigate to="/inventory" replace />} />
-                  <Route path="/inventory/*" element={<InventoryPage />} />
+                {/* PR-SEC2: TOTP gate flow — must_setup_totp=true ise buraya yönlendirilir.
+                    Gate modunda /totp/setup accessToken'ı store'dan okur. */}
+                <Route path="/totp/setup" element={<TOTPSetupPage />} />
+
+                {/* MustSetupTOTPGate: must_setup_totp=true ise /totp/setup'a yönlendirir */}
+                <Route element={<MustSetupTOTPGate />}>
+                  <Route element={<WsProvider><AppShell /></WsProvider>}>
+                    <Route index element={<Navigate to="/inventory" replace />} />
+                    <Route path="/inventory/*" element={<InventoryPage />} />
+                  </Route>
                 </Route>
               </Route>
             </Route>

@@ -45,6 +45,10 @@ interface AuthState {
    *  Set for admin-created accounts and the default seed admin on first run.
    *  Cleared after successful POST /auth/change-password. */
   mustChangePassword: boolean;
+  /** True when the user is authenticated but must complete TOTP enrollment before
+   *  accessing the app. Set when totp_required=true && !hasTOTP at login.
+   *  Cleared after successful TOTP verify in the gate flow (PR-SEC2). */
+  mustSetupTOTP: boolean;
 
   setSession(input: {
     user: SessionUser;
@@ -53,6 +57,7 @@ interface AuthState {
     kek: Uint8Array;
     privateKey: Uint8Array;
     mustChangePassword?: boolean;
+    mustSetupTOTP?: boolean;
   }): void;
   /** Bootstrap login — no kek/privateKey available (TOTP-free admin path). */
   setBootstrapSession(input: {
@@ -60,9 +65,12 @@ interface AuthState {
     accessToken: string;
     refreshToken: string;
     mustChangePassword?: boolean;
+    mustSetupTOTP?: boolean;
   }): void;
   /** Clear the must_change_password flag after a successful password change. */
   clearMustChangePassword(): void;
+  /** Clear the must_setup_totp flag after successful TOTP gate enrollment. */
+  clearMustSetupTOTP(): void;
   /** Update only the access token (after refresh rotation). */
   setAccessToken(token: string, refreshToken: string): void;
   setHydrating(value: boolean): void;
@@ -79,8 +87,9 @@ export const useAuthStore = create<AuthState>()(
       hydrating: true,
       isBootstrap: false,
       mustChangePassword: false,
+      mustSetupTOTP: false,
 
-      setSession({ user, accessToken, refreshToken, kek, privateKey, mustChangePassword }) {
+      setSession({ user, accessToken, refreshToken, kek, privateKey, mustChangePassword, mustSetupTOTP }) {
         syncAccessToStorage(accessToken);
         syncRefreshToStorage(refreshToken);
         set(
@@ -92,13 +101,14 @@ export const useAuthStore = create<AuthState>()(
             hydrating: false,
             isBootstrap: false,
             mustChangePassword: mustChangePassword ?? false,
+            mustSetupTOTP: mustSetupTOTP ?? false,
           },
           false,
           'auth/setSession',
         );
       },
 
-      setBootstrapSession({ user, accessToken, refreshToken, mustChangePassword }) {
+      setBootstrapSession({ user, accessToken, refreshToken, mustChangePassword, mustSetupTOTP }) {
         syncAccessToStorage(accessToken);
         syncRefreshToStorage(refreshToken);
         // Persist a per-user bootstrap key in localStorage so items created in
@@ -139,6 +149,7 @@ export const useAuthStore = create<AuthState>()(
             hydrating: false,
             isBootstrap: true,
             mustChangePassword: mustChangePassword ?? false,
+            mustSetupTOTP: mustSetupTOTP ?? false,
           },
           false,
           'auth/setBootstrapSession',
@@ -147,6 +158,10 @@ export const useAuthStore = create<AuthState>()(
 
       clearMustChangePassword() {
         set({ mustChangePassword: false }, false, 'auth/clearMustChangePassword');
+      },
+
+      clearMustSetupTOTP() {
+        set({ mustSetupTOTP: false }, false, 'auth/clearMustSetupTOTP');
       },
 
       setAccessToken(token, refreshToken) {
@@ -176,6 +191,7 @@ export const useAuthStore = create<AuthState>()(
             hydrating: false,
             isBootstrap: false,
             mustChangePassword: false,
+            mustSetupTOTP: false,
           },
           false,
           'auth/clear',

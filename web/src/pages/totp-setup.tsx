@@ -1,18 +1,24 @@
 /**
  * TOTP setup wizard.
  *
- * Reached AFTER /auth/register (flow not yet wired in PR-W2 — admin
- * creates accounts; PR-W3 will surface a "register new user" button).
- * For PR-W2 this page is reachable by passing a tmp_token via route
- * state: navigate('/totp/setup', { state: { tmpToken } }).
+ * İki mod:
  *
- * Steps:
- *   1. POST /auth/totp/init        → otpauth_uri + secret_base32
- *   2. Show QR (data URI in iframe / canvas) + secret for manual entry
- *   3. User scans + types first 6-digit code
- *   4. POST /auth/totp/verify      → 10 plaintext recovery codes (ONCE)
- *   5. Show codes + "I've saved them" confirmation
- *   6. Navigate to /login (status now 'active')
+ * 1. tmp_token modu (eski flow — register / bootstrap):
+ *    navigate('/totp/setup', { state: { tmpToken } }) ile ulaşılır.
+ *    POST /totp/init + POST /totp/verify'ı tmp_token ile çağırır.
+ *    Kurulum tamamlandığında /login'e yönlendirir.
+ *
+ * 2. Gate modu (PR-SEC2 — first-login forced TOTP):
+ *    Kullanıcı giriş yapmış, MustSetupTOTPGate /totp/setup'a yönlendirdi.
+ *    route state'i yoktur; auth store'dan accessToken okunur.
+ *    POST /totp/init + POST /totp/verify'ı access_token ile çağırır.
+ *    Kurulum tamamlandığında mustSetupTOTP flag'i temizlenir → /inventory.
+ *
+ * Adımlar (her iki modda aynı):
+ *   1. POST /auth/totp/init   → otpauth_uri + secret_base32
+ *   2. QR kodu göster + manuel giriş seçeneği
+ *   3. Kullanıcı kodu girer → POST /auth/totp/verify → 10 recovery code
+ *   4. Kodları onayla → yönlendir
  */
 
 import * as React from 'react';
@@ -24,26 +30,37 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { useTOTPInitMutation, useTOTPVerifyMutation } from '@/api/auth';
 import { TOTPQRCode } from '@/components/auth/totp-qr';
+import { useAuthStore } from '@/store/auth';
 
 export default function TOTPSetupPage() {
-  // Hooks önce çağrılmalı (React Hooks rule). Early-return for invalid
-  // tmpToken aşağıda; effect içinde de tekrar guard ediyoruz.
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
   const initMut = useTOTPInitMutation();
   const verifyMut = useTOTPVerifyMutation();
+
+  // Auth store — gate mode
+  const mustSetupTOTP = useAuthStore((s) => s.mustSetupTOTP);
+  const accessToken = useAuthStore((s) => s.accessToken);
+  const clearMustSetupTOTP = useAuthStore((s) => s.clearMustSetupTOTP);
+
   const [phase, setPhase] = React.useState<'enroll' | 'verify' | 'recovery_codes'>('enroll');
   const [otpAuthUrl, setOtpAuthUrl] = React.useState('');
   const [secretBase32, setSecretBase32] = React.useState('');
   const [code, setCode] = React.useState('');
   const [recoveryCodes, setRecoveryCodes] = React.useState<string[]>([]);
 
-  const tmpToken = (location.state as { tmpToken?: string } | null)?.tmpToken;
+  // tmpToken: route state'ten gelir (eski flow). Gate modunda null.
+  const tmpToken = (location.state as { tmpToken?: string } | null)?.tmpToken ?? null;
+
+  // Gate modu: kullanıcı giriş yapmış ama TOTP kurulmamış.
+  const isGateMode = mustSetupTOTP && !tmpToken;
+  // Token: gate modunda accessToken, diğer modda tmpToken.
+  const token = isGateMode ? (accessToken ?? '') : (tmpToken ?? '');
 
   React.useEffect(() => {
-    if (!tmpToken || phase !== 'enroll') return;
-    initMut.mutate(tmpToken, {
+    if (!token || phase !== 'enroll') return;
+    initMut.mutate(token, {
       onSuccess: (res) => {
         setOtpAuthUrl(res.otpauth_uri);
         setSecretBase32(res.secret_base32);
@@ -58,18 +75,18 @@ export default function TOTPSetupPage() {
       },
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, tmpToken]);
+  }, [phase, token]);
 
-  // Render-time guard. After hooks, before JSX.
-  if (!tmpToken) {
+  // Guard: token yoksa ve gate modunda da değilse /login'e yönlendir.
+  if (!tmpToken && !isGateMode) {
     return <Navigate to="/login" replace />;
   }
 
   async function onVerify(e: React.FormEvent) {
     e.preventDefault();
-    if (!code || !tmpToken) return;
+    if (!code || !token) return;
     try {
-      const res = await verifyMut.mutateAsync({ tmpToken, code });
+      const res = await verifyMut.mutateAsync({ token, code });
       setRecoveryCodes(res.recovery_codes);
       setPhase('recovery_codes');
     } catch (err) {
@@ -82,11 +99,19 @@ export default function TOTPSetupPage() {
   }
 
   function onConfirmSavedCodes() {
-    toast({
-      title: 'TOTP kurulumu tamamlandı',
-      description: 'Şimdi giriş yapabilirsiniz.',
-    });
-    navigate('/login', { replace: true });
+    if (isGateMode) {
+      // Gate modu: mustSetupTOTP flag'ini temizle → MustSetupTOTPGate kalkıyor → /inventory.
+      clearMustSetupTOTP();
+      toast({ title: 'TOTP kurulumu tamamlandı', description: 'Envanter\'e hoş geldiniz.' });
+      navigate('/inventory', { replace: true });
+    } else {
+      // tmp_token modu: oturum henüz yok → /login'e yönlendir.
+      toast({
+        title: 'TOTP kurulumu tamamlandı',
+        description: 'Şimdi giriş yapabilirsiniz.',
+      });
+      navigate('/login', { replace: true });
+    }
   }
 
   return (
@@ -95,7 +120,9 @@ export default function TOTPSetupPage() {
         <CardHeader>
           <CardTitle>TOTP Kurulumu</CardTitle>
           <CardDescription>
-            Authenticator uygulamanızda QR kodu tarayın ve gösterilen ilk kodu girin.
+            {isGateMode
+              ? 'Bu hesap için TOTP zorunludur. Authenticator uygulamanızda QR kodu tarayın.'
+              : 'Authenticator uygulamanızda QR kodu tarayın ve gösterilen ilk kodu girin.'}
           </CardDescription>
         </CardHeader>
         <CardContent>

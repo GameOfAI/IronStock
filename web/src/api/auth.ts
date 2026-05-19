@@ -71,21 +71,20 @@ export function useChangePasswordMutation() {
 // --- TOTP (post-register / pre-active) ---
 
 /**
- * /totp/init expects the tmp_token in Authorization, NOT the access
- * token. We use raw fetch here because token-storage only knows the
- * access-token slot — mixing tmp tokens into it would let them survive
- * past the enrollment flow.
+ * /totp/init expects a bearer token in Authorization.
+ * PR-SEC2: accepts either tmp_token (registration flow) or access_token (gate flow).
+ * We use raw fetch to keep the token separate from the access-token slot in storage.
  */
 export function useTOTPInitMutation() {
   return useMutation({
-    mutationFn: async (tmpToken: string) => {
+    mutationFn: async (token: string) => {
       const res = await fetch('/api/v1/auth/totp/init', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${tmpToken}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({ message: 'TOTP init hatası' }));
-        throw new Error(body.message ?? `TOTP init: ${res.status}`);
+        throw new Error((body as { message?: string }).message ?? `TOTP init: ${res.status}`);
       }
       return (await res.json()) as TOTPInitResponse;
     },
@@ -94,18 +93,18 @@ export function useTOTPInitMutation() {
 
 export function useTOTPVerifyMutation() {
   return useMutation({
-    mutationFn: async (input: { tmpToken: string; code: string }) => {
+    mutationFn: async (input: { token: string; code: string }) => {
       const res = await fetch('/api/v1/auth/totp/verify', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${input.tmpToken}`,
+          Authorization: `Bearer ${input.token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ code: input.code } satisfies TOTPVerifyRequest),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({ message: 'TOTP doğrulama hatası' }));
-        throw new Error(body.message ?? `TOTP verify: ${res.status}`);
+        throw new Error((body as { message?: string }).message ?? `TOTP verify: ${res.status}`);
       }
       return (await res.json()) as TOTPVerifyResponse;
     },

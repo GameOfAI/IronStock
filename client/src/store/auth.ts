@@ -25,6 +25,8 @@ interface AuthState {
   privateKey: Uint8Array | null;
   hydrating: boolean;
   isBootstrap: boolean;
+  /** PR-SEC2: true when authenticated but TOTP enrollment is required before use. */
+  mustSetupTOTP: boolean;
 
   setSession(input: {
     user: SessionUser;
@@ -32,13 +34,17 @@ interface AuthState {
     refreshToken: string;
     kek: Uint8Array;
     privateKey: Uint8Array;
+    mustSetupTOTP?: boolean;
   }): void;
   /** Bootstrap login (TOTP-free admin path) — kek=null, ephemeral privateKey */
   setBootstrapSession(input: {
     user: SessionUser;
     accessToken: string;
     refreshToken: string;
+    mustSetupTOTP?: boolean;
   }): void;
+  /** Clear the must_setup_totp flag after successful gate-flow TOTP enrollment. */
+  clearMustSetupTOTP(): void;
   setAccessToken(token: string, refreshToken: string): void;
   setHydrating(value: boolean): void;
   clear(): void;
@@ -53,18 +59,19 @@ export const useAuthStore = create<AuthState>()(
       privateKey: null,
       hydrating: true,
       isBootstrap: false,
+      mustSetupTOTP: false,
 
-      setSession({ user, accessToken, refreshToken, kek, privateKey }) {
+      setSession({ user, accessToken, refreshToken, kek, privateKey, mustSetupTOTP }) {
         syncAccessToStorage(accessToken);
         syncRefreshToStorage(refreshToken);
         set(
-          { user, accessToken, kek, privateKey, hydrating: false, isBootstrap: false },
+          { user, accessToken, kek, privateKey, hydrating: false, isBootstrap: false, mustSetupTOTP: mustSetupTOTP ?? false },
           false,
           'auth/setSession',
         );
       },
 
-      setBootstrapSession({ user, accessToken, refreshToken }) {
+      setBootstrapSession({ user, accessToken, refreshToken, mustSetupTOTP }) {
         syncAccessToStorage(accessToken);
         syncRefreshToStorage(refreshToken);
         // Persist per-user bootstrap key so items stay decryptable across
@@ -91,10 +98,14 @@ export const useAuthStore = create<AuthState>()(
           localStorage.setItem(storageKey, btoa(bin));
         }
         set(
-          { user, accessToken, kek: null, privateKey, hydrating: false, isBootstrap: true },
+          { user, accessToken, kek: null, privateKey, hydrating: false, isBootstrap: true, mustSetupTOTP: mustSetupTOTP ?? false },
           false,
           'auth/setBootstrapSession',
         );
+      },
+
+      clearMustSetupTOTP() {
+        set({ mustSetupTOTP: false }, false, 'auth/clearMustSetupTOTP');
       },
 
       setAccessToken(token, refreshToken) {
@@ -120,6 +131,7 @@ export const useAuthStore = create<AuthState>()(
             privateKey: null,
             hydrating: false,
             isBootstrap: false,
+            mustSetupTOTP: false,
           },
           false,
           'auth/clear',

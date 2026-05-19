@@ -26,15 +26,16 @@ export function useLogoutMutation() {
 }
 
 /**
- * TOTP init — tmp_token Authorization header gerektirir; token-storage dışı
- * tutulur. Client versiyonu: getBaseUrl() ile tam URL oluşturur.
+ * TOTP init — bearer token Authorization header gerektirir; token-storage dışı
+ * tutulur. PR-SEC2: tmp_token (eski flow) veya access_token (gate flow) kabul eder.
+ * Client versiyonu: getBaseUrl() ile tam URL oluşturur.
  */
 export function useTOTPInitMutation() {
   return useMutation({
-    mutationFn: async (tmpToken: string) => {
+    mutationFn: async (token: string) => {
       const res = await fetch(`${getBaseUrl()}/api/v1/auth/totp/init`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${tmpToken}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({ message: 'TOTP init hatası' }));
@@ -47,11 +48,11 @@ export function useTOTPInitMutation() {
 
 export function useTOTPVerifyMutation() {
   return useMutation({
-    mutationFn: async (input: { tmpToken: string; code: string }) => {
+    mutationFn: async (input: { token: string; code: string }) => {
       const res = await fetch(`${getBaseUrl()}/api/v1/auth/totp/verify`, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${input.tmpToken}`,
+          Authorization: `Bearer ${input.token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ code: input.code } satisfies TOTPVerifyRequest),

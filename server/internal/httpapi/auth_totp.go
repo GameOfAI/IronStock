@@ -18,11 +18,12 @@ type totpInitResponse struct {
 }
 
 // TOTPInit implements POST /api/v1/auth/totp/init.
-// Auth: tmp_token (purpose=totp_enroll). Generates fresh secret, envelope
-// encrypts, persists to totp_secrets (verified=false). Idempotent — calling
-// again before /verify replaces the old secret.
+// Auth: accepts either tmp_token (purpose=totp_enroll, bootstrap flow) or
+// access_token (purpose=access, PR-SEC2 gate flow). Generates fresh secret,
+// envelope encrypts, persists to totp_secrets (verified=false). Idempotent —
+// calling again before /verify replaces the old secret.
 func (s *AuthHandlers) TOTPInit(w http.ResponseWriter, r *http.Request) {
-	userID, ok := s.requireTmpToken(w, r, auth.PurposeTOTPEnroll)
+	userID, ok := s.requireTmpOrAccessToken(w, r)
 	if !ok {
 		return
 	}
@@ -99,10 +100,11 @@ type totpVerifyResponse struct {
 }
 
 // TOTPVerify implements POST /api/v1/auth/totp/verify.
-// On success: marks totp_secret verified, flips users.status to 'active',
-// generates 10 recovery codes (Argon2id-hashed), returns plaintext codes ONCE.
+// Auth: accepts either tmp_token (bootstrap flow) or access_token (PR-SEC2 gate flow).
+// On success: marks totp_secret verified, flips users.status to 'active' (no-op if
+// already active), generates 10 recovery codes (Argon2id-hashed), returns plaintext codes ONCE.
 func (s *AuthHandlers) TOTPVerify(w http.ResponseWriter, r *http.Request) {
-	userID, ok := s.requireTmpToken(w, r, auth.PurposeTOTPEnroll)
+	userID, ok := s.requireTmpOrAccessToken(w, r)
 	if !ok {
 		return
 	}
@@ -209,6 +211,38 @@ func (s *AuthHandlers) TOTPVerify(w http.ResponseWriter, r *http.Request) {
 	})
 
 	writeJSON(w, http.StatusOK, totpVerifyResponse{RecoveryCodes: plain})
+}
+
+// requireTmpOrAccessToken accepts either a tmp_token (purpose=totp_enroll,
+// bootstrap / registration flow) or a regular access_token (purpose=access,
+// PR-SEC2 gate flow where the user is already authenticated but has not yet
+// set up TOTP). Returns the user ID (subject) on success.
+//
+// The tmp_token path is tried first so that registration-flow callers are
+// not affected by the presence of an access_token in the header.
+func (s *AuthHandlers) requireTmpOrAccessToken(w http.ResponseWriter, r *http.Request) (string, bool) {
+	authz := r.Header.Get("Authorization")
+	const prefix = "Bearer "
+	if len(authz) <= len(prefix) || authz[:len(prefix)] != prefix {
+		writeError(w, s.Logger, http.StatusUnauthorized, ErrCodeUnauthorized,
+			"Authorization header eksik.", errors.New("no bearer token"))
+		return "", false
+	}
+	token := authz[len(prefix):]
+
+	// Try tmp_token (PurposeTOTPEnroll) first — registration / bootstrap flow.
+	if claims, err := s.Service.JWT.Parse(token, auth.PurposeTOTPEnroll); err == nil {
+		return claims.Subject, true
+	}
+
+	// Try access_token (PurposeAccess) — PR-SEC2 gate flow.
+	if claims, err := s.Service.JWT.Parse(token, auth.PurposeAccess); err == nil {
+		return claims.Subject, true
+	}
+
+	writeError(w, s.Logger, http.StatusUnauthorized, ErrCodeInvalidToken,
+		"Token geçersiz veya süresi dolmuş.", errors.New("token is neither totp-enroll nor access"))
+	return "", false
 }
 
 // requireTmpToken extracts and validates the bearer tmp token, returning the

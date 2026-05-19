@@ -1,16 +1,17 @@
 /**
- * Login akışı (PR-SEC1 sonrası 2-fazlı):
+ * Login akışı (PR-SEC2 sonrası 2-fazlı):
  *
  *   Faz 1: username + master_password → POST /auth/login
  *     - hasTOTP && totp_required → 401 mfa_required → Faz 2 dialog'u açılır
- *     - !hasTOTP && totp_required → tmp_token döner → /totp/setup'a yönlen
- *     - !totp_required → direkt access_token döner → Faz 3 keypair çözümlemesi
+ *     - !hasTOTP && totp_required → tam session + must_setup_totp=true → MustSetupTOTPGate
+ *     - !totp_required → direkt access_token → Faz 3 keypair çözümlemesi
  *
  *   Faz 2: TOTP dialog → kullanıcı kod girer → aynı POST /auth/login retry
  *     - dialog "İptal" ile kapatılabilir; form temizlenmez ama substep idle olur
  *
  *   Faz 3 (her iki yolun ortak son adımı): GET /users/me/keypair, KEK türet,
  *   private key çöz, setSession, keyring'e kaydet, navigate('/inventory').
+ *   must_setup_totp=true ise MustSetupTOTPGate /totp/setup'a yönlendirir.
  *
  * Web/login.tsx ile UX paritesi sağlanmıştır.
  */
@@ -83,14 +84,6 @@ export default function LoginPage() {
       totp_code: opts.totp || undefined,
     });
 
-    // Sunucu TOTP setup gerektiriyorsa (totp_required && !hasTOTP) tmp_token döner.
-    if (loginRes.tmp_token) {
-      setTotpDialogOpen(false);
-      setSubstep('idle');
-      navigate('/totp/setup', { state: { tmpToken: loginRes.tmp_token } });
-      return;
-    }
-
     setSubstep('fetching_keypair');
     const keypair = await fetchMyKeypair(loginRes.access_token);
 
@@ -109,6 +102,7 @@ export default function LoginPage() {
       refreshToken: loginRes.refresh_token,
       kek,
       privateKey,
+      mustSetupTOTP: loginRes.must_setup_totp,
     });
 
     // KEK'i OS keyring'e kaydet (Tauri ortamında; browser'da no-op).
@@ -117,6 +111,8 @@ export default function LoginPage() {
     // Son kullanıcı adını kaydet → uygulama yeniden başlatılınca bootstrap için.
     localStorage.setItem('envanter.last_username', username.toLowerCase());
 
+    // PR-SEC2: must_setup_totp=true ise MustSetupTOTPGate /totp/setup'a yönlendirir.
+    // must_setup_totp=false ise doğrudan hedef route'a git.
     navigate(fromPath ?? '/inventory', { replace: true });
   }
 

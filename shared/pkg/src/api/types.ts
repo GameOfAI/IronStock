@@ -62,12 +62,15 @@ export interface LoginResponse {
   token_type: 'Bearer';
   user_id: string;
   roles: string[];
-  /** TOTP setup gerektiğinde döner; access_token yerine bu alanla /totp/setup'a yönlendir. */
-  tmp_token?: string;
   /** Admin tarafından oluşturulan veya ilk kurulumda seed edilen kullanıcılarda true.
    *  true olduğunda frontend /change-password'e yönlendirir ve şifre değiştirilinceye
    *  kadar diğer route'lara erişimi engeller. */
   must_change_password?: boolean;
+  /** PR-SEC2: totp_required=true && !hasTOTP → tam oturum verilir ama frontend
+   *  MustSetupTOTPGate aracılığıyla /totp/setup'a yönlendirir. Kullanıcı TOTP
+   *  kurulumunu tamamlayınca gate kaldırılır ve /inventory'e geçilir.
+   *  must_change_password=true iken bu alan false olur (önce şifre değişikliği). */
+  must_setup_totp?: boolean;
 }
 
 export interface RefreshRequest {

@@ -53,6 +53,20 @@ export function MustChangePasswordGate() {
   return <Outlet />;
 }
 
+/**
+ * MustSetupTOTPGate — if the session has mustSetupTOTP=true, redirect to
+ * /totp/setup regardless of where the user is trying to go.
+ * Placed inside MustChangePasswordGate (password gate fires first).
+ * Cleared after successful TOTP enrollment via the gate flow (PR-SEC2).
+ */
+export function MustSetupTOTPGate() {
+  const mustSetupTOTP = useAuthStore((s) => s.mustSetupTOTP);
+  if (mustSetupTOTP) {
+    return <Navigate to="/totp/setup" replace />;
+  }
+  return <Outlet />;
+}
+
 interface RoleGateProps {
   role: string;
   children?: React.ReactNode;

@@ -8,7 +8,7 @@ import { useAuthStore } from '@/store/auth';
 import { ThemeProvider } from '@/components/layout/theme-provider';
 import { AppShell } from '@/components/layout/app-shell';
 import { Toaster } from '@/components/ui/toaster';
-import { AuthGate, MustChangePasswordGate, RoleGate } from '@/routes/auth-gate';
+import { AuthGate, MustChangePasswordGate, MustSetupTOTPGate, RoleGate } from '@/routes/auth-gate';
 import { WsProvider } from '@/components/ws-provider';
 
 import LoginPage from '@/pages/login';
@@ -88,31 +88,39 @@ export default function App() {
 
             {/* Authenticated — WsProvider starts WebSocket after login */}
             <Route element={<AuthGate />}>
-              {/* Zorunlu şifre değiştirme — MustChangePasswordGate'ten önce erişilebilir */}
+              {/* Zorunlu şifre değiştirme — her iki gate'ten önce erişilebilir */}
               <Route path="/change-password" element={<ChangePasswordPage />} />
 
               {/* MustChangePasswordGate: must_change_password=true ise /change-password'e yönlendirir */}
               <Route element={<MustChangePasswordGate />}>
-                <Route element={<WsProvider><Outlet /></WsProvider>}>
-                <Route element={<AppShell />}>
-                  <Route index element={<Navigate to="/inventory" replace />} />
-                  <Route path="/inventory/*" element={<InventoryPage />} />
-                  <Route path="/tags" element={<TagsPage />} />
-                  <Route path="/graph" element={<GraphPage />} />
-                  <Route path="/pipeline" element={<PipelineListPage />} />
-                  <Route path="/pipeline/lifecycle" element={<LifecyclePage />} />
-                  <Route path="/pipeline/:id" element={<DiagramPage />} />
-                  <Route path="/profile" element={<ProfilePage />} />
+                {/* PR-SEC2: TOTP gate flow — must_setup_totp=true ise buraya yönlendirilir.
+                    Public /totp/setup route'u tmp_token flow'u için (register vs.) kalır.
+                    Gate mode'da /totp/setup sayfası accessToken'ı store'dan okur. */}
+                <Route path="/totp/setup" element={<TOTPSetupPage />} />
 
-                  {/* Admin */}
-                  <Route element={<RoleGate role="admin" />}>
-                    <Route path="/admin" element={<AdminDashboardPage />} />
-                    <Route path="/admin/users" element={<AdminUsersPage />} />
-                    <Route path="/admin/groups" element={<Navigate to="/admin/users?tab=groups" replace />} />
-                    <Route path="/admin/roles" element={<Navigate to="/admin/users?tab=roles" replace />} />
-                    <Route path="/admin/audit-log" element={<AdminAuditLogPage />} />
+                {/* MustSetupTOTPGate: must_setup_totp=true ise /totp/setup'a yönlendirir */}
+                <Route element={<MustSetupTOTPGate />}>
+                  <Route element={<WsProvider><Outlet /></WsProvider>}>
+                  <Route element={<AppShell />}>
+                    <Route index element={<Navigate to="/inventory" replace />} />
+                    <Route path="/inventory/*" element={<InventoryPage />} />
+                    <Route path="/tags" element={<TagsPage />} />
+                    <Route path="/graph" element={<GraphPage />} />
+                    <Route path="/pipeline" element={<PipelineListPage />} />
+                    <Route path="/pipeline/lifecycle" element={<LifecyclePage />} />
+                    <Route path="/pipeline/:id" element={<DiagramPage />} />
+                    <Route path="/profile" element={<ProfilePage />} />
+
+                    {/* Admin */}
+                    <Route element={<RoleGate role="admin" />}>
+                      <Route path="/admin" element={<AdminDashboardPage />} />
+                      <Route path="/admin/users" element={<AdminUsersPage />} />
+                      <Route path="/admin/groups" element={<Navigate to="/admin/users?tab=groups" replace />} />
+                      <Route path="/admin/roles" element={<Navigate to="/admin/users?tab=roles" replace />} />
+                      <Route path="/admin/audit-log" element={<AdminAuditLogPage />} />
+                    </Route>
                   </Route>
-                </Route>
+                  </Route>
                 </Route>
               </Route>
             </Route>

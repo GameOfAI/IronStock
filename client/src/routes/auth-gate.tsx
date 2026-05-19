@@ -25,3 +25,16 @@ export function AuthGate() {
   }
   return <Outlet />;
 }
+
+/**
+ * MustSetupTOTPGate — if the session has mustSetupTOTP=true, redirect to
+ * /totp/setup. Placed inside AuthGate wrapping app routes (PR-SEC2).
+ * Cleared after successful TOTP enrollment via the gate flow.
+ */
+export function MustSetupTOTPGate() {
+  const mustSetupTOTP = useAuthStore((s) => s.mustSetupTOTP);
+  if (mustSetupTOTP) {
+    return <Navigate to="/totp/setup" replace />;
+  }
+  return <Outlet />;
+}

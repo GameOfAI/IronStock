@@ -144,6 +144,7 @@ export default function LoginPage() {
         accessToken: loginRes.access_token,
         refreshToken: loginRes.refresh_token,
         mustChangePassword: loginRes.must_change_password,
+        mustSetupTOTP: loginRes.must_setup_totp,
       });
     } else {
       setSubstep('deriving_key');
@@ -161,6 +162,7 @@ export default function LoginPage() {
         kek,
         privateKey,
         mustChangePassword: loginRes.must_change_password,
+        mustSetupTOTP: loginRes.must_setup_totp,
       });
     }
 
