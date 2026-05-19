@@ -17,12 +17,16 @@ export default defineConfig({
     proxy: {
       // WebSocket endpoint must be declared BEFORE the generic /api rule
       // so Vite applies the ws:true upgrade for /api/v1/ws connections.
+      // VITE_PROXY_TARGET allows overriding the target when running inside
+      // Docker (use service name instead of localhost).
       '/api/v1/ws': {
-        target: 'ws://localhost:8080',
+        target: process.env.VITE_WS_PROXY_TARGET ?? 'ws://localhost:8080',
         ws: true,
-        rewriteWsOrigin: true,
+        // rewriteWsOrigin intentionally omitted: browser sends Origin: localhost:5173
+        // which matches the server's allowed OriginPatterns (localhost:*).
+        // Inside Docker the proxy rewrites to server:8080 if enabled — rejected.
       },
-      '/api': 'http://localhost:8080',
+      '/api': process.env.VITE_PROXY_TARGET ?? 'http://localhost:8080',
     },
   },
 });
