@@ -222,7 +222,7 @@ export default function LifecyclePage() {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col bg-slate-950">
       {/* ── Onboarding banner ────────────────────────────────────────── */}
       {!bannerDismissed && !isLoading && (
         <div className="flex items-start gap-3 border-b bg-blue-50 px-6 py-3 dark:bg-blue-950/30">

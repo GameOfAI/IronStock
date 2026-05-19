@@ -117,11 +117,12 @@ export function AdminAuditLogPage() {
   };
 
   return (
+    <div className="h-full overflow-auto p-6">
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-4">
         <div>
-          <CardTitle>Audit Log</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-slate-100">Audit Log</CardTitle>
+          <CardDescription className="text-slate-400">
             Tüm sistem olaylarını görüntüleyin. Filtreler URL'de saklanır, paylaşılabilir.
           </CardDescription>
         </div>
@@ -203,6 +204,7 @@ export function AdminAuditLogPage() {
         ) : null}
       </CardContent>
     </Card>
+    </div>
   );
 }
 

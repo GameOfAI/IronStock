@@ -272,12 +272,12 @@ export function GraphPage() {
   }
 
   return (
-    <div className="flex h-full flex-col gap-4">
+    <div className="flex h-full flex-col gap-4 p-6 overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold">Pipeline İlişki Haritası</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-xl font-semibold text-slate-100">İlişki Haritası</h1>
+          <p className="text-[13px] text-slate-400">
             {nodes.length} öğe · {edges.length} ilişki
           </p>
         </div>

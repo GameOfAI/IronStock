@@ -188,7 +188,8 @@ export default function AdminDashboardPage() {
   const isLoading = usersQuery.isLoading || auditQuery.isLoading;
 
   return (
-    <div className="space-y-5 p-4">
+    <div className="h-full overflow-auto p-6">
+    <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold">Admin Dashboard</h1>
         <span className="text-xs text-muted-foreground">
@@ -441,6 +442,7 @@ export default function AdminDashboardPage() {
           </Card>
         </div>
       </div>
+    </div>
     </div>
   );
 }

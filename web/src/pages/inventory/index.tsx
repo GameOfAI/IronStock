@@ -13,7 +13,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Copy, FolderPlus, FolderTree as FolderTreeIcon, Pencil, Plus, Share2, Trash2 } from 'lucide-react';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useFieldDefinitions, useItemTypes } from '@/api/catalog';
 import { useItem, useItems } from '@/api/items';
@@ -191,12 +190,11 @@ export default function InventoryPage() {
   }
 
   return (
-    <Card className="h-[calc(100vh-9rem)] overflow-hidden p-0">
-      <div className="grid h-full grid-cols-[260px_minmax(0,1fr)_minmax(0,420px)]">
+    <div className="grid h-full min-h-0 grid-cols-[260px_minmax(0,1fr)_minmax(0,420px)]">
         {/* Sol: FolderTree + folder toolbar */}
-        <aside className="flex min-h-0 flex-col border-r bg-muted/20">
-          <div className="flex items-center justify-between border-b px-3 py-2">
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+        <aside className="flex min-h-0 flex-col border-r border-slate-800 bg-slate-950">
+          <div className="flex items-center justify-between border-b border-slate-800 px-3 py-2">
+            <span className="font-mono text-[10px] uppercase tracking-wider text-slate-500">
               Klasörler
             </span>
             <div className="flex gap-1">
@@ -254,8 +252,8 @@ export default function InventoryPage() {
         </aside>
 
         {/* Orta: Search + item toolbar + ItemList */}
-        <section className="flex min-h-0 flex-col overflow-hidden">
-          <div className="flex items-center gap-2 border-b p-2">
+        <section className="flex min-h-0 flex-col overflow-hidden border-r border-slate-800 bg-slate-950">
+          <div className="flex items-center gap-2 border-b border-slate-800 p-2">
             <div className="flex-1">
               <ItemSearch initial={query} onCommit={handleSearchCommit} disabled={!folderId} />
             </div>
@@ -275,7 +273,7 @@ export default function InventoryPage() {
 
           {/* PR-UX4: Tip filtre chip'leri — sadece ≥2 farklı tip varsa göster */}
           {folderId && presentTypeIds.length >= 2 && (
-            <div className="flex items-center gap-1.5 border-b px-2 py-1.5 overflow-x-auto scrollbar-thin">
+            <div className="flex items-center gap-1.5 border-b border-slate-800 px-2 py-1.5 overflow-x-auto scrollbar-thin">
               {presentTypeIds.map((typeId) => {
                 const Icon = PIPELINE_TYPE_ICONS[typeId];
                 const label = PIPELINE_TYPE_LABELS[typeId] ?? `tip:${typeId}`;
@@ -285,11 +283,11 @@ export default function InventoryPage() {
                     key={typeId}
                     onClick={() => toggleTypeFilter(typeId)}
                     className={cn(
-                      'inline-flex items-center gap-1 shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors',
-                      'border focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                      'inline-flex items-center gap-1 shrink-0 rounded-full px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-wide transition-colors',
+                      'border focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-blue-500',
                       active
-                        ? 'bg-primary/10 border-primary/40 text-primary'
-                        : 'bg-transparent border-border text-muted-foreground hover:text-foreground hover:border-border/80',
+                        ? 'bg-blue-600/10 border-blue-500/40 text-blue-400'
+                        : 'bg-transparent border-slate-700 text-slate-500 hover:text-slate-300 hover:border-slate-600',
                     )}
                     aria-pressed={active}
                   >
@@ -301,7 +299,7 @@ export default function InventoryPage() {
               {activeTypeIds.size > 0 && (
                 <button
                   onClick={() => setActiveTypeIds(new Set())}
-                  className="inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] text-muted-foreground hover:text-foreground border border-transparent hover:border-border transition-colors"
+                  className="inline-flex shrink-0 items-center rounded-full border border-transparent px-2 py-0.5 font-mono text-[10px] text-slate-500 hover:text-slate-300 hover:border-slate-700 transition-colors"
                 >
                   ✕ Temizle
                 </button>
@@ -309,7 +307,7 @@ export default function InventoryPage() {
             </div>
           )}
           {folderId && itemId && (
-            <div className="flex items-center gap-1 border-b px-3 py-1.5">
+            <div className="flex items-center gap-1 border-b border-slate-800 px-3 py-1.5">
               <span className="mr-auto text-xs text-muted-foreground truncate">
                 {selectedItem?.name ?? itemId}
               </span>
@@ -371,14 +369,14 @@ export default function InventoryPage() {
         </section>
 
         {/* Sağ: ItemDetail */}
-        <aside className="overflow-y-auto border-l bg-card">
+        <aside className="overflow-y-auto border-l border-slate-800 bg-slate-900/40">
           <ItemDetail
             itemId={itemId}
             fieldDefinitions={fieldDefsQuery.data?.field_definitions ?? []}
             itemTypes={itemTypesQuery.data?.item_types ?? []}
           />
         </aside>
-      </div>
+
 
       {/* Folder modals */}
       {/* Kök klasör — parent yok */}
@@ -465,6 +463,6 @@ export default function InventoryPage() {
           />
         </>
       )}
-    </Card>
+    </div>
   );
 }

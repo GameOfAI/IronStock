@@ -8,10 +8,6 @@
 import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Tag, Trash2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,17 +21,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useTagsQuery, useCreateTagMutation, useDeleteTagMutation } from '@/api/tags';
-
-function HexColorPreview({ color }: { color: string }) {
-  const isValid = /^#[0-9a-fA-F]{6}$/.test(color);
-  if (!isValid) return null;
-  return (
-    <span
-      className="inline-block h-4 w-4 shrink-0 rounded-sm border"
-      style={{ backgroundColor: color }}
-    />
-  );
-}
 
 export default function TagsPage() {
   const navigate = useNavigate();
@@ -78,95 +63,98 @@ export default function TagsPage() {
   }
 
   return (
-    <div className="max-w-xl space-y-6">
+    <div className="h-full overflow-auto">
+    <div className="max-w-xl px-8 py-7 space-y-6">
       <div>
-        <h1 className="text-xl font-semibold">Etiketlerim</h1>
-        <p className="text-sm text-muted-foreground mt-1">
+        <h1 className="text-xl font-semibold text-slate-100">Etiketlerim</h1>
+        <p className="mt-1 text-[13px] text-slate-400">
           Kişisel etiketler — item'lara atayabilirsiniz.
         </p>
       </div>
 
       {/* Create form */}
-      <form onSubmit={handleCreate} className="flex flex-col gap-3 rounded-md border p-4">
-        <h2 className="text-sm font-medium">Yeni Etiket</h2>
-        <div className="flex gap-2">
+      <form onSubmit={handleCreate} className="rounded-lg border border-slate-800 bg-slate-900/60 p-5 space-y-4">
+        <h2 className="text-[13px] font-semibold text-slate-200">Yeni Etiket</h2>
+        <div className="flex gap-3">
           <div className="flex-1 space-y-1.5">
-            <Label htmlFor="tag-name">Ad *</Label>
-            <Input
+            <label htmlFor="tag-name" className="block font-mono text-[10px] uppercase tracking-wider text-slate-500">Ad *</label>
+            <input
               id="tag-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="örn. Kritik, Servis, Dev"
               maxLength={64}
+              className="w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/40"
             />
           </div>
-          <div className="w-32 space-y-1.5">
-            <Label htmlFor="tag-color">Renk (opsiyonel)</Label>
-            <div className="flex items-center gap-1.5">
-              <Input
+          <div className="w-36 space-y-1.5">
+            <label htmlFor="tag-color" className="block font-mono text-[10px] uppercase tracking-wider text-slate-500">Renk (opsiyonel)</label>
+            <div className="flex items-center gap-2">
+              <input
                 id="tag-color"
                 value={color}
                 onChange={(e) => setColor(e.target.value)}
                 placeholder="#3b82f6"
                 maxLength={7}
-                className="flex-1"
+                className="flex-1 rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 font-mono text-sm text-slate-200 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/40"
               />
-              <HexColorPreview color={color} />
+              <div className="h-8 w-8 shrink-0 rounded-md border border-slate-700" style={{ backgroundColor: /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#1e293b' }} />
             </div>
           </div>
         </div>
         <div className="flex justify-end">
-          <Button type="submit" size="sm" className="gap-2" disabled={!name.trim() || createMut.isPending}>
-            <Plus className="h-4 w-4" />
+          <button type="submit" disabled={!name.trim() || createMut.isPending}
+            className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white hover:bg-blue-500 disabled:opacity-60">
+            <Plus className="h-3.5 w-3.5" />
             {createMut.isPending ? 'Oluşturuluyor…' : 'Oluştur'}
-          </Button>
+          </button>
         </div>
       </form>
 
       {/* Tag list */}
       {isLoading ? (
-        <p className="text-sm text-muted-foreground">Yükleniyor…</p>
+        <p className="text-sm text-slate-500">Yükleniyor…</p>
       ) : tags.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 py-10 text-center text-muted-foreground">
+        <div className="flex flex-col items-center gap-3 py-10 text-center text-slate-500">
           <Tag className="h-8 w-8 opacity-40" />
           <p className="text-sm">Henüz etiket yok. Yukarıdan oluşturun.</p>
         </div>
       ) : (
-        <div className="flex flex-col divide-y rounded-md border">
-          {tags.map((tag) => (
-            <div key={tag.id} className="flex items-center gap-3 px-4 py-2.5">
-              {tag.color && (
-                <span
-                  className="h-3 w-3 shrink-0 rounded-full"
-                  style={{ backgroundColor: tag.color }}
-                />
-              )}
-              <Badge
-                variant="secondary"
-                className="flex-1 justify-start font-normal cursor-pointer hover:opacity-80 transition-opacity"
-                style={tag.color ? { backgroundColor: `${tag.color}22`, color: tag.color } : undefined}
+        <div className="space-y-2">
+          {tags.map((tag) => {
+            const col = tag.color ?? '#64748b';
+            const r = parseInt(col.slice(1, 3), 16);
+            const g = parseInt(col.slice(3, 5), 16);
+            const b = parseInt(col.slice(5, 7), 16);
+            return (
+            <div key={tag.id} className="group flex items-center overflow-hidden rounded-lg border border-slate-800"
+              style={{ background: `linear-gradient(90deg, rgba(${r},${g},${b},0.18) 0%, rgba(${r},${g},${b},0.04) 100%)` }}>
+              <div className="h-full w-1 shrink-0 self-stretch" style={{ backgroundColor: col }} />
+              <div
+                className="flex h-10 flex-1 cursor-pointer items-center gap-3 px-4"
                 onClick={() => navigate(`/inventory?tag=${tag.id}`)}
                 title="Bu etiketle filtrelenmiş envantere git"
               >
-                {tag.name}
-              </Badge>
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: col }} />
+                <span className="font-mono text-[13px] font-medium" style={{ color: col }}>{tag.name}</span>
+              </div>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0">
+                  <button className="mr-2 rounded p-1.5 text-slate-600 opacity-0 transition hover:bg-slate-800 hover:text-red-400 group-hover:opacity-100">
                     <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
+                  </button>
                 </AlertDialogTrigger>
-                <AlertDialogContent>
+                <AlertDialogContent className="border-slate-800 bg-slate-900">
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Etiketi sil</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      <strong>{tag.name}</strong> etiketi tüm item'lardan kaldırılacak.
+                    <AlertDialogTitle className="text-slate-100">Etiketi sil</AlertDialogTitle>
+                    <AlertDialogDescription className="text-slate-400">
+                      <strong className="text-slate-200">{tag.name}</strong> etiketi tüm item'lardan kaldırılacak.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>İptal</AlertDialogCancel>
                     <AlertDialogAction
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      className="bg-red-600 text-white hover:bg-red-500"
                       onClick={() => handleDelete(tag.id, tag.name)}
                     >
                       Sil
@@ -175,9 +163,11 @@ export default function TagsPage() {
                 </AlertDialogContent>
               </AlertDialog>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
+    </div>
     </div>
   );
 }

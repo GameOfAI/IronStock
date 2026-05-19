@@ -20,11 +20,7 @@
 
 import * as React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, KeyRound, Loader2, ShieldCheck } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Eye, EyeOff, Key, Loader2, ShieldCheck } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -49,28 +45,31 @@ interface PasswordInputProps extends React.InputHTMLAttributes<HTMLInputElement>
   onChange: React.ChangeEventHandler<HTMLInputElement>;
 }
 
-function PasswordInput({ value, onChange, disabled, ...rest }: PasswordInputProps) {
+function PasswordInput({ value, onChange, disabled, className, ...rest }: PasswordInputProps) {
   const [visible, setVisible] = React.useState(false);
 
   return (
     <div className="relative">
-      <Input
+      {/* Lock icon on the left */}
+      <Eye className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+      <input
         {...rest}
         type={visible ? 'text' : 'password'}
         value={value}
         onChange={onChange}
         disabled={disabled}
-        className="pr-10"
+        placeholder="••••••••"
+        className={className ?? 'w-full rounded-md border border-slate-700 bg-slate-950/60 py-2.5 pl-9 pr-10 text-sm text-slate-200 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/40 disabled:opacity-60'}
       />
       <button
         type="button"
         tabIndex={-1}
         disabled={disabled}
         onClick={() => setVisible((v) => !v)}
-        className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground disabled:opacity-40 transition-colors"
+        className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-500 hover:text-slate-300 disabled:opacity-40 transition-colors"
         aria-label={visible ? 'Parolayı gizle' : 'Parolayı göster'}
       >
-        {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        {visible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
       </button>
     </div>
   );
@@ -247,100 +246,165 @@ export default function LoginPage() {
   const totpBusy = totpDialogOpen && busy;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-6">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Envanter Girişi</CardTitle>
-          <CardDescription>
-            Kullanıcı adınız ve master parolanızla giriş yapın.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={onSubmit} className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="username">Kullanıcı Adı</Label>
-              <Input
-                id="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                autoComplete="username"
-                required
-                disabled={busy}
-              />
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-950">
+      {/* Grid texture overlay */}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.03]"
+        style={{
+          backgroundImage:
+            'linear-gradient(rgba(148,163,184,1) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,1) 1px, transparent 1px)',
+          backgroundSize: '48px 48px',
+        }}
+      />
+      {/* Blue glow */}
+      <div className="pointer-events-none absolute left-1/2 top-1/2 h-[480px] w-[480px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-blue-600/10 blur-[120px]" />
+
+      <div className="relative w-full max-w-sm px-4">
+        {/* Logo */}
+        <div className="mb-8 flex flex-col items-center gap-3">
+          <div className="grid h-12 w-12 place-items-center rounded-xl bg-blue-600 shadow-lg shadow-blue-600/30">
+            <Key className="h-[22px] w-[22px] text-white" />
+          </div>
+          <div className="text-center">
+            <h1 className="text-xl font-bold tracking-tight text-slate-100">IronStock</h1>
+            <p className="mt-0.5 font-mono text-[11px] text-slate-500">
+              DevOps Credential Vault · v0.3
+            </p>
+          </div>
+        </div>
+
+        {/* Main card */}
+        <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl shadow-black/60 backdrop-blur-sm">
+          <form onSubmit={onSubmit} className="space-y-4">
+            <div>
+              <h2 className="text-[15px] font-semibold text-slate-100">Giriş Yap</h2>
+              <p className="mt-0.5 text-[12px] text-slate-400">Yetkili kullanıcılar için.</p>
             </div>
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="password">Master Parola</Label>
-              <PasswordInput
-                id="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-                required
-                minLength={12}
-                disabled={busy}
-              />
+            <div className="space-y-3">
+              <div>
+                <label
+                  htmlFor="login-username"
+                  className="mb-1 block font-mono text-[10px] uppercase tracking-wider text-slate-400"
+                >
+                  Kullanıcı Adı
+                </label>
+                <div className="relative">
+                  <Eye className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+                  <input
+                    id="login-username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="admin"
+                    autoComplete="username"
+                    required
+                    disabled={busy}
+                    className="w-full rounded-md border border-slate-700 bg-slate-950/60 py-2.5 pl-9 pr-3 text-sm text-slate-200 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/40 disabled:opacity-60"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="login-password"
+                  className="mb-1 block font-mono text-[10px] uppercase tracking-wider text-slate-400"
+                >
+                  Master Parola
+                </label>
+                <PasswordInput
+                  id="login-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
+                  required
+                  minLength={12}
+                  disabled={busy}
+                  className="w-full rounded-md border border-slate-700 bg-slate-950/60 py-2.5 pl-9 pr-10 text-sm text-slate-200 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/40 disabled:opacity-60"
+                />
+              </div>
             </div>
 
-            <Button type="submit" disabled={busy} className="mt-2">
+            <button
+              type="submit"
+              disabled={busy}
+              className="flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 py-2.5 text-[13px] font-semibold text-white transition hover:bg-blue-500 disabled:opacity-60"
+            >
               {busy && !totpDialogOpen ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   {substepLabel(substep)}
                 </>
               ) : (
-                substepLabel('idle')
+                'Devam Et →'
               )}
-            </Button>
+            </button>
 
-            <div className="flex justify-between text-sm text-muted-foreground">
-              <Link to="/recover" className="hover:text-foreground">
+            <div className="flex items-center gap-2 rounded-md border border-slate-800 bg-slate-950/40 px-3 py-2 text-[11px] text-slate-400">
+              <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
+              <span>Tüm oturumlar uçtan uca şifrelenir. İzinsiz giriş loglanır.</span>
+            </div>
+
+            <div className="text-center text-[12px]">
+              <Link to="/recover" className="text-slate-500 hover:text-slate-300">
                 Hesabınızı mı unuttunuz?
               </Link>
             </div>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+
+        <p className="mt-4 text-center font-mono text-[10px] text-slate-600">
+          IronStock © 2026 · Tüm hakları saklıdır
+        </p>
+      </div>
 
       {/* TOTP dialog — appears after successful password auth when MFA is required */}
-      <Dialog open={totpDialogOpen} onOpenChange={(open) => { if (!open) handleTotpCancel(); }}>
-        <DialogContent className="sm:max-w-sm" onInteractOutside={(e) => e.preventDefault()}>
+      <Dialog
+        open={totpDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) handleTotpCancel();
+        }}
+      >
+        <DialogContent
+          className="border-slate-800 bg-slate-900 sm:max-w-sm"
+          onInteractOutside={(e) => e.preventDefault()}
+        >
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-primary" />
+            <DialogTitle className="flex items-center gap-2 text-slate-100">
+              <ShieldCheck className="h-5 w-5 text-blue-400" />
               İki Faktörlü Doğrulama
             </DialogTitle>
-            <DialogDescription>
-              Hesabınızda 2FA aktif. Authenticator uygulamanızdaki{' '}
-              <strong>6 haneli kodu</strong> girin.
+            <DialogDescription className="text-slate-400">
+              <span className="font-mono text-slate-300">{username}</span> için TOTP kodunu girin.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={onTotpSubmit} className="flex flex-col gap-4 pt-2">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="totp-code" className="flex items-center gap-1.5">
-                <KeyRound className="h-3.5 w-3.5 text-muted-foreground" />
-                Doğrulama Kodu
-              </Label>
-              <Input
+              <label className="font-mono text-[10px] uppercase tracking-wider text-slate-400">
+                Doğrulayıcı Kodu
+              </label>
+              <input
                 id="totp-code"
                 inputMode="numeric"
                 pattern="[0-9]{6}"
                 maxLength={8}
                 value={totpCode}
                 onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))}
-                placeholder="123 456"
-                className="text-center text-xl tracking-[0.4em] font-mono"
+                placeholder="000 000"
                 autoFocus
                 required
                 disabled={totpBusy}
+                className="w-full rounded-md border border-slate-700 bg-slate-950/60 px-4 py-2.5 text-center font-mono text-xl tracking-[0.4em] text-slate-100 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/40 disabled:opacity-60"
               />
+              <p className="text-[11px] text-slate-500">
+                Google Authenticator veya uyumlu TOTP uygulamasını kullanın.
+              </p>
             </div>
 
-            <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
+            <label className="flex cursor-pointer select-none items-center gap-2 text-[12px] text-slate-400">
               <input
                 type="checkbox"
-                className="h-4 w-4 rounded border-input accent-primary"
+                className="h-3.5 w-3.5 rounded border-slate-700 accent-blue-600"
                 checked={rememberDevice}
                 onChange={(e) => setRememberDevice(e.target.checked)}
                 disabled={totpBusy}
@@ -349,27 +413,30 @@ export default function LoginPage() {
             </label>
 
             <DialogFooter className="gap-2 sm:gap-0">
-              <Button
+              <button
                 type="button"
-                variant="outline"
                 onClick={handleTotpCancel}
                 disabled={totpBusy}
+                className="rounded-md border border-slate-700 bg-transparent px-4 py-2 text-[13px] text-slate-300 hover:bg-slate-800 disabled:opacity-50"
               >
                 İptal
-              </Button>
-              <Button
+              </button>
+              <button
                 type="submit"
                 disabled={totpBusy || totpCode.length < 6}
+                className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
               >
                 {totpBusy ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     {substepLabel(substep)}
                   </>
                 ) : (
-                  'Doğrula'
+                  <>
+                    <ShieldCheck className="h-3.5 w-3.5" /> Giriş Yap
+                  </>
                 )}
-              </Button>
+              </button>
             </DialogFooter>
           </form>
         </DialogContent>

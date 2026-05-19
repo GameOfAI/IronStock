@@ -14,7 +14,7 @@
  */
 
 import * as React from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Folder,
   Shield,
@@ -24,6 +24,7 @@ import {
   Moon,
   Monitor,
   KeyRound,
+  Key,
   Menu,
   ShieldAlert,
   UserCircle,
@@ -70,9 +71,15 @@ function ThemeToggle() {
   const label = theme === 'light' ? 'Aydınlık' : theme === 'dark' ? 'Karanlık' : 'Sistem';
 
   return (
-    <Button variant="ghost" size="icon" onClick={cycle} aria-label={`Tema: ${label}`}>
-      <Icon className="h-4 w-4" />
-    </Button>
+    <button
+      type="button"
+      className="rounded p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+      onClick={cycle}
+      aria-label={`Tema: ${label}`}
+      title={`Tema: ${label}`}
+    >
+      <Icon className="h-[15px] w-[15px]" />
+    </button>
   );
 }
 
@@ -105,17 +112,17 @@ function WsStatusDot() {
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="flex items-center gap-1.5 rounded px-1.5 py-1 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex items-center gap-1.5 rounded px-0.5 py-0.5 hover:opacity-80 focus-visible:outline-none"
           aria-label={label}
           title={label}
         >
-          <span className="relative flex h-2.5 w-2.5 items-center justify-center">
+          <span className="relative flex h-2 w-2 items-center justify-center">
             {pulse && (
               <span
                 className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-60 ${dotColor}`}
               />
             )}
-            <span className={`relative inline-flex h-2 w-2 rounded-full ${dotColor}`} />
+            <span className={`relative inline-flex h-1.5 w-1.5 rounded-full ${dotColor}`} />
           </span>
         </button>
       </PopoverTrigger>
@@ -180,16 +187,48 @@ function NavItem({ to, icon: Icon, label, collapsed }: NavItemProps) {
       aria-label={label}
       className={({ isActive }) =>
         cn(
-          'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-          'hover:bg-accent hover:text-accent-foreground',
-          isActive ? 'bg-accent text-accent-foreground' : 'text-muted-foreground',
+          'flex items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[13px] transition-colors',
+          isActive
+            ? 'bg-slate-800/80 text-slate-100'
+            : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200',
           collapsed && 'justify-center px-2',
         )
       }
     >
-      <Icon className="h-4 w-4 shrink-0" />
-      {!collapsed && <span>{label}</span>}
+      {({ isActive }) => (
+        <>
+          <Icon className={cn('h-[15px] w-[15px] shrink-0', isActive && 'text-blue-400')} />
+          {!collapsed && <span className="truncate">{label}</span>}
+        </>
+      )}
     </NavLink>
+  );
+}
+
+// --- WS Sidebar status box (bottom of sidebar) ---
+
+function WsSidebarStatus() {
+  const { status } = useWsDetail();
+  const connected = status === 'connected';
+  const dotColor = connected
+    ? 'bg-emerald-400'
+    : status === 'connecting' || status === 'reconnecting'
+      ? 'bg-amber-400'
+      : 'bg-red-400';
+  const label = connected ? 'WS bağlı' : status === 'reconnecting' ? 'Bağlanıyor…' : 'Bağlantı yok';
+  return (
+    <div className="rounded-md border border-slate-800 bg-slate-900/60 p-2.5">
+      <div className="flex items-center gap-2 text-[11px]">
+        <span className="relative flex h-1.5 w-1.5 shrink-0 items-center justify-center">
+          {connected && (
+            <span className="absolute h-1.5 w-1.5 animate-ping rounded-full bg-emerald-400 opacity-50" />
+          )}
+          <span className={`relative h-1.5 w-1.5 rounded-full ${dotColor}`} />
+        </span>
+        <span className="font-mono uppercase tracking-wider text-emerald-400">{label}</span>
+      </div>
+      <div className="mt-1 font-mono text-[10px] text-slate-500">region eu-west</div>
+    </div>
   );
 }
 
@@ -253,19 +292,19 @@ function NotificationBell() {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
+        <button
+          type="button"
+          className="relative rounded p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
           aria-label={unreadCount > 0 ? `${unreadCount} okunmamış bildirim` : 'Bildirimler'}
-          className="relative"
+          title="Bildirimler"
         >
-          <Bell className="h-4 w-4" />
+          <Bell className="h-[15px] w-[15px]" />
           {unreadCount > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
+            <span className="absolute -right-0.5 -top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           )}
-        </Button>
+        </button>
       </PopoverTrigger>
       <PopoverContent className="w-80 p-0" align="end">
         <div className="flex items-center justify-between border-b px-3 py-2">
@@ -335,8 +374,24 @@ function NotificationBell() {
 
 // --- AppShell ---
 
+// Page title map for TopBar
+const NAV_LABELS: Record<string, string> = {
+  '/inventory': 'Envanter',
+  '/tags': 'Etiketlerim',
+  '/graph': 'İlişki Haritası',
+  '/pipeline': 'Pipeline Diyagramları',
+  '/pipeline/lifecycle': 'Lifecycle Lanes',
+  '/admin': 'Admin Paneli',
+  '/admin/users': 'Kullanıcı Yönetimi',
+  '/admin/groups': 'Gruplar',
+  '/admin/roles': 'Roller',
+  '/admin/audit-log': 'Audit Log',
+  '/profile': 'Profil',
+};
+
 export function AppShell() {
   const navigate = useNavigate();
+  const location = useLocation();
   const user = useAuthStore((s) => s.user);
   const isAdmin = useAuthStore(selectIsAdmin);
   const isBootstrap = useAuthStore(selectIsBootstrap);
@@ -345,8 +400,17 @@ export function AppShell() {
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
   const logoutMut = useLogoutMutation();
   const [pwOpen, setPwOpen] = React.useState(false);
-  // Mobile overlay: sidebar is hidden by default on small screens
   const [mobileOpen, setMobileOpen] = React.useState(false);
+
+  // Find the best-matching label for the current path
+  const pageTitle = React.useMemo(() => {
+    const path = location.pathname;
+    // Exact match first, then prefix match (longest wins)
+    const match = Object.keys(NAV_LABELS)
+      .filter((k) => path === k || path.startsWith(k + '/'))
+      .sort((a, b) => b.length - a.length)[0];
+    return match ? NAV_LABELS[match] : 'IronStock';
+  }, [location.pathname]);
 
   async function handleLogout() {
     try {
@@ -359,10 +423,10 @@ export function AppShell() {
   }
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex h-screen flex-col bg-slate-950 text-slate-200">
       {/* Bootstrap mode warning banner */}
       {isBootstrap && (
-        <div className="flex shrink-0 items-center justify-center gap-2 bg-amber-500 px-4 py-1.5 text-sm font-medium text-black dark:bg-amber-700 dark:text-white">
+        <div className="flex shrink-0 items-center justify-center gap-2 bg-amber-600 px-4 py-1.5 text-sm font-medium text-white">
           <ShieldAlert className="h-4 w-4 shrink-0" />
           <span>
             Bootstrap Modu — TOTP atlanarak giriş yapıldı. İşiniz bitince çıkış yapın ve{' '}
@@ -370,68 +434,81 @@ export function AppShell() {
           </span>
         </div>
       )}
-      {/* Break-glass alert banners (PR-N4) — admin only, shown on WS event */}
+      {/* Break-glass alert banners (PR-N4) */}
       <BreakGlassBanner />
 
-      {/* Top bar */}
-      <header className="flex h-14 shrink-0 items-center justify-between border-b bg-background px-4">
+      {/* Top bar — IronStock design */}
+      <header className="flex h-12 shrink-0 items-center gap-3 border-b border-slate-800 bg-slate-950 px-3">
+        {/* Mobile hamburger */}
+        <button
+          type="button"
+          className="rounded p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-100 md:hidden"
+          aria-label="Menüyü aç/kapat"
+          onClick={() => setMobileOpen((v) => !v)}
+        >
+          <Menu className="h-4 w-4" />
+        </button>
+        {/* Desktop sidebar collapse toggle */}
+        <button
+          type="button"
+          className="hidden rounded p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-100 md:block"
+          aria-label={sidebarCollapsed ? 'Kenar çubuğunu genişlet' : 'Kenar çubuğunu daralt'}
+          onClick={toggleSidebar}
+        >
+          <Menu className="h-4 w-4" />
+        </button>
+
+        {/* Logo + branding */}
         <div className="flex items-center gap-2">
-          {/* Mobile hamburger */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden"
-            aria-label="Menüyü aç/kapat"
-            onClick={() => setMobileOpen((v) => !v)}
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-          {/* Desktop sidebar collapse toggle */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="hidden md:flex"
-            aria-label={sidebarCollapsed ? 'Kenar çubuğunu genişlet' : 'Kenar çubuğunu daralt'}
-            onClick={toggleSidebar}
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-          <span className="text-sm font-semibold">Envanter</span>
-          <span className="hidden text-xs text-muted-foreground sm:inline">v0.3</span>
+          <div className="grid h-6 w-6 place-items-center rounded-md bg-blue-600">
+            <Key className="h-[13px] w-[13px] text-white" />
+          </div>
+          <span className="text-[14px] font-semibold tracking-tight text-slate-100">IronStock</span>
+          <span className="font-mono text-[10px] text-slate-500">v0.3</span>
+          <span className="mx-1.5 h-3 w-px bg-slate-800" />
+          <span className="text-[13px] text-slate-400">{pageTitle}</span>
         </div>
 
-        <div className="flex items-center gap-2">
-          <WsStatusDot />
-          {user && (
-            <span className="hidden text-sm text-muted-foreground sm:inline">{user.username}</span>
-          )}
+        {/* Right side actions */}
+        <div className="ml-auto flex items-center gap-1">
+          {/* WS status + username pill */}
+          <div className="flex items-center gap-1.5 rounded-md border border-slate-800 bg-slate-900/40 px-2 py-1 text-[11px]">
+            <WsStatusDot />
+            {user && (
+              <span className="hidden font-mono text-slate-400 sm:inline">{user.username}</span>
+            )}
+          </div>
+
           <NotificationBell />
           <ThemeToggle />
-          <Button
-            variant="ghost"
-            size="icon"
+          <button
+            type="button"
+            className="rounded p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
             onClick={() => navigate('/profile')}
             aria-label="Profil ve güvenlik"
+            title="Profil"
           >
-            <UserCircle className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
+            <UserCircle className="h-[15px] w-[15px]" />
+          </button>
+          <button
+            type="button"
+            className="rounded p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
             onClick={() => setPwOpen(true)}
             aria-label="Parola değiştir"
+            title="Şifre değiştir"
           >
-            <KeyRound className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
+            <KeyRound className="h-[15px] w-[15px]" />
+          </button>
+          <button
+            type="button"
+            className="rounded p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
             onClick={handleLogout}
             aria-label="Çıkış yap"
+            title="Çıkış"
             disabled={logoutMut.isPending}
           >
-            <LogOut className="h-4 w-4" />
-          </Button>
+            <LogOut className="h-[15px] w-[15px]" />
+          </button>
         </div>
       </header>
 
@@ -441,25 +518,23 @@ export function AppShell() {
         {/* Mobile overlay backdrop */}
         {mobileOpen && (
           <div
-            className="fixed inset-0 z-20 bg-black/40 md:hidden"
+            className="fixed inset-0 z-20 bg-black/50 md:hidden"
             aria-hidden
             onClick={() => setMobileOpen(false)}
           />
         )}
 
-        {/* Sidebar */}
+        {/* Sidebar — IronStock design */}
         <aside
           className={cn(
-            // Desktop: always visible, width controlled by collapsed state
-            'hidden md:flex md:flex-col border-r bg-background transition-all duration-200',
+            'hidden md:flex md:flex-col border-r border-slate-800 bg-slate-950 transition-all duration-200',
             sidebarCollapsed ? 'md:w-14' : 'md:w-56',
-            // Mobile: fixed overlay, shown when mobileOpen
             mobileOpen &&
-              'flex flex-col fixed inset-y-0 left-0 z-30 w-56 border-r bg-background pt-14',
+              'flex flex-col fixed inset-y-0 left-0 z-30 w-56 border-r border-slate-800 bg-slate-950 pt-12',
           )}
           aria-label="Ana navigasyon"
         >
-          <nav className="flex flex-col gap-1 p-2" role="navigation">
+          <nav className="flex flex-1 flex-col gap-0.5 p-2" role="navigation">
             <NavItem
               to="/inventory"
               icon={Folder}
@@ -495,7 +570,7 @@ export function AppShell() {
                 <NavItem
                   to="/admin"
                   icon={Shield}
-                  label="Admin Paneli"
+                  label="Kullanıcı Yönetimi"
                   collapsed={sidebarCollapsed && !mobileOpen}
                 />
                 <NavItem
@@ -507,10 +582,17 @@ export function AppShell() {
               </>
             )}
           </nav>
+
+          {/* WS status box at bottom — only when expanded */}
+          {!sidebarCollapsed && (
+            <div className="border-t border-slate-800 p-3">
+              <WsSidebarStatus />
+            </div>
+          )}
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 overflow-auto bg-muted/20 p-4 md:p-6" role="main">
+        <main className="relative flex-1 overflow-hidden bg-slate-950" role="main">
           <Outlet />
         </main>
       </div>

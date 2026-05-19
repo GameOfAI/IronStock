@@ -143,10 +143,11 @@ export default function AdminUsersPage() {
   }
 
   return (
+    <div className="h-full overflow-auto p-6">
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-semibold">Kullanıcı Yönetimi</h1>
-        <p className="text-sm text-muted-foreground">
+        <h1 className="text-xl font-semibold text-slate-100">Kullanıcı Yönetimi</h1>
+        <p className="text-[13px] text-slate-400">
           Kullanıcılar, gruplar ve roller tek bir yerden yönetin.
         </p>
       </div>
@@ -174,6 +175,7 @@ export default function AdminUsersPage() {
           </Suspense>
         </TabsContent>
       </Tabs>
+    </div>
     </div>
   );
 }
