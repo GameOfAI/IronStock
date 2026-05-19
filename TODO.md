@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-05-19 (**Post-v1.0.0 Kapsamlı Geliştirmeler** — tüm PR-UX1..UX9 tamamlandı. Kalan: PR-F3, PR-N3, prod hardening.)
+Son güncelleme: 2026-05-19 (**Post-v1.0.0 Kapsamlı Geliştirmeler** — tüm PR-UX1..UX9 + WS origin fix + PR-Export tamamlandı. Kalan: PR-F3, PR-N3, prod hardening.)
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 
@@ -651,12 +651,12 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 > Detaylı karşılaştırma tablosu ve "kopyalanabilir" analizi için PROGRESS.md'ye bakınız.
 
 **Zorunlu / Teknik borç:**
-- [ ] **WS origin prod config** — `OriginPatterns` hardcoded `localhost:*`; env-config'den alınmalı. Production riski.
+- [x] **WS origin prod config** — `ENVANTER_WS_ALLOWED_ORIGINS` env var eklendi. WSHandlers.AllowedOrigins wired. ✅ 2026-05-19
 - [ ] **PR-F3 (Tauri Sync)** — Rust keyring bootstrap pk store/load/delete. Client senkron değil.
 
 **Kolay kazanımlar — Devolutions'dan ilham (günler):**
 - [ ] **Log forwarding** — Audit log event'larından Syslog (UDP/TCP) + Slack webhook entegrasyonu. SOC/SIEM için kritik. `POST /api/v1/admin/log-forwarding` config endpoint + background forwarder goroutine.
-- [ ] **Scheduled export** — `GET /api/v1/admin/export?format=json|csv` endpoint. Felaket kurtarma + migration için. Alanlar: item meta (şifreli alanlar hariç).
+- [x] **Scheduled export** — `GET /api/v1/admin/export?format=json|csv` endpoint. Admin Dashboard'da JSON/CSV butonları. ✅ 2026-05-19
 - [ ] **Zaman bazlı erişim** — `item_shares` + `folder_permissions`'a `valid_from TIMESTAMPTZ`, `valid_until TIMESTAMPTZ` alanları. `ResolveItemPermission` CTE'ye `AND (valid_until IS NULL OR valid_until > NOW())` eklenir. Migration + UI.
 - [ ] **Item arama iyileştirmesi** — HMAC blind index sadece tam eşleşme. Prefix için bigram HMAC array veya Postgres `ILIKE` (plaintext metadata).
 

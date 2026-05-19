@@ -184,6 +184,21 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 
 ## Günlük
 
+### 2026-05-19 (Win) — WS origin prod config + Admin metadata export ✅
+
+**WS origin prod config:**
+- `ENVANTER_WS_ALLOWED_ORIGINS` env var eklendi (config.go). Virgülle ayrılmış glob listesi, default `localhost:*,127.0.0.1:*`.
+- `WSHandlers.AllowedOrigins` alanı eklendi, `main.go`'da `cfg.WSAllowedOrigins` ile besleniyor.
+- `websocket.Accept` artık hardcoded localhost yerine config'den okunan origins'ı kullanıyor.
+
+**Admin metadata export (PR-Export):**
+- `GET /api/v1/admin/export?format=json|csv` — admin-only endpoint.
+- Tüm item'ların metadata'sını (isim, tip, klasör, etiketler, expiry, tarihler) döndürür. İsimler master key ile server-side decrypt edilir. Şifreli/E2E alanlar dahil edilmez.
+- CSV: UTF-8 BOM (Excel compat) + RFC 4180 quoting. JSON: `{"exported_at","count","items":[…]}`.
+- `admin.export` audit event emits.
+- Frontend: `downloadAdminExport(fmt)` Blob helper + Admin Dashboard'da JSON/CSV butonları.
+- Go build ✅, TS/ESLint ✅, Docker build ✅.
+
 ### 2026-05-18 (Win) — CI test fix'leri ✅
 
 **Sorun:** CI #72 ve #73 başarısız oldu. İki bağımsız test hatası:
