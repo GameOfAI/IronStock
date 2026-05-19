@@ -1,13 +1,13 @@
 # İlerleyiş
 
-Son güncelleme: 2026-05-19 (Devolutions rekabet analizi + olgunluk güncellemesi)
+Son güncelleme: 2026-05-19 (PR-UX4..UX9 tamamlandı — envanter tip filtreleri, ikon-satır listesi, Admin Dashboard, item şablon galerisi)
 
 ## Mevcut Durum
 
 - **Aktif Faz:** Post-v1.0.0 Kapsamlı Geliştirmeler (Faz 6+)
 - **Tamamlanan Faz:** Faz 0 + 1 + 2 + 3 + 4 + 5 ✅
-- **Son tamamlanan:** Item tam alan düzenleme + WS proxy/origin fix + renkli telemetri dot + CI test düzeltmeleri ✅ 2026-05-18
-- **Proje durumu:** MVP + kapsamlı geliştirmeler devam ediyor. PR-UX5'e kadar tüm planlı PR'lar tamamlandı. Kalan zorunlu: PR-F3 (Tauri Sync), PR-N3 (Onay Workflow). Yeni yön: PAM özellikleri (Devolutions analizi sonrası — bakınız aşağıdaki rekabet analizi).
+- **Son tamamlanan:** PR-UX4..UX9 — tip filtre chip'leri, ikon-satır ItemList, Admin Dashboard (6 widget), item form şablon galerisi ✅ 2026-05-19
+- **Proje durumu:** MVP + tüm UX PR'ları tamamlandı. Kalan zorunlu: PR-F3 (Tauri Sync), PR-N3 (Onay Workflow). Yeni yön: PAM özellikleri (Devolutions analizi sonrası — bakınız aşağıdaki rekabet analizi).
 
 ---
 
@@ -135,6 +135,10 @@ IronStock şu an **"güvenli credential vault + DevOps görselleştirme"** kesi�
 | PR-UX3 | Admin konsolidasyonu (tabbed) + TOTP sıfırlama | ✅ DONE |
 | PR-UX4 | Graf tip filtresi + Lifecycle onboarding | ✅ DONE |
 | PR-UX5 | Item paylaşım modalı fix (DEK re-wrap + user picker) | ✅ DONE |
+| PR-UX6 | Inventory liste overhaul (ikon-satır, type colors) | ✅ DONE |
+| PR-UX7 | Item Detail 5-tab layout (Genel/Alanlar/İlişkiler/Yaşam/Geçmiş) | ✅ DONE |
+| PR-UX8 | Admin Dashboard (6 widget: güvenlik skoru, expiry, user stats, audit) | ✅ DONE |
+| PR-UX9 | Item form şablon galerisi (11 quickstart şablonu) | ✅ DONE |
 | PR-F3 | Tauri Client Sync | ⏳ TODO |
 | PR-N3 | Onay Workflow / Dual Control | ⏳ Faz 6+ (büyük iş) |
 
