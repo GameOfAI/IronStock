@@ -493,9 +493,9 @@ export function AppShell() {
             {isAdmin && (
               <>
                 <NavItem
-                  to="/admin/users"
+                  to="/admin"
                   icon={Shield}
-                  label="Kullanıcı Yönetimi"
+                  label="Admin Paneli"
                   collapsed={sidebarCollapsed && !mobileOpen}
                 />
                 <NavItem

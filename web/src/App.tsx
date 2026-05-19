@@ -16,7 +16,7 @@ import RegisterPage from '@/pages/register';
 import TOTPSetupPage from '@/pages/totp-setup';
 import RecoverPage from '@/pages/recover';
 import InventoryPage from '@/pages/inventory';
-import AdminUsersPage, { AdminAuditLogPage } from '@/pages/admin';
+import AdminUsersPage, { AdminAuditLogPage, AdminDashboardPage } from '@/pages/admin';
 import TagsPage from '@/pages/tags';
 import { GraphPage } from '@/pages/graph';
 import PipelineListPage from '@/pages/pipeline/index';
@@ -106,6 +106,7 @@ export default function App() {
 
                   {/* Admin */}
                   <Route element={<RoleGate role="admin" />}>
+                    <Route path="/admin" element={<AdminDashboardPage />} />
                     <Route path="/admin/users" element={<AdminUsersPage />} />
                     <Route path="/admin/groups" element={<Navigate to="/admin/users?tab=groups" replace />} />
                     <Route path="/admin/roles" element={<Navigate to="/admin/users?tab=roles" replace />} />
