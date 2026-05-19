@@ -23,6 +23,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useTOTPInitMutation, useTOTPVerifyMutation } from '@/api/auth';
+import { TOTPQRCode } from '@/components/auth/totp-qr';
 
 export default function TOTPSetupPage() {
   // Hooks önce çağrılmalı (React Hooks rule). Early-return for invalid
@@ -104,15 +105,19 @@ export default function TOTPSetupPage() {
 
           {phase === 'verify' && (
             <form onSubmit={onVerify} className="flex flex-col gap-4">
-              <div className="rounded-md border bg-muted/30 p-4 text-center">
-                {/* MVP: QR rendering Faz 5 polish'inde kütüphane ile.
-                    Şimdilik secret manuel olarak gösteriliyor. */}
-                <p className="text-xs uppercase text-muted-foreground">Manuel anahtar</p>
-                <code className="mt-2 block break-all text-sm">{secretBase32}</code>
-                <p className="mt-3 text-xs text-muted-foreground">
-                  veya bu URI'yi authenticator uygulamanıza yapıştırın:
+              <div className="flex flex-col items-center gap-3 rounded-md border bg-muted/30 p-4">
+                <p className="text-xs text-muted-foreground">
+                  Authenticator uygulamanızla aşağıdaki QR kodu tarayın.
                 </p>
-                <code className="mt-2 block break-all text-xs">{otpAuthUrl}</code>
+                <TOTPQRCode uri={otpAuthUrl} />
+                <details className="w-full text-center">
+                  <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
+                    QR tarayamıyor musunuz? Manuel anahtar
+                  </summary>
+                  <code className="mt-2 block break-all rounded bg-background px-2 py-1 text-sm">
+                    {secretBase32}
+                  </code>
+                </details>
               </div>
 
               <div className="flex flex-col gap-1.5">

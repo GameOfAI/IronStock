@@ -29,6 +29,8 @@ export interface CreateUserInput {
   email: string;
   password: string;
   roles: string[];
+  /** PR-SEC1: TOTP zorunluluğu (default true). */
+  totp_required?: boolean;
 }
 
 export function useCreateUserMutation() {
@@ -118,6 +120,20 @@ export function useResetTOTPMutation(userId: string) {
     mutationFn: () =>
       apiFetch<void>(`/api/v1/admin/users/${userId}/totp/reset`, {
         method: 'POST',
+      }),
+    onSuccess: () => invalidateAllUserPages(queryClient),
+  });
+}
+
+// ---------- TOTP Requirement Toggle (PR-SEC1) ----------
+
+export function useUpdateTOTPRequirementMutation(userId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (required: boolean) =>
+      apiFetch<void>(`/api/v1/admin/users/${userId}/totp-required`, {
+        method: 'PATCH',
+        body: { required },
       }),
     onSuccess: () => invalidateAllUserPages(queryClient),
   });

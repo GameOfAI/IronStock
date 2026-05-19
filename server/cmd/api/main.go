@@ -456,9 +456,11 @@ func ensureDefaultAdmin(
 		userID = existingID
 	} else {
 		// Create the admin user.
+		// PR-SEC1: totp_required=true explicit — bootstrap admin must enroll TOTP
+		// after the forced password change on first login.
 		err = tx.QueryRow(ctx, `
-			INSERT INTO users (username, email, password_hash, argon2_params, status, must_change_password)
-			VALUES ('admin', 'admin@localhost', $1, $2, 'active', true)
+			INSERT INTO users (username, email, password_hash, argon2_params, status, must_change_password, totp_required)
+			VALUES ('admin', 'admin@localhost', $1, $2, 'active', true, true)
 			RETURNING id::text
 		`, hp.Hash, hp.ParamsJSON).Scan(&userID)
 		if err != nil {

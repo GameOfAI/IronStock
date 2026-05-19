@@ -263,6 +263,7 @@ export interface AdminUser {
   last_login_at?: string | null;
   created_at: string;
   is_break_glass: boolean; // PR-N4
+  totp_required: boolean;  // PR-SEC1 — per-user TOTP enforcement
 }
 
 export interface AdminUsersResponse {

@@ -10,7 +10,7 @@
  */
 
 import { useState } from 'react';
-import { KeyRound, Loader2, MoreVertical } from 'lucide-react';
+import { KeyRound, Loader2, MoreVertical, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -34,6 +34,7 @@ import {
   useGrantRoleMutation,
   useResetTOTPMutation,
   useRevokeRoleMutation,
+  useUpdateTOTPRequirementMutation,
 } from '@/api/admin';
 import { useAuthStore } from '@/store/auth';
 import { ApiError } from '@/api/errors';
@@ -74,6 +75,7 @@ export function UserActionsMenu({ user }: UserActionsMenuProps) {
   const disableUser = useDisableUserMutation(user.id);
   const enableUser = useEnableUserMutation(user.id);
   const resetTotp = useResetTOTPMutation(user.id);
+  const updateTotpReq = useUpdateTOTPRequirementMutation(user.id);
 
   const isSelf = me?.id === user.id;
   const userRoles = new Set(user.roles);
@@ -212,6 +214,36 @@ export function UserActionsMenu({ user }: UserActionsMenuProps) {
             <KeyRound className="mr-2 h-4 w-4" />
             TOTP Sıfırla
           </DropdownMenuItem>
+          {/* PR-SEC1: TOTP zorunluluğu toggle. Self için kapatma engelli. */}
+          <DropdownMenuCheckboxItem
+            checked={user.totp_required}
+            disabled={
+              updateTotpReq.isPending ||
+              (isSelf && user.totp_required) /* admin kendi TOTP'sini kapatamaz */
+            }
+            onSelect={(e) => {
+              e.preventDefault();
+              const next = !user.totp_required;
+              updateTotpReq.mutate(next, {
+                onSuccess: () =>
+                  toast({
+                    title: next ? 'TOTP zorunlu kılındı' : 'TOTP zorunluluğu kaldırıldı',
+                    description: next
+                      ? `${user.username} bir sonraki girişte TOTP kurmak zorunda.`
+                      : `${user.username} artık sadece şifreyle giriş yapabilir.`,
+                  }),
+                onError: (err) =>
+                  toast({
+                    title: 'TOTP zorunluluğu güncellenemedi',
+                    description: describeError(err),
+                    variant: 'destructive',
+                  }),
+              });
+            }}
+          >
+            <ShieldCheck className="mr-2 h-4 w-4" />
+            <span>TOTP zorunlu</span>
+          </DropdownMenuCheckboxItem>
           <DropdownMenuSeparator />
           {isDisabled ? (
             <DropdownMenuItem onSelect={handleEnable} disabled={statusPending || isSelf}>

@@ -231,6 +231,8 @@ func NewRouter(d Deps) http.Handler {
 			ar.Get("/audit-log", d.Admin.QueryAuditLog)
 			// Admin TOTP reset (PR-F2a).
 			ar.Post("/users/{id}/totp/reset", d.Admin.AdminResetTOTP)
+			// Admin TOTP zorunluluğu toggle (PR-SEC1).
+			ar.Patch("/users/{id}/totp-required", d.Admin.SetTOTPRequired)
 			// Break-glass toggle (PR-N4).
 			ar.Post("/users/{id}/break-glass", d.Admin.SetBreakGlass)
 			// Export (PR-Export) — registered inside this block so auth/role MW applies.

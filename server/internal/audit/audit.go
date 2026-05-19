@@ -74,6 +74,8 @@ const (
 
 	// Admin TOTP reset (PR-F2a).
 	ActionAdminTOTPReset = "admin.totp_reset"
+	// Admin per-user TOTP enforcement toggle (PR-SEC1).
+	ActionAdminTOTPRequirementChanged = "admin.totp_requirement_changed"
 	// Admin metadata export (PR-Export).
 	ActionAdminExport = "admin.export"
 

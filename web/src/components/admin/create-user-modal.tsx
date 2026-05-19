@@ -42,6 +42,8 @@ export function CreateUserModal({ open, onClose }: CreateUserModalProps) {
   const [password, setPassword] = React.useState('');
   const [confirmPassword, setConfirmPassword] = React.useState('');
   const [selectedRoles, setSelectedRoles] = React.useState<string[]>(['read']);
+  // PR-SEC1: TOTP zorunluluğu — default true. Admin kapatabilir.
+  const [totpRequired, setTotpRequired] = React.useState(true);
 
   const busy = createMutation.isPending;
 
@@ -51,6 +53,7 @@ export function CreateUserModal({ open, onClose }: CreateUserModalProps) {
     setPassword('');
     setConfirmPassword('');
     setSelectedRoles(['read']);
+    setTotpRequired(true);
   }
 
   function handleClose() {
@@ -79,7 +82,13 @@ export function CreateUserModal({ open, onClose }: CreateUserModalProps) {
     }
 
     try {
-      await createMutation.mutateAsync({ username, email, password, roles: selectedRoles });
+      await createMutation.mutateAsync({
+        username,
+        email,
+        password,
+        roles: selectedRoles,
+        totp_required: totpRequired,
+      });
       toast({ title: 'Kullanıcı oluşturuldu', description: `@${username} başarıyla eklendi.` });
       resetForm();
       onClose();
@@ -181,6 +190,33 @@ export function CreateUserModal({ open, onClose }: CreateUserModalProps) {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* PR-SEC1: TOTP zorunluluk seçimi */}
+          <div className="flex flex-col gap-2">
+            <Label>Güvenlik</Label>
+            <div className="rounded-md border p-3">
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  id="cu-totp-required"
+                  checked={totpRequired}
+                  onCheckedChange={(c) => setTotpRequired(c === true)}
+                  disabled={busy}
+                />
+                <div className="flex flex-col">
+                  <label
+                    htmlFor="cu-totp-required"
+                    className="text-sm font-medium cursor-pointer"
+                  >
+                    TOTP (2FA) zorunlu
+                  </label>
+                  <span className="text-xs text-muted-foreground">
+                    Açık: kullanıcı ilk girişte authenticator uygulaması kurmak zorunda.
+                    Kapalı: sadece şifreyle giriş yapabilir (önerilmez).
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 

@@ -34,19 +34,23 @@ type loginRequest struct {
 }
 
 type loginResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
+	AccessToken  string `json:"access_token,omitempty"`
+	RefreshToken string `json:"refresh_token,omitempty"`
 	// ExpiresIn is the access-token lifetime in seconds. Refresh-token
 	// lifetime is fixed (auth.RefreshTokenLifetime) and not echoed.
-	ExpiresIn int      `json:"expires_in"`
-	TokenType string   `json:"token_type"` // "Bearer"
-	UserID    string   `json:"user_id"`
-	Roles     []string `json:"roles"`
+	ExpiresIn int      `json:"expires_in,omitempty"`
+	TokenType string   `json:"token_type,omitempty"` // "Bearer"
+	UserID    string   `json:"user_id,omitempty"`
+	Roles     []string `json:"roles,omitempty"`
 	// MustChangePassword signals that the user must complete a password change
 	// before accessing the application. Set for admin-created accounts and the
 	// default seed admin. Frontend redirects to /change-password and blocks
 	// all other routes until the password is updated.
-	MustChangePassword bool `json:"must_change_password"`
+	MustChangePassword bool `json:"must_change_password,omitempty"`
+	// TmpToken is set instead of AccessToken when the user has totp_required=true
+	// but no verified TOTP secret yet. Frontend uses this to call /totp/init.
+	// Purpose: PurposeTOTPEnroll, lifetime: 15 minutes.
+	TmpToken string `json:"tmp_token,omitempty"`
 }
 
 // Login implements POST /api/v1/auth/login.
@@ -136,6 +140,40 @@ func (s *AuthHandlers) Login(w http.ResponseWriter, r *http.Request) {
 	var trustedDeviceID string    // ID of the device row that was used (for audit)
 	hasTOTP := err == nil         // true when user has an active TOTP secret
 
+	// PR-SEC1: 3-way branch based on TOTP enrollment and per-user requirement.
+	//
+	// Cases:
+	//   A) hasTOTP=true                                → mevcut TOTP verify akışı (B'ye düşer)
+	//   B) hasTOTP=false && totp_required=true         → tmp_token (PurposeTOTPEnroll) dön,
+	//                                                     frontend /totp/setup'a yönlendirir
+	//   C) hasTOTP=false && totp_required=false        → şifre yeterli (knowledge-only)
+	if !hasTOTP && userRow.TOTPRequired {
+		// User must set up TOTP before getting a session. Reset failed counter and
+		// audit a partial success; tmp_token gates /totp/init + /totp/verify.
+		_ = recordLoginSuccess(ctx, s.Service.DB, userRow.ID)
+		tmp, tmpErr := s.Service.JWT.IssueTmp(userRow.ID, auth.PurposeTOTPEnroll)
+		if tmpErr != nil {
+			writeError(w, s.Logger, http.StatusInternalServerError, ErrCodeInternal,
+				"TOTP enrollment token üretilemedi.", tmpErr)
+			return
+		}
+		_ = s.Audit.Write(ctx, audit.Entry{
+			ActorUserID:  userRow.ID,
+			Action:       audit.ActionAuthLogin,
+			ResourceType: audit.ResourceUser,
+			ResourceID:   userRow.ID,
+			Details:      map[string]any{"stage": "totp_enroll_required"},
+			IPAddress:    parseIP(r.RemoteAddr),
+			UserAgent:    r.UserAgent(),
+		})
+		writeJSON(w, http.StatusOK, loginResponse{
+			TmpToken:           tmp,
+			UserID:             userRow.ID,
+			MustChangePassword: userRow.MustChangePassword,
+		})
+		return
+	}
+
 	if hasTOTP {
 		// User has TOTP configured.
 		// PR-F2b: check the trusted-device cookie first.
@@ -171,7 +209,9 @@ func (s *AuthHandlers) Login(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	// No TOTP configured OR trusted-device verified — password alone is sufficient.
+	// At this point: hasTOTP=true (verified above) OR (hasTOTP=false && !totp_required).
+	// Trusted-device verified, TOTP verified, or per-user TOTP requirement is off.
+	// Password alone is sufficient.
 
 	// All factors OK: create session in a tx so the failed-login counter
 	// reset and session insert are atomic.
@@ -295,6 +335,7 @@ type userLoginRow struct {
 	LockedUntil        *time.Time
 	MustChangePassword bool
 	IsBreakGlass       bool // PR-N4 — triggers emergency alert on successful login
+	TOTPRequired       bool // PR-SEC1 — per-user TOTP enforcement (default true)
 }
 
 // fetchUserForLogin returns the row needed to verify the password and check
@@ -303,7 +344,7 @@ func fetchUserForLogin(ctx context.Context, db auth.DBExec, usernameLower string
 	const sqlText = `
 		SELECT id::text, password_hash, argon2_params,
 		       status, failed_login_attempts, locked_until,
-		       must_change_password, is_break_glass
+		       must_change_password, is_break_glass, totp_required
 		FROM users
 		WHERE username = $1
 		LIMIT 1
@@ -312,7 +353,7 @@ func fetchUserForLogin(ctx context.Context, db auth.DBExec, usernameLower string
 	err := db.QueryRow(ctx, sqlText, usernameLower).Scan(
 		&row.ID, &row.PasswordHash, &row.Argon2Params,
 		&row.Status, &row.FailedAttempts, &row.LockedUntil,
-		&row.MustChangePassword, &row.IsBreakGlass,
+		&row.MustChangePassword, &row.IsBreakGlass, &row.TOTPRequired,
 	)
 	return row, err
 }

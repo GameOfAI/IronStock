@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-05-19 (**Post-v1.0.0 Kapsamlı Geliştirmeler** — tüm PR-UX1..UX9 + WS origin fix + PR-Export + PR-F3 tamamlandı. Kalan: PR-N3, login güvenlik iyileştirmeleri, prod hardening.)
+Son güncelleme: 2026-05-19 (**Post-v1.0.0 Kapsamlı Geliştirmeler** — tüm PR-UX1..UX9 + WS origin fix + PR-Export + PR-F3 + PR-SEC1 tamamlandı. Kalan: PR-SEC2 (first-login TOTP gate), PR-SEC3 (mTLS), prod hardening.)
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 
@@ -653,6 +653,9 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 **Zorunlu / Teknik borç:**
 - [x] **WS origin prod config** — `ENVANTER_WS_ALLOWED_ORIGINS` env var eklendi. WSHandlers.AllowedOrigins wired. ✅ 2026-05-19
 - [x] **PR-F3 (Tauri Sync)** — KeyringBootstrap + TLS skip-verify + client item-detail parity. ✅ 2026-05-19
+- [x] **PR-SEC1 (TOTP per-user + Login UX + QR)** — `users.totp_required` flag, 3-dallı login akışı, web/client login UX paritesi (dialog), QR render, admin per-user toggle. ✅ 2026-05-19
+- [ ] **PR-SEC2 (First-login forced TOTP gate)** — Bootstrap admin & yeni kullanıcılar için PWD değiş → TOTP setup zorunlu redirect. `must_setup_totp` flag + `MustSetupTOTPGate`.
+- [ ] **PR-SEC3 (mTLS Client Certificate)** — Built-in CA + external CA upload, per-user `requires_client_cert`, Ingress mTLS forward.
 
 **Kolay kazanımlar — Devolutions'dan ilham (günler):**
 - [ ] **Log forwarding** — Audit log event'larından Syslog (UDP/TCP) + Slack webhook entegrasyonu. SOC/SIEM için kritik. `POST /api/v1/admin/log-forwarding` config endpoint + background forwarder goroutine.

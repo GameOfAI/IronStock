@@ -14,6 +14,7 @@ export const sampleUsers: AdminUser[] = [
     last_login_at: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
     created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
     is_break_glass: false,
+    totp_required: true,
   },
   {
     id: 'u2',
@@ -24,6 +25,7 @@ export const sampleUsers: AdminUser[] = [
     last_login_at: null,
     created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
     is_break_glass: false,
+    totp_required: true,
   },
   {
     id: 'u3',
@@ -34,6 +36,7 @@ export const sampleUsers: AdminUser[] = [
     last_login_at: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
     created_at: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
     is_break_glass: false,
+    totp_required: true,
   },
 ];
 

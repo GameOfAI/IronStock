@@ -32,6 +32,7 @@ type adminUserRow struct {
 	LastLoginAt  *string  `json:"last_login_at,omitempty"`
 	CreatedAt    string   `json:"created_at"`
 	IsBreakGlass bool     `json:"is_break_glass"` // PR-N4
+	TOTPRequired bool     `json:"totp_required"`  // PR-SEC1 — per-user TOTP enforcement
 }
 
 type adminUsersResponse struct {
@@ -60,7 +61,8 @@ func (h *AdminHandlers) ListUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Page query — includes is_break_glass for badge display (PR-N4).
+	// Page query — includes is_break_glass for badge display (PR-N4)
+	// and totp_required for the admin TOTP toggle UI (PR-SEC1).
 	const sqlText = `
 		SELECT
 		    COALESCE(array_agg(id::text                        ORDER BY username), '{}'),
@@ -69,18 +71,19 @@ func (h *AdminHandlers) ListUsers(w http.ResponseWriter, r *http.Request) {
 		    COALESCE(array_agg(status                          ORDER BY username), '{}'),
 		    COALESCE(array_agg(COALESCE(last_login_at::text, '') ORDER BY username), '{}'),
 		    COALESCE(array_agg(created_at::text                ORDER BY username), '{}'),
-		    COALESCE(array_agg(is_break_glass                  ORDER BY username), '{}')
+		    COALESCE(array_agg(is_break_glass                  ORDER BY username), '{}'),
+		    COALESCE(array_agg(totp_required                   ORDER BY username), '{}')
 		FROM (
-		    SELECT id, username, email, status, last_login_at, created_at, is_break_glass
+		    SELECT id, username, email, status, last_login_at, created_at, is_break_glass, totp_required
 		    FROM users
 		    ORDER BY username
 		    LIMIT $1 OFFSET $2
 		) page
 	`
 	var ids, usernames, emails, statuses, lastLogins, createdAts []string
-	var isBreakGlassFlags []bool
+	var isBreakGlassFlags, totpRequiredFlags []bool
 	if err := h.Service.DB.QueryRow(ctx, sqlText, limit, offset).Scan(
-		&ids, &usernames, &emails, &statuses, &lastLogins, &createdAts, &isBreakGlassFlags,
+		&ids, &usernames, &emails, &statuses, &lastLogins, &createdAts, &isBreakGlassFlags, &totpRequiredFlags,
 	); err != nil {
 		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
 			"Kullanıcı listesi alınamadı.", err)
@@ -105,6 +108,7 @@ func (h *AdminHandlers) ListUsers(w http.ResponseWriter, r *http.Request) {
 			lastLogin = &ll
 		}
 		breakGlass := i < len(isBreakGlassFlags) && isBreakGlassFlags[i]
+		totpReq := i >= len(totpRequiredFlags) || totpRequiredFlags[i] // default true if missing
 		out = append(out, adminUserRow{
 			ID:           ids[i],
 			Username:     usernames[i],
@@ -114,6 +118,7 @@ func (h *AdminHandlers) ListUsers(w http.ResponseWriter, r *http.Request) {
 			LastLoginAt:  lastLogin,
 			CreatedAt:    createdAts[i],
 			IsBreakGlass: breakGlass,
+			TOTPRequired: totpReq,
 		})
 	}
 
@@ -397,14 +402,17 @@ func validRoleName(name string) bool {
 //   - Kullanıcı direkt 'active' statüsünde açılır, TOTP kurulumu gerektirmez.
 //   - Başlangıç rolleri req.Roles'dan atanır; boşsa ["read"] varsayılır.
 //
-// Body: { username, email, password, roles? }
+// Body: { username, email, password, roles?, totp_required? }
 // Returns: adminUserRow (201 Created)
+//
+// PR-SEC1: totp_required varsayılan true. Admin checkbox'ı kaldırırsa false gönderir.
 func (h *AdminHandlers) CreateUser(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Username string   `json:"username"`
-		Email    string   `json:"email"`
-		Password string   `json:"password"`
-		Roles    []string `json:"roles"`
+		Username     string   `json:"username"`
+		Email        string   `json:"email"`
+		Password     string   `json:"password"`
+		Roles        []string `json:"roles"`
+		TOTPRequired *bool    `json:"totp_required"` // nil → default true
 	}
 	if !decodeJSON(w, r, h.Logger, &req) {
 		return
@@ -455,9 +463,14 @@ func (h *AdminHandlers) CreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	totpRequired := true // default
+	if req.TOTPRequired != nil {
+		totpRequired = *req.TOTPRequired
+	}
+
 	const insertUser = `
-		INSERT INTO users (username, email, password_hash, argon2_params, status, must_change_password)
-		VALUES ($1, $2, $3, $4, 'active', true)
+		INSERT INTO users (username, email, password_hash, argon2_params, status, must_change_password, totp_required)
+		VALUES ($1, $2, $3, $4, 'active', true, $5)
 		RETURNING id::text, created_at::text
 	`
 	var userID, createdAt string
@@ -466,6 +479,7 @@ func (h *AdminHandlers) CreateUser(w http.ResponseWriter, r *http.Request) {
 		strings.ToLower(req.Email),
 		hp.Hash,
 		hp.ParamsJSON,
+		totpRequired,
 	).Scan(&userID, &createdAt)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -537,12 +551,13 @@ func (h *AdminHandlers) CreateUser(w http.ResponseWriter, r *http.Request) {
 	})
 
 	writeJSON(w, http.StatusCreated, adminUserRow{
-		ID:        userID,
-		Username:  strings.ToLower(req.Username),
-		Email:     strings.ToLower(req.Email),
-		Status:    "active",
-		Roles:     roles,
-		CreatedAt: createdAt,
+		ID:           userID,
+		Username:     strings.ToLower(req.Username),
+		Email:        strings.ToLower(req.Email),
+		Status:       "active",
+		Roles:        roles,
+		CreatedAt:    createdAt,
+		TOTPRequired: totpRequired,
 	})
 }
 
@@ -618,6 +633,73 @@ func (h *AdminHandlers) AdminResetTOTP(w http.ResponseWriter, r *http.Request) {
 		Action:       audit.ActionAdminTOTPReset,
 		ResourceType: audit.ResourceUser,
 		ResourceID:   id,
+		IPAddress:    parseIP(r.RemoteAddr),
+		UserAgent:    r.UserAgent(),
+	})
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// SetTOTPRequired implements PATCH /api/v1/admin/users/{id}/totp-required.
+//
+// Body: { "required": true | false }
+//
+// PR-SEC1: Per-user TOTP enforcement toggle. Admin tarafından çağrılır;
+// admin kendi TOTP zorunluluğunu kapatamaz (self-lockdown protection).
+//
+// false → kullanıcı bir sonraki girişte sadece şifreyle giriş yapabilir
+//         (varolan TOTP secret'ı korunur ama login akışı atlatır)
+// true  → kullanıcı login için TOTP kurmak zorunda
+func (h *AdminHandlers) SetTOTPRequired(w http.ResponseWriter, r *http.Request) {
+	claims := ClaimsFromContext(r.Context())
+	if claims == nil {
+		writeMiddlewareUnauthorized(w, errors.New("no claims"))
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		writeError(w, h.Logger, http.StatusBadRequest, ErrCodeBadRequest,
+			"id zorunlu.", errors.New("missing id"))
+		return
+	}
+
+	var body struct {
+		Required bool `json:"required"`
+	}
+	if !decodeJSON(w, r, h.Logger, &body) {
+		return
+	}
+
+	// Self-protection: admin kendi TOTP zorunluluğunu kapatamaz.
+	if id == claims.Subject && !body.Required {
+		writeError(w, h.Logger, http.StatusBadRequest, ErrCodeBadRequest,
+			"Kendi hesabınızın TOTP zorunluluğunu kapatamazsınız.",
+			errors.New("self-disable totp_required"))
+		return
+	}
+
+	ctx := r.Context()
+	tag, err := h.Service.DB.Exec(ctx,
+		`UPDATE users SET totp_required = $2 WHERE id = $1::uuid`,
+		id, body.Required,
+	)
+	if err != nil {
+		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
+			"TOTP zorunluluğu güncellenemedi.", err)
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		writeError(w, h.Logger, http.StatusNotFound, ErrCodeNotFound,
+			"Kullanıcı bulunamadı.", errors.New("no user"))
+		return
+	}
+
+	_ = h.Audit.Write(ctx, audit.Entry{
+		ActorUserID:  claims.Subject,
+		Action:       audit.ActionAdminTOTPRequirementChanged,
+		ResourceType: audit.ResourceUser,
+		ResourceID:   id,
+		Details:      map[string]any{"required": body.Required},
 		IPAddress:    parseIP(r.RemoteAddr),
 		UserAgent:    r.UserAgent(),
 	})

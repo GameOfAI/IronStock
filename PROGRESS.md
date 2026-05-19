@@ -1,6 +1,6 @@
 # İlerleyiş
 
-Son güncelleme: 2026-05-19 (PR-F3 Tauri KeyringBootstrap + TLS skip-verify + client item-detail parity tamamlandı)
+Son güncelleme: 2026-05-19 (PR-SEC1 — TOTP per-user enforcement + Login UX birleştirme + QR kod tamamlandı)
 
 ## Mevcut Durum
 
@@ -183,6 +183,27 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-05-19 (Win) — PR-SEC1: TOTP Per-User Enforcement + Login UX + QR ✅
+
+**Backend:**
+- `server/migrations/00034_totp_required.sql`: `users.totp_required BOOLEAN DEFAULT true` kolonu eklendi (geriye dönük uyumlu).
+- `auth_login.go` 3-dallı akışa dönüştürüldü: (A) hasTOTP+required → mevcut TOTP verify, (B) !hasTOTP && required → `tmp_token` (PurposeTOTPEnroll) döner, (C) !required → TOTP'siz direkt access_token. `loginResponse.TmpToken` field eklendi.
+- `admin_users.go`: `adminUserRow.TOTPRequired` + `ListUsers` SQL'inde `totp_required` agg + `CreateUser` body'sinde `totp_required *bool` (default true) + yeni `SetTOTPRequired` handler (PATCH `/admin/users/{id}/totp-required`, self-protection: admin kendi kapatamaz).
+- `router.go`: `PATCH /admin/users/{id}/totp-required` route'u wire.
+- `ensureDefaultAdmin`: INSERT'e `totp_required` kolonu explicit `true`.
+- `audit.go`: `ActionAdminTOTPRequirementChanged = "admin.totp_requirement_changed"` constant.
+
+**Frontend (Web + Client paritesi):**
+- `qrcode.react@^4.2.0` her iki workspace'e eklendi.
+- `web/src/components/auth/totp-qr.tsx` + `client/src/components/auth/totp-qr.tsx`: `QRCodeSVG`'yi sarmalayan reusable component.
+- `web/src/pages/totp-setup.tsx` ve `client/src/pages/totp-setup.tsx`: QR görsel olarak render, manuel anahtar "QR tarayamıyor musunuz?" details altında.
+- `client/src/pages/login.tsx`: 3-alanlı inline form → 2-alanlı form + TOTP dialog (web pattern'i ile birebir). `ApiError.code === ErrCode.MFARequired` dönerse popup açılır, "İptal" ile kapatılabilir.
+- `web/src/components/admin/create-user-modal.tsx`: "TOTP zorunlu" checkbox (default checked), payload'a `totp_required` geçirilir.
+- `web/src/components/admin/user-actions-menu.tsx`: `DropdownMenuCheckboxItem` ile "TOTP zorunlu" toggle. Self-protection: admin kendi TOTP'sini kapatamaz.
+- `web/src/api/admin.ts`: `CreateUserInput.totp_required` + `useUpdateTOTPRequirementMutation` hook eklendi.
+- `shared/pkg/src/api/types.ts`: `AdminUser.totp_required: boolean` field.
+- Test mock'ları + fixture (`__fixtures__.ts`) güncellendi: 131/131 web + 21/21 client + tüm Go testleri PASS.
 
 ### 2026-05-19 (Win) — PR-F3 Tauri KeyringBootstrap + TLS skip-verify + Client parity ✅
 
