@@ -10,7 +10,7 @@
  * Toolbar actions open modals wired here; modals do their own mutations.
  */
 
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Copy, FolderPlus, FolderTree as FolderTreeIcon, Pencil, Plus, Share2, Trash2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
@@ -21,6 +21,7 @@ import { useFolder } from '@/api/folders';
 import { useAuthStore } from '@/store/auth';
 import { useToast } from '@/hooks/use-toast';
 import { fromBase64, openDEKWithKEK, decryptField } from '@/lib/crypto';
+import { cn } from '@/lib/cn';
 import { FolderTree } from '@/components/inventory/folder-tree';
 import { ItemList } from '@/components/inventory/item-list';
 import { ItemSearch } from '@/components/inventory/item-search';
@@ -30,6 +31,10 @@ import { FolderDeleteDialog } from '@/components/inventory/folder-delete-dialog'
 import { ItemFormModal } from '@/components/inventory/item-form-modal';
 import { ItemDeleteDialog } from '@/components/inventory/item-delete-dialog';
 import { ItemShareModal } from '@/components/inventory/item-share-modal';
+import {
+  PIPELINE_TYPE_ICONS,
+  PIPELINE_TYPE_LABELS,
+} from '@/components/pipeline/pipeline-constants';
 import type { Item } from '@/api/types';
 
 type FolderModal = 'create-root' | 'create-sub' | 'rename' | 'delete' | null;
@@ -44,6 +49,8 @@ export default function InventoryPage() {
   const [folderModal, setFolderModal] = useState<FolderModal>(null);
   const [itemModal, setItemModal] = useState<ItemModal>(null);
   const [activeItem, setActiveItem] = useState<Item | null>(null);
+  // PR-UX4: Tip filtre chip'leri — boş set = hepsi göster
+  const [activeTypeIds, setActiveTypeIds] = useState<Set<number>>(new Set());
   const [duplicateFrom, setDuplicateFrom] = useState<{
     name: string;
     description?: string;
@@ -91,6 +98,29 @@ export default function InventoryPage() {
     },
     [updateParams],
   );
+
+  // PR-UX4: Mevcut klasördeki unique tip ID'leri (chip'leri oluşturmak için)
+  const presentTypeIds = useMemo(
+    () => Array.from(new Set((itemsQuery.data?.items ?? []).map((i) => i.item_type_id))).sort(),
+    [itemsQuery.data?.items],
+  );
+
+  // Tip filtresi uygula
+  const filteredItems = useMemo(() => {
+    const all = itemsQuery.data?.items;
+    if (!all) return undefined;
+    if (activeTypeIds.size === 0) return all;
+    return all.filter((i) => activeTypeIds.has(i.item_type_id));
+  }, [itemsQuery.data?.items, activeTypeIds]);
+
+  function toggleTypeFilter(typeId: number) {
+    setActiveTypeIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(typeId)) next.delete(typeId);
+      else next.add(typeId);
+      return next;
+    });
+  }
 
   const selectedItem = activeItem ?? itemsQuery.data?.items.find((i) => i.id === itemId) ?? null;
 
@@ -242,6 +272,42 @@ export default function InventoryPage() {
               </Button>
             )}
           </div>
+
+          {/* PR-UX4: Tip filtre chip'leri — sadece ≥2 farklı tip varsa göster */}
+          {folderId && presentTypeIds.length >= 2 && (
+            <div className="flex items-center gap-1.5 border-b px-2 py-1.5 overflow-x-auto scrollbar-thin">
+              {presentTypeIds.map((typeId) => {
+                const Icon = PIPELINE_TYPE_ICONS[typeId];
+                const label = PIPELINE_TYPE_LABELS[typeId] ?? `tip:${typeId}`;
+                const active = activeTypeIds.has(typeId);
+                return (
+                  <button
+                    key={typeId}
+                    onClick={() => toggleTypeFilter(typeId)}
+                    className={cn(
+                      'inline-flex items-center gap-1 shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors',
+                      'border focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                      active
+                        ? 'bg-primary/10 border-primary/40 text-primary'
+                        : 'bg-transparent border-border text-muted-foreground hover:text-foreground hover:border-border/80',
+                    )}
+                    aria-pressed={active}
+                  >
+                    {Icon && <Icon className="h-3 w-3" aria-hidden />}
+                    {label}
+                  </button>
+                );
+              })}
+              {activeTypeIds.size > 0 && (
+                <button
+                  onClick={() => setActiveTypeIds(new Set())}
+                  className="inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] text-muted-foreground hover:text-foreground border border-transparent hover:border-border transition-colors"
+                >
+                  ✕ Temizle
+                </button>
+              )}
+            </div>
+          )}
           {folderId && itemId && (
             <div className="flex items-center gap-1 border-b px-3 py-1.5">
               <span className="mr-auto text-xs text-muted-foreground truncate">
@@ -292,7 +358,7 @@ export default function InventoryPage() {
           )}
           <div className="flex-1 overflow-y-auto">
             <ItemList
-              items={itemsQuery.data?.items}
+              items={filteredItems}
               isLoading={itemsQuery.isLoading || itemsQuery.isFetching}
               isError={itemsQuery.isError}
               folderSelected={!!folderId}
