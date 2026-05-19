@@ -1,5 +1,7 @@
 import { useEffect, useReducer, useState } from 'react';
-import { Eye, EyeOff, HelpCircle, Lock, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Eye, EyeOff, HelpCircle, Lock, Loader2 } from 'lucide-react';
+import { TemplateGallery, ITEM_TEMPLATES } from './item-form-templates';
+import type { ItemTemplate } from './item-form-templates';
 import {
   Dialog,
   DialogContent,
@@ -100,6 +102,8 @@ export function ItemFormModal({
   const [fields, dispatchFields] = useReducer(fieldReducer, {});
   const [error, setError] = useState<string | null>(null);
   const [decryptingFields, setDecryptingFields] = useState(false);
+  // PR-UX9: şablon galerisi — sadece "yeni oluştur" modunda göster
+  const [showTemplates, setShowTemplates] = useState(true);
   // PR-N1: expiry fields
   const [expiresAt, setExpiresAt] = useState(''); // ISO date string (YYYY-MM-DD)
   const [rotationIntervalDays, setRotationIntervalDays] = useState('');
@@ -180,12 +184,14 @@ export function ItemFormModal({
       setName(duplicateFrom.name);
       setDescription(duplicateFrom.description ?? '');
       setItemTypeId(String(duplicateFrom.itemTypeId));
+      setShowTemplates(false);
     } else {
       setName('');
       setDescription('');
       setItemTypeId(itemTypes[0] ? String(itemTypes[0].id) : '');
       setExpiresAt('');
       setRotationIntervalDays('');
+      setShowTemplates(true); // yeni oluşturma: şablon galerisini göster
     }
     setError(null);
     createMutation.reset();
@@ -292,6 +298,26 @@ export function ItemFormModal({
     }
   }
 
+  // PR-UX9: şablon seçimi → tip ata + ön-değerleri fieldMap'e yaz
+  function handleTemplateSelect(tpl: ItemTemplate) {
+    const matched = itemTypes.find((t) => t.key === tpl.typeKey);
+    if (matched) {
+      setItemTypeId(String(matched.id));
+      // Template default değerleri bir sonraki render cycle'da selectedType
+      // değişince useEffect ile field map rebuild edilir; sonrasında override ederiz.
+      // setTimeout ile rebuild'ın bitmesini bekle, sonra defaults'u yaz.
+      setTimeout(() => {
+        for (const [fieldKey, fieldValue] of Object.entries(tpl.defaults)) {
+          const def = fieldDefinitions.find((d) => d.key === fieldKey);
+          if (def) {
+            dispatchFields({ type: 'set', id: def.id, value: fieldValue });
+          }
+        }
+      }, 0);
+    }
+    setShowTemplates(false);
+  }
+
   const suggestedDefs = selectedType
     ? fieldDefinitions.filter((d) => selectedType.suggested_fields.includes(d.key))
     : editItem
@@ -307,6 +333,33 @@ export function ItemFormModal({
           <DialogTitle>{isEdit ? 'Item Düzenle' : 'Yeni Item'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+
+          {/* PR-UX9: Şablon galerisi — yalnızca yeni oluşturma modunda */}
+          {!isEdit && !duplicateFrom && (
+            <div className="rounded-lg border bg-muted/30">
+              <button
+                type="button"
+                className="flex w-full items-center justify-between px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => setShowTemplates((v) => !v)}
+              >
+                <span>Şablondan başla</span>
+                {showTemplates ? (
+                  <ChevronDown className="h-3.5 w-3.5" />
+                ) : (
+                  <ChevronRight className="h-3.5 w-3.5" />
+                )}
+              </button>
+              {showTemplates && (
+                <div className="border-t px-3 pb-3 pt-2">
+                  <TemplateGallery
+                    onSelect={handleTemplateSelect}
+                    onSkip={() => setShowTemplates(false)}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <Label htmlFor="item-name">
               Ad <span className="text-destructive">*</span>
