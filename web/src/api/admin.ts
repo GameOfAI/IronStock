@@ -31,6 +31,8 @@ export interface CreateUserInput {
   roles: string[];
   /** PR-SEC1: TOTP zorunluluğu (default true). */
   totp_required?: boolean;
+  /** PR-SEC3: Client cert (mTLS) zorunluluğu (default false). */
+  requires_client_cert?: boolean;
 }
 
 export function useCreateUserMutation() {

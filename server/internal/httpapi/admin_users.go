@@ -24,15 +24,16 @@ type AdminHandlers struct {
 }
 
 type adminUserRow struct {
-	ID           string   `json:"id"`
-	Username     string   `json:"username"`
-	Email        string   `json:"email"`
-	Status       string   `json:"status"`
-	Roles        []string `json:"roles"`
-	LastLoginAt  *string  `json:"last_login_at,omitempty"`
-	CreatedAt    string   `json:"created_at"`
-	IsBreakGlass bool     `json:"is_break_glass"` // PR-N4
-	TOTPRequired bool     `json:"totp_required"`  // PR-SEC1 — per-user TOTP enforcement
+	ID                 string   `json:"id"`
+	Username           string   `json:"username"`
+	Email              string   `json:"email"`
+	Status             string   `json:"status"`
+	Roles              []string `json:"roles"`
+	LastLoginAt        *string  `json:"last_login_at,omitempty"`
+	CreatedAt          string   `json:"created_at"`
+	IsBreakGlass       bool     `json:"is_break_glass"`        // PR-N4
+	TOTPRequired       bool     `json:"totp_required"`         // PR-SEC1 — per-user TOTP enforcement
+	RequiresClientCert bool     `json:"requires_client_cert"`  // PR-SEC3 — mTLS client cert enforcement
 }
 
 type adminUsersResponse struct {
@@ -61,29 +62,32 @@ func (h *AdminHandlers) ListUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Page query — includes is_break_glass for badge display (PR-N4)
-	// and totp_required for the admin TOTP toggle UI (PR-SEC1).
+	// Page query — includes is_break_glass (PR-N4), totp_required (PR-SEC1),
+	// and requires_client_cert (PR-SEC3).
 	const sqlText = `
 		SELECT
-		    COALESCE(array_agg(id::text                        ORDER BY username), '{}'),
-		    COALESCE(array_agg(username                        ORDER BY username), '{}'),
-		    COALESCE(array_agg(email                           ORDER BY username), '{}'),
-		    COALESCE(array_agg(status                          ORDER BY username), '{}'),
+		    COALESCE(array_agg(id::text                         ORDER BY username), '{}'),
+		    COALESCE(array_agg(username                         ORDER BY username), '{}'),
+		    COALESCE(array_agg(email                            ORDER BY username), '{}'),
+		    COALESCE(array_agg(status                           ORDER BY username), '{}'),
 		    COALESCE(array_agg(COALESCE(last_login_at::text, '') ORDER BY username), '{}'),
-		    COALESCE(array_agg(created_at::text                ORDER BY username), '{}'),
-		    COALESCE(array_agg(is_break_glass                  ORDER BY username), '{}'),
-		    COALESCE(array_agg(totp_required                   ORDER BY username), '{}')
+		    COALESCE(array_agg(created_at::text                 ORDER BY username), '{}'),
+		    COALESCE(array_agg(is_break_glass                   ORDER BY username), '{}'),
+		    COALESCE(array_agg(totp_required                    ORDER BY username), '{}'),
+		    COALESCE(array_agg(requires_client_cert             ORDER BY username), '{}')
 		FROM (
-		    SELECT id, username, email, status, last_login_at, created_at, is_break_glass, totp_required
+		    SELECT id, username, email, status, last_login_at, created_at,
+		           is_break_glass, totp_required, requires_client_cert
 		    FROM users
 		    ORDER BY username
 		    LIMIT $1 OFFSET $2
 		) page
 	`
 	var ids, usernames, emails, statuses, lastLogins, createdAts []string
-	var isBreakGlassFlags, totpRequiredFlags []bool
+	var isBreakGlassFlags, totpRequiredFlags, requiresCertFlags []bool
 	if err := h.Service.DB.QueryRow(ctx, sqlText, limit, offset).Scan(
-		&ids, &usernames, &emails, &statuses, &lastLogins, &createdAts, &isBreakGlassFlags, &totpRequiredFlags,
+		&ids, &usernames, &emails, &statuses, &lastLogins, &createdAts,
+		&isBreakGlassFlags, &totpRequiredFlags, &requiresCertFlags,
 	); err != nil {
 		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
 			"Kullanıcı listesi alınamadı.", err)
@@ -108,17 +112,19 @@ func (h *AdminHandlers) ListUsers(w http.ResponseWriter, r *http.Request) {
 			lastLogin = &ll
 		}
 		breakGlass := i < len(isBreakGlassFlags) && isBreakGlassFlags[i]
-		totpReq := i >= len(totpRequiredFlags) || totpRequiredFlags[i] // default true if missing
+		totpReq := i >= len(totpRequiredFlags) || totpRequiredFlags[i]  // default true if missing
+		requiresCert := i < len(requiresCertFlags) && requiresCertFlags[i]
 		out = append(out, adminUserRow{
-			ID:           ids[i],
-			Username:     usernames[i],
-			Email:        emails[i],
-			Status:       statuses[i],
-			Roles:        roles,
-			LastLoginAt:  lastLogin,
-			CreatedAt:    createdAts[i],
-			IsBreakGlass: breakGlass,
-			TOTPRequired: totpReq,
+			ID:                 ids[i],
+			Username:           usernames[i],
+			Email:              emails[i],
+			Status:             statuses[i],
+			Roles:              roles,
+			LastLoginAt:        lastLogin,
+			CreatedAt:          createdAts[i],
+			IsBreakGlass:       breakGlass,
+			TOTPRequired:       totpReq,
+			RequiresClientCert: requiresCert,
 		})
 	}
 

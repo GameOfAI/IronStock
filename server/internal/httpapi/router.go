@@ -39,6 +39,7 @@ type Deps struct {
 	Item         *ItemHandlers
 	Attachment   *AttachmentHandlers
 	Admin        *AdminHandlers
+	ClientCert   *ClientCertHandlers // PR-SEC3: mTLS client certificate management
 	Group        *GroupHandlers
 	Catalog      *CatalogHandlers
 	WS           *WSHandlers
@@ -238,6 +239,17 @@ func NewRouter(d Deps) http.Handler {
 			// Export (PR-Export) — registered inside this block so auth/role MW applies.
 			if d.Export != nil {
 				ar.Get("/export", d.Export.Export)
+			}
+			// Client certificate management (PR-SEC3).
+			if d.ClientCert != nil {
+				ar.Get("/client-cert-cas", d.ClientCert.ListCAs)
+				ar.Post("/client-cert-cas", d.ClientCert.UploadCA)
+				ar.Delete("/client-cert-cas/{ca_id}", d.ClientCert.DeleteCA)
+				ar.Get("/users/{id}/client-certs", d.ClientCert.ListUserCerts)
+				ar.Post("/users/{id}/client-certs/issue", d.ClientCert.IssueCert)
+				ar.Post("/users/{id}/client-certs/register", d.ClientCert.RegisterCert)
+				ar.Delete("/users/{id}/client-certs/{cert_id}", d.ClientCert.RevokeCert)
+				ar.Patch("/users/{id}/cert-required", d.ClientCert.SetCertRequired)
 			}
 		})
 	}

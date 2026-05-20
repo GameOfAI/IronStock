@@ -31,6 +31,12 @@ const (
 	ErrCodeNotFound          = "not_found"
 	ErrCodeConflict          = "conflict"
 	ErrCodeInternal          = "internal_error"
+	// ErrCodeClientCertRequired is returned when a user has requires_client_cert=true
+	// but no valid client certificate was presented at login (PR-SEC3).
+	ErrCodeClientCertRequired = "client_cert_required" //nolint:gosec // G101 false positive
+	// ErrCodeClientCertInvalid is returned when a client cert is presented but
+	// fails validation (not registered, revoked, expired, wrong user) (PR-SEC3).
+	ErrCodeClientCertInvalid = "client_cert_invalid" //nolint:gosec // G101 false positive
 )
 
 // writeError emits a JSON error response and logs internal errors at warn level.

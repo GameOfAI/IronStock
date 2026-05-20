@@ -120,6 +120,22 @@ const (
 	ActionShareLinkViewed  = "item.share_link_viewed"  // public endpoint hit + view_count++
 	ActionShareLinkExpired = "item.share_link_expired" // view_limit or TTL reached
 	ActionShareLinkRevoked = "item.share_link_revoked"
+
+	// Client certificate management (PR-SEC3).
+	// ActionAdminClientCertIssued: admin issues a leaf cert from the built-in CA.
+	ActionAdminClientCertIssued = "admin.client_cert_issued"
+	// ActionAdminClientCertRegistered: admin registers an external cert PEM.
+	ActionAdminClientCertRegistered = "admin.client_cert_registered"
+	// ActionAdminClientCertRevoked: admin revokes a cert (sets revoked_at).
+	ActionAdminClientCertRevoked = "admin.client_cert_revoked"
+	// ActionAdminClientCertCARegistered: admin uploads an external CA.
+	ActionAdminClientCertCARegistered = "admin.client_cert_ca_registered"
+	// ActionAdminClientCertCADeleted: admin deletes a non-builtin CA.
+	ActionAdminClientCertCADeleted = "admin.client_cert_ca_deleted"
+	// ActionAdminClientCertRequirementChanged: admin toggles requires_client_cert.
+	ActionAdminClientCertRequirementChanged = "admin.client_cert_requirement_changed"
+	// ActionAuthClientCertRejected: login rejected because client cert validation failed.
+	ActionAuthClientCertRejected = "auth.client_cert_rejected"
 )
 
 // ResourceGroup is the audit resource type for group rows.

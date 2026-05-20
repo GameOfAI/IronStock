@@ -24,6 +24,7 @@ import (
 
 	"envanter.app/server/internal/audit"
 	"envanter.app/server/internal/auth"
+	"envanter.app/server/internal/clientcert"
 	"envanter.app/server/internal/config"
 	"envanter.app/server/internal/db"
 	"envanter.app/server/internal/httpapi"
@@ -103,6 +104,18 @@ func run() error {
 	auditWriter := audit.NewWriter(pool)
 	if cfg.BootstrapEnabled {
 		logger.Warn("BOOTSTRAP MODE ENABLED — /api/v1/auth/bootstrap is active (TOTP bypassed)")
+	}
+
+	// --- Built-in Client CA bootstrap (PR-SEC3) ---
+	// Idempotent: creates the IronStock built-in CA exactly once.
+	// The CA private key is AES-256-GCM encrypted with the master key.
+	if err := clientcert.EnsureBuiltinCA(rootCtx, pool, authSvc.Master); err != nil {
+		// Non-fatal: the server still starts; admins can't issue certs until the CA exists.
+		// On the next restart it will be created. Log at Warn so ops can see it.
+		logger.Warn("built-in client CA bootstrap failed — cert issuance unavailable",
+			slog.String("error", err.Error()))
+	} else {
+		logger.Info("built-in client CA ready")
 	}
 
 	// --- WebSocket hub + ticket store ---
@@ -230,6 +243,12 @@ func run() error {
 		Audit:   auditWriter,
 		Logger:  logger,
 	}
+	// PR-SEC3: client certificate management handler.
+	clientCertHandlers := &httpapi.ClientCertHandlers{
+		Service: authSvc,
+		Audit:   auditWriter,
+		Logger:  logger,
+	}
 	groupHandlers := &httpapi.GroupHandlers{
 		Service: authSvc,
 		Audit:   auditWriter,
@@ -323,6 +342,7 @@ func run() error {
 		Item:         itemHandlers,
 		Attachment:   attachmentHandlers,
 		Admin:        adminHandlers,
+		ClientCert:   clientCertHandlers, // PR-SEC3
 		Group:        groupHandlers,
 		Tag:          tagHandlers,
 		Notification: notificationHandlers,

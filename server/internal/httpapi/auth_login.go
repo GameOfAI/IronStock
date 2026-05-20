@@ -14,6 +14,7 @@ import (
 
 	"envanter.app/server/internal/audit"
 	"envanter.app/server/internal/auth"
+	"envanter.app/server/internal/clientcert"
 	"envanter.app/server/internal/crypto"
 	"envanter.app/server/internal/notify"
 	"envanter.app/server/internal/ws"
@@ -92,6 +93,44 @@ func (s *AuthHandlers) Login(w http.ResponseWriter, r *http.Request) {
 		writeError(w, s.Logger, http.StatusInternalServerError, ErrCodeInternal,
 			"Kullanıcı sorgulanamadı.", err)
 		return
+	}
+
+	// PR-SEC3: Client certificate validation — the FIRST gate (before status/lockout/password).
+	// If the user requires a client cert, extract it from the nginx header and validate.
+	// This prevents an attacker from learning status/lockout via timing when they lack a cert.
+	if userRow.RequiresClientCert {
+		cert, fp, certErr := clientcert.ExtractCertFromRequest(r)
+		if certErr != nil || cert == nil {
+			// cert extraction failed or no cert presented
+			s.recordLoginFail(ctx, r, userRow.ID, "client_cert_missing")
+			_ = s.Audit.Write(ctx, audit.Entry{
+				ActorUserID:  userRow.ID,
+				Action:       audit.ActionAuthClientCertRejected,
+				ResourceType: audit.ResourceUser,
+				ResourceID:   userRow.ID,
+				Details:      map[string]any{"reason": "missing"},
+				IPAddress:    parseIP(r.RemoteAddr),
+				UserAgent:    r.UserAgent(),
+			})
+			writeError(w, s.Logger, http.StatusUnauthorized, ErrCodeClientCertRequired,
+				"Bu hesap için istemci sertifikası gerekli.", errors.New("client cert required"))
+			return
+		}
+		if err := clientcert.ValidateCertForUser(ctx, s.Service.DB, fp, userRow.ID); err != nil {
+			s.recordLoginFail(ctx, r, userRow.ID, "client_cert_invalid")
+			_ = s.Audit.Write(ctx, audit.Entry{
+				ActorUserID:  userRow.ID,
+				Action:       audit.ActionAuthClientCertRejected,
+				ResourceType: audit.ResourceUser,
+				ResourceID:   userRow.ID,
+				Details:      map[string]any{"reason": err.Error()},
+				IPAddress:    parseIP(r.RemoteAddr),
+				UserAgent:    r.UserAgent(),
+			})
+			writeError(w, s.Logger, http.StatusUnauthorized, ErrCodeClientCertInvalid,
+				"İstemci sertifikası geçersiz, süresi dolmuş veya iptal edilmiş.", err)
+			return
+		}
 	}
 
 	// Status / lockout gates BEFORE we burn CPU on Argon2 — this is a tiny
@@ -394,6 +433,7 @@ type userLoginRow struct {
 	MustChangePassword bool
 	IsBreakGlass       bool // PR-N4 — triggers emergency alert on successful login
 	TOTPRequired       bool // PR-SEC1 — per-user TOTP enforcement (default true)
+	RequiresClientCert bool // PR-SEC3 — mTLS client certificate enforcement (default false)
 }
 
 // fetchUserForLogin returns the row needed to verify the password and check
@@ -402,7 +442,8 @@ func fetchUserForLogin(ctx context.Context, db auth.DBExec, usernameLower string
 	const sqlText = `
 		SELECT id::text, password_hash, argon2_params,
 		       status, failed_login_attempts, locked_until,
-		       must_change_password, is_break_glass, totp_required
+		       must_change_password, is_break_glass, totp_required,
+		       requires_client_cert
 		FROM users
 		WHERE username = $1
 		LIMIT 1
@@ -412,6 +453,7 @@ func fetchUserForLogin(ctx context.Context, db auth.DBExec, usernameLower string
 		&row.ID, &row.PasswordHash, &row.Argon2Params,
 		&row.Status, &row.FailedAttempts, &row.LockedUntil,
 		&row.MustChangePassword, &row.IsBreakGlass, &row.TOTPRequired,
+		&row.RequiresClientCert,
 	)
 	return row, err
 }

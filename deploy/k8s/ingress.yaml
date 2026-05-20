@@ -7,6 +7,19 @@
 # After domain update run:
 #   kubectl apply -f deploy/k8s/ingress.yaml
 #   kubectl -n envanter describe certificate envanter-tls   # check cert issuance
+#
+# mTLS (PR-SEC3):
+#   The `auth-tls-verify-client: optional` setting allows connections without a
+#   client cert (enforcement is per-user in the app layer). When a cert IS
+#   presented, nginx validates it against the CA bundle and forwards it via the
+#   `ssl-client-cert` header (URL-encoded PEM). The app reads this header to
+#   perform fingerprint-based identity verification.
+#
+#   To provision the CA bundle Secret:
+#     kubectl -n envanter create secret generic ironstock-client-cert-ca \
+#       --from-file=ca.crt=<path-to-ca.crt>
+#   Update the secret whenever a new CA is added in the Admin → Sertifikalar panel.
+#   The built-in CA cert is available via: GET /api/v1/admin/client-cert-cas
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -18,6 +31,13 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "10"
+    # mTLS (PR-SEC3): optional client cert verification.
+    # "optional" means connections without a cert are allowed through;
+    # the app enforces per-user requirements on the backend.
+    nginx.ingress.kubernetes.io/auth-tls-secret: "envanter/ironstock-client-cert-ca"
+    nginx.ingress.kubernetes.io/auth-tls-verify-client: "optional"
+    nginx.ingress.kubernetes.io/auth-tls-pass-certificate-to-upstream: "true"
+    nginx.ingress.kubernetes.io/auth-tls-verify-depth: "2"
 spec:
   ingressClassName: nginx
   tls:

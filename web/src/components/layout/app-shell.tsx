@@ -36,6 +36,7 @@ import {
   Layers,
   AlertOctagon,
   X,
+  Fingerprint,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -386,6 +387,7 @@ const NAV_LABELS: Record<string, string> = {
   '/admin/groups': 'Gruplar',
   '/admin/roles': 'Roller',
   '/admin/audit-log': 'Audit Log',
+  '/admin/client-certs': 'Sertifikalar',
   '/profile': 'Profil',
 };
 
@@ -577,6 +579,12 @@ export function AppShell() {
                   to="/admin/audit-log"
                   icon={FileText}
                   label="Audit Log"
+                  collapsed={sidebarCollapsed && !mobileOpen}
+                />
+                <NavItem
+                  to="/admin/client-certs"
+                  icon={Fingerprint}
+                  label="Sertifikalar"
                   collapsed={sidebarCollapsed && !mobileOpen}
                 />
               </>

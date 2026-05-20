@@ -1,13 +1,13 @@
 # İlerleyiş
 
-Son güncelleme: 2026-05-19 (PR-SEC1 — TOTP per-user enforcement + Login UX birleştirme + QR kod tamamlandı)
+Son güncelleme: 2026-05-20 (PR-SEC3 — Client Certificate (mTLS) katmanı tamamlandı)
 
 ## Mevcut Durum
 
 - **Aktif Faz:** Post-v1.0.0 Kapsamlı Geliştirmeler (Faz 6+)
 - **Tamamlanan Faz:** Faz 0 + 1 + 2 + 3 + 4 + 5 ✅
-- **Son tamamlanan:** PR-F3 (Tauri KeyringBootstrap + TLS skip-verify), client item-detail parity (expiry/tags), API hooks (tags + notifications) ✅ 2026-05-19
-- **Proje durumu:** MVP + tüm UX PR'ları + PR-F3 tamamlandı. Kalan zorunlu: PR-N3 (Onay Workflow, büyük iş). Güvenlik iyileştirme adayları var (kullanıcı gündemi).
+- **Son tamamlanan:** PR-SEC1 ✅ 2026-05-19 + PR-SEC2 ✅ 2026-05-20 + PR-SEC3 (mTLS client cert) ✅ 2026-05-20
+- **Proje durumu:** MVP + tüm UX PR'ları + PR-F3 + PR-SEC1 + PR-SEC2 + PR-SEC3 tamamlandı. Login güvenlik üçlüsü (bilgi faktörü + sahip olma faktörü + kriptografik kimlik) tamamlandı. Sıradaki: PR-N3 (Onay/checkout workflow).
 
 ---
 
@@ -141,6 +141,9 @@ IronStock şu an **"güvenli credential vault + DevOps görselleştirme"** kesi�
 | PR-UX9 | Item form şablon galerisi (11 quickstart şablonu) | ✅ DONE |
 | PR-F3 | Tauri Client Sync | ✅ DONE |
 | PR-N3 | Onay Workflow / Dual Control | ⏳ Faz 6+ (büyük iş) |
+| PR-SEC1 | TOTP per-user enforcement + Login UX + QR | ✅ DONE |
+| PR-SEC2 | First-login forced TOTP setup wizard | ✅ DONE |
+| PR-SEC3 | Client Certificate (mTLS) | 📋 TODO |
 
 ## Faz Durumu
 
@@ -183,6 +186,38 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-05-20 (Win) — PR-SEC3: Client Certificate (mTLS) Katmanı ✅
+
+**Mimari:** nginx Ingress `auth-tls-verify-client: optional` → `ssl-client-cert` header (URL-encoded PEM) → Go app fingerprint doğrulama. Per-user enforcement (uygulama katmanında).
+
+**Backend:**
+- `server/migrations/00034_client_cert_cas.sql`: `client_cert_cas` tablosu — built-in + external CA kayıt.
+- `server/migrations/00035_client_certificates.sql`: `client_certificates` tablosu — SHA-256 fingerprint BYTEA unique index (`WHERE revoked_at IS NULL`).
+- `server/migrations/00036_users_requires_client_cert.sql`: `users.requires_client_cert BOOLEAN DEFAULT false`.
+- `server/internal/clientcert/` yeni paket:
+  - `ca.go`: `EnsureBuiltinCA` (idempotent, ECDSA P-256, 20 yıl, private key AES-256-GCM şifreli), `LoadBuiltinCA`, `ParseCACert`.
+  - `issue.go`: `IssueCert` — ECDSA P-256 leaf cert, PEM cert+key döner (one-time). `FingerprintFromPEM` external cert kayıt için.
+  - `verify.go`: `ExtractCertFromRequest` nginx header'dan, `ValidateCertForUser` DB fingerprint doğrulama.
+- `server/internal/httpapi/admin_client_certs.go`: 8 handler — CA CRUD + kullanıcı cert issuance/register/revoke/cert-required toggle. Tüm mutations audit log yazar.
+- `server/internal/httpapi/router.go`: 8 yeni admin route (`/client-cert-cas`, `/users/{id}/client-certs/...`, `/users/{id}/cert-required`).
+- `server/internal/httpapi/error.go`: `ErrCodeClientCertRequired`, `ErrCodeClientCertInvalid`.
+- `server/internal/httpapi/auth_login.go`: Cert validation **ilk** gate (şifre/TOTP öncesi). `requires_client_cert=true` ise missing → 401, invalid → 401.
+- `server/internal/httpapi/admin_users.go`: `requires_client_cert` field ListUsers'a eklendi.
+- `server/cmd/api/main.go`: `EnsureBuiltinCA` (non-fatal), `ClientCertHandlers` wire.
+- `server/internal/audit/audit.go`: 7 yeni action constant (client cert issued/registered/revoked/CA registered/deleted/requirement changed/rejected).
+
+**Frontend:**
+- `shared/pkg/src/api/types.ts`: PR-SEC3 tipleri — `ClientCertCA`, `ClientCertificate`, `IssueCertResponse`, `RegisterCertRequest`, `CertRequiredRequest` vb. `AdminUser.requires_client_cert` eklendi.
+- `web/src/api/admin-client-certs.ts`: 7 React Query hook — CA listele/yükle/sil, kullanıcı cert listele/üret/kaydet/revoke/zorunluluk-toggle.
+- `web/src/pages/admin/client-certs.tsx`: İki sekmeli admin sayfası — "Sertifika Yetkilileri" (built-in CA durumu + external CA upload/list/delete) + "Kullanıcı Sertifikaları" (user picker → cert listesi, üret, external kayıt, revoke, one-time PEM display).
+- `web/src/App.tsx`: `/admin/client-certs` route'u eklendi.
+- `web/src/components/admin/create-user-modal.tsx`: "Sertifika zorunlu" checkbox (default false).
+- `web/src/components/admin/user-actions-menu.tsx`: "Sertifika zorunlu" toggle item.
+- `web/src/components/layout/app-shell.tsx`: Admin nav'a "Sertifikalar" linki + breadcrumb.
+
+**Deploy:**
+- `deploy/k8s/ingress.yaml`: nginx mTLS annotations (`auth-tls-secret`, `auth-tls-verify-client: optional`, `auth-tls-pass-certificate-to-upstream`, `auth-tls-verify-depth: 2`) + ops comment.
 
 ### 2026-05-19 (Win) — PR-SEC1: TOTP Per-User Enforcement + Login UX + QR ✅
 

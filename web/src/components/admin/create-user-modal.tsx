@@ -44,6 +44,8 @@ export function CreateUserModal({ open, onClose }: CreateUserModalProps) {
   const [selectedRoles, setSelectedRoles] = React.useState<string[]>(['read']);
   // PR-SEC1: TOTP zorunluluğu — default true. Admin kapatabilir.
   const [totpRequired, setTotpRequired] = React.useState(true);
+  // PR-SEC3: Client cert zorunluluğu — default false. Admin açarsa mTLS gerekir.
+  const [certRequired, setCertRequired] = React.useState(false);
 
   const busy = createMutation.isPending;
 
@@ -54,6 +56,7 @@ export function CreateUserModal({ open, onClose }: CreateUserModalProps) {
     setConfirmPassword('');
     setSelectedRoles(['read']);
     setTotpRequired(true);
+    setCertRequired(false);
   }
 
   function handleClose() {
@@ -88,6 +91,7 @@ export function CreateUserModal({ open, onClose }: CreateUserModalProps) {
         password,
         roles: selectedRoles,
         totp_required: totpRequired,
+        requires_client_cert: certRequired,
       });
       toast({ title: 'Kullanıcı oluşturuldu', description: `@${username} başarıyla eklendi.` });
       resetForm();

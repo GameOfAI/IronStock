@@ -267,6 +267,7 @@ export interface AdminUser {
   created_at: string;
   is_break_glass: boolean; // PR-N4
   totp_required: boolean;  // PR-SEC1 — per-user TOTP enforcement
+  requires_client_cert: boolean; // PR-SEC3 — per-user mTLS enforcement
 }
 
 export interface AdminUsersResponse {
@@ -721,4 +722,63 @@ export interface DiagramGraphResponse {
   nodes: DiagramGraphNode[];
   edges: DiagramGraphEdge[];
   lifecycle_stages: Record<string, number[]>;
+}
+
+// --- Client Certificates (PR-SEC3) ---
+
+export interface ClientCertCA {
+  id: string;
+  name: string;
+  cert_pem: string;
+  is_builtin: boolean;
+  created_at: string; // RFC 3339
+  created_by?: string | null; // user id
+}
+
+export interface ClientCertCAListResponse {
+  cas: ClientCertCA[];
+}
+
+export interface UploadCARequest {
+  name: string;
+  cert_pem: string;
+}
+
+export interface ClientCertificate {
+  id: string;
+  ca_id: string;
+  ca_name: string;
+  fingerprint_sha256: string; // hex-encoded
+  subject_cn: string;
+  serial_number: string;
+  not_before: string; // RFC 3339
+  not_after: string;  // RFC 3339
+  revoked_at?: string | null; // RFC 3339
+  label?: string | null;
+  created_at: string; // RFC 3339
+}
+
+export interface ClientCertListResponse {
+  certs: ClientCertificate[];
+}
+
+export interface IssueCertRequest {
+  label?: string;
+  valid_for_days?: number;
+}
+
+/** IssueCertResponse extends ClientCertificate with the one-time PEM payload. */
+export interface IssueCertResponse extends ClientCertificate {
+  cert_pem: string;
+  key_pem: string;
+}
+
+export interface RegisterCertRequest {
+  cert_pem: string;
+  ca_id: string;
+  label?: string;
+}
+
+export interface CertRequiredRequest {
+  required: boolean;
 }

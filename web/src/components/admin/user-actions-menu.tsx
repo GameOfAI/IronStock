@@ -10,7 +10,7 @@
  */
 
 import { useState } from 'react';
-import { KeyRound, Loader2, MoreVertical, ShieldCheck } from 'lucide-react';
+import { Fingerprint, KeyRound, Loader2, MoreVertical, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -36,6 +36,7 @@ import {
   useRevokeRoleMutation,
   useUpdateTOTPRequirementMutation,
 } from '@/api/admin';
+import { useUpdateClientCertRequirementMutation } from '@/api/admin-client-certs';
 import { useAuthStore } from '@/store/auth';
 import { ApiError } from '@/api/errors';
 import type { AdminUser } from '@/api/types';
@@ -76,6 +77,7 @@ export function UserActionsMenu({ user }: UserActionsMenuProps) {
   const enableUser = useEnableUserMutation(user.id);
   const resetTotp = useResetTOTPMutation(user.id);
   const updateTotpReq = useUpdateTOTPRequirementMutation(user.id);
+  const updateCertReq = useUpdateClientCertRequirementMutation(user.id);
 
   const isSelf = me?.id === user.id;
   const userRoles = new Set(user.roles);
@@ -243,6 +245,36 @@ export function UserActionsMenu({ user }: UserActionsMenuProps) {
           >
             <ShieldCheck className="mr-2 h-4 w-4" />
             <span>TOTP zorunlu</span>
+          </DropdownMenuCheckboxItem>
+          {/* PR-SEC3: Client cert (mTLS) zorunluluğu toggle */}
+          <DropdownMenuCheckboxItem
+            checked={user.requires_client_cert}
+            disabled={updateCertReq.isPending}
+            onSelect={(e) => {
+              e.preventDefault();
+              const next = !user.requires_client_cert;
+              updateCertReq.mutate(
+                { required: next },
+                {
+                  onSuccess: () =>
+                    toast({
+                      title: next ? 'Sertifika zorunlu kılındı' : 'Sertifika zorunluluğu kaldırıldı',
+                      description: next
+                        ? `${user.username} artık istemci sertifikasıyla giriş yapmak zorunda.`
+                        : `${user.username} artık sertifikasız giriş yapabilir.`,
+                    }),
+                  onError: (err) =>
+                    toast({
+                      title: 'Sertifika zorunluluğu güncellenemedi',
+                      description: describeError(err),
+                      variant: 'destructive',
+                    }),
+                },
+              );
+            }}
+          >
+            <Fingerprint className="mr-2 h-4 w-4" />
+            <span>Sertifika zorunlu</span>
           </DropdownMenuCheckboxItem>
           <DropdownMenuSeparator />
           {isDisabled ? (
