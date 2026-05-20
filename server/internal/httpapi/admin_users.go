@@ -414,11 +414,12 @@ func validRoleName(name string) bool {
 // PR-SEC1: totp_required varsayılan true. Admin checkbox'ı kaldırırsa false gönderir.
 func (h *AdminHandlers) CreateUser(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Username     string   `json:"username"`
-		Email        string   `json:"email"`
-		Password     string   `json:"password"`
-		Roles        []string `json:"roles"`
-		TOTPRequired *bool    `json:"totp_required"` // nil → default true
+		Username            string   `json:"username"`
+		Email               string   `json:"email"`
+		Password            string   `json:"password"`
+		Roles               []string `json:"roles"`
+		TOTPRequired        *bool    `json:"totp_required"`         // nil → default true
+		RequiresClientCert  *bool    `json:"requires_client_cert"`  // nil → default false (PR-SEC3)
 	}
 	if !decodeJSON(w, r, h.Logger, &req) {
 		return
@@ -473,10 +474,14 @@ func (h *AdminHandlers) CreateUser(w http.ResponseWriter, r *http.Request) {
 	if req.TOTPRequired != nil {
 		totpRequired = *req.TOTPRequired
 	}
+	requiresClientCert := false // default
+	if req.RequiresClientCert != nil {
+		requiresClientCert = *req.RequiresClientCert
+	}
 
 	const insertUser = `
-		INSERT INTO users (username, email, password_hash, argon2_params, status, must_change_password, totp_required)
-		VALUES ($1, $2, $3, $4, 'active', true, $5)
+		INSERT INTO users (username, email, password_hash, argon2_params, status, must_change_password, totp_required, requires_client_cert)
+		VALUES ($1, $2, $3, $4, 'active', true, $5, $6)
 		RETURNING id::text, created_at::text
 	`
 	var userID, createdAt string
@@ -486,6 +491,7 @@ func (h *AdminHandlers) CreateUser(w http.ResponseWriter, r *http.Request) {
 		hp.Hash,
 		hp.ParamsJSON,
 		totpRequired,
+		requiresClientCert,
 	).Scan(&userID, &createdAt)
 	if err != nil {
 		if isUniqueViolation(err) {

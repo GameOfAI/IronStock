@@ -70,12 +70,23 @@ func ValidateCertForUser(ctx context.Context, db DB, fingerprint []byte, userID 
 	}
 
 	// Expiry check.
-	// not_after is stored as text in UTC by PostgreSQL::text. We parse it back.
+	// not_after is stored as text via PostgreSQL ::text cast.
+	// PostgreSQL timestamptz::text produces "2006-01-02 15:04:05+00"
+	// (space separator, not T). We try multiple layouts to be safe.
 	if row.NotAfter != "" {
 		var notAfter time.Time
-		// Try RFC3339 first (what pgx text-scans produce), then common fallbacks.
+		// Primary: PostgreSQL ::text format ("2006-01-02 15:04:05+00").
+		// Secondary: RFC3339 variants in case the value was originally stored
+		// as ISO 8601 and is returned as-is by some pgx versions.
 		parsed := false
-		for _, layout := range []string{time.RFC3339, time.RFC3339Nano, "2006-01-02T15:04:05Z"} {
+		for _, layout := range []string{
+			"2006-01-02 15:04:05-07:00", // PostgreSQL timestamptz::text primary
+			"2006-01-02 15:04:05+00",    // PostgreSQL UTC shorthand
+			"2006-01-02 15:04:05Z",      // alt with Z
+			time.RFC3339,                // 2006-01-02T15:04:05Z07:00
+			time.RFC3339Nano,            // with nanoseconds
+			"2006-01-02T15:04:05Z",      // minimal ISO 8601
+		} {
 			if t, err := time.Parse(layout, row.NotAfter); err == nil {
 				notAfter = t
 				parsed = true
