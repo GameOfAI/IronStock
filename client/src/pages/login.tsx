@@ -31,10 +31,18 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { useLoginMutation } from '@/api/auth';
+import { useLoginMutation, initKeypair } from '@/api/auth';
 import { fetchMyKeypair } from '@/api/me';
 import { useAuthStore } from '@/store/auth';
-import { decryptPrivateKey, deriveKEK, fromBase64, toBase64 } from '@/lib/crypto';
+import {
+  decryptPrivateKey,
+  deriveKEK,
+  encryptPrivateKey,
+  fromBase64,
+  generateX25519Keypair,
+  toBase64,
+  DEFAULT_KEK_PARAMS,
+} from '@/lib/crypto';
 import type { KEKParams } from '@/lib/crypto';
 import { ApiError, ErrCode } from '@/api/errors';
 import { kekStore } from '@/lib/tauri';
@@ -88,15 +96,44 @@ export default function LoginPage() {
     const keypair = await fetchMyKeypair(loginRes.access_token);
 
     setSubstep('deriving_key');
-    const kekSalt = fromBase64(keypair.kek_salt);
-    const kekParams = keypair.kek_params as unknown as KEKParams & { alg?: string };
-    // Placeholder keypair — bootstrap admin veya henüz kurulmamış hesap.
-    // Bu hesabın şifresi web arayüzünden değiştirilmeli (proper keypair oluşturur).
+    let kekParams = keypair.kek_params as unknown as KEKParams & { alg?: string };
+
+    // Placeholder keypair — bootstrap admin veya admin panelinden oluşturulan kullanıcı.
+    // Mevcut şifreyle proper keypair üretip sunucuya gönder, login'e devam et.
     if (kekParams?.alg === 'none') {
-      throw new Error(
-        'Bu hesabın şifresi henüz ayarlanmamış. Lütfen web arayüzünden (http://...:5173) giriş yapıp şifrenizi değiştirin.',
-      );
+      const newKp = await generateX25519Keypair();
+      const newKEKSalt = crypto.getRandomValues(new Uint8Array(16));
+      const newKek = await deriveKEK(password, newKEKSalt, DEFAULT_KEK_PARAMS);
+      const newPrivKeyEnc = await encryptPrivateKey(newKp.privateKey, newKek);
+      await initKeypair(loginRes.access_token, {
+        current_master_password: password,
+        new_public_key: toBase64(newKp.publicKey),
+        new_private_key_enc: toBase64(newPrivKeyEnc),
+        new_kek_salt: toBase64(newKEKSalt),
+        new_kek_params: { ...DEFAULT_KEK_PARAMS },
+      });
+      // Devam için yeni keypair'i kullan.
+      kekParams = DEFAULT_KEK_PARAMS;
+      const kekSaltNew = newKEKSalt;
+      const kek = newKek;
+      const privateKey = newKp.privateKey;
+      setSession({
+        user: { id: loginRes.user_id, username, roles: loginRes.roles },
+        accessToken: loginRes.access_token,
+        refreshToken: loginRes.refresh_token,
+        kek,
+        privateKey,
+        mustSetupTOTP: loginRes.must_setup_totp,
+      });
+      await kekStore(username.toLowerCase(), toBase64(kek));
+      localStorage.setItem('envanter.last_username', username.toLowerCase());
+      // kekSaltNew is used — suppress lint warning
+      void kekSaltNew;
+      navigate(fromPath ?? '/inventory', { replace: true });
+      return;
     }
+
+    const kekSalt = fromBase64(keypair.kek_salt);
     const kek = await deriveKEK(password, kekSalt, kekParams);
 
     setSubstep('unlocking');

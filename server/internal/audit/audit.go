@@ -136,6 +136,8 @@ const (
 	ActionAdminClientCertRequirementChanged = "admin.client_cert_requirement_changed"
 	// ActionAuthClientCertRejected: login rejected because client cert validation failed.
 	ActionAuthClientCertRejected = "auth.client_cert_rejected"
+	// ActionAuthKeypairInitialized: placeholder keypair replaced with proper one on first client login.
+	ActionAuthKeypairInitialized = "auth.keypair_initialized"
 )
 
 // ResourceGroup is the audit resource type for group rows.

@@ -155,6 +155,7 @@ func NewRouter(d Deps) http.Handler {
 			ar.Post("/logout", d.Auth.Logout)
 			ar.Post("/logout-all", d.Auth.LogoutAll)
 			ar.Post("/change-password", d.Auth.ChangePassword)
+			ar.Post("/keypair-init", d.Auth.InitKeypair)
 
 			// recovery flow — init is brute-forceable (rate-limit it),
 			// complete is tmp-token gated.

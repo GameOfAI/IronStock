@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import { apiFetch, getBaseUrl } from './client';
+import { ApiError } from './errors';
 import type {
   LoginRequest,
   LoginResponse,
@@ -44,6 +45,41 @@ export function useTOTPInitMutation() {
       return (await res.json()) as TOTPInitResponse;
     },
   });
+}
+
+/**
+ * keypair-init — placeholder keypair'i proper one ile değiştirir.
+ * Şifre değişmez, session revoke edilmez. Sadece kek_params.alg=="none" iken çalışır.
+ */
+/**
+ * keypair-init — placeholder keypair'i proper one ile değiştirir.
+ * Şifre değişmez, session revoke edilmez. Sadece kek_params.alg=="none" iken çalışır.
+ */
+export async function initKeypair(
+  accessToken: string,
+  payload: {
+    current_master_password: string;
+    new_public_key: string;       // base64
+    new_private_key_enc: string;  // base64
+    new_kek_salt: string;         // base64
+    new_kek_params: Record<string, unknown>;
+  },
+): Promise<void> {
+  const res = await fetch(`${getBaseUrl()}/api/v1/auth/keypair-init`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, {
+      code: (body as { code?: string }).code ?? 'internal',
+      message: (body as { message?: string }).message ?? `keypair-init: ${res.status}`,
+    });
+  }
 }
 
 export function useTOTPVerifyMutation() {
