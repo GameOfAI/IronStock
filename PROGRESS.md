@@ -1,13 +1,13 @@
 # İlerleyiş
 
-Son güncelleme: 2026-05-20 (PR-SEC3 — Client Certificate (mTLS) katmanı tamamlandı)
+Son güncelleme: 2026-05-22 (PR-LOG1 — Audit Log Forwarding tamamlandı)
 
 ## Mevcut Durum
 
 - **Aktif Faz:** Post-v1.0.0 Kapsamlı Geliştirmeler (Faz 6+)
 - **Tamamlanan Faz:** Faz 0 + 1 + 2 + 3 + 4 + 5 ✅
-- **Son tamamlanan:** PR-SEC1 ✅ 2026-05-19 + PR-SEC2 ✅ 2026-05-20 + PR-SEC3 (mTLS client cert) ✅ 2026-05-20
-- **Proje durumu:** MVP + tüm UX PR'ları + PR-F3 + PR-SEC1 + PR-SEC2 + PR-SEC3 tamamlandı. Login güvenlik üçlüsü (bilgi faktörü + sahip olma faktörü + kriptografik kimlik) tamamlandı. Sıradaki: PR-N3 (Onay/checkout workflow).
+- **Son tamamlanan:** PR-SEC3 (mTLS) ✅ 2026-05-20 + PR-UX7 (client item-detail tabs) ✅ 2026-05-22 + PR-LOG1 (Log Forwarding) ✅ 2026-05-22
+- **Proje durumu:** MVP + tüm UX PR'ları + PR-F3 + PR-SEC1/SEC2/SEC3 + PR-LOG1 tamamlandı. Syslog/Slack audit fan-out eklendi. Sıradaki: "Zaman bazlı erişim" veya PR-N3 (Onay/checkout workflow).
 
 ---
 
@@ -186,6 +186,22 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-05-22 (Win) — PR-LOG1: Audit Log Forwarding (Syslog + Slack) ✅
+
+**Mimari:** `audit.Writer.Write()` artık `RETURNING id, created_at` ile row ID'yi alıp `audit.Publisher` interface üzerinden `logfwd.Manager`'a fan-out yapıyor. Manager goroutine-per-forwarder (chan 256 buffer); channel dolunca event drop (back-pressure yok). Syslog cross-platform (stdlib log/syslog Unix-only; raw net.Conn UDP/TCP RFC-5424).
+
+**Tamamlanan:**
+- `server/migrations/00038_log_forwarding.sql` — `log_forwarding_configs` tablosu
+- `server/internal/logfwd/` — `Forwarder` interface, `Manager`, `SyslogForwarder`, `SlackForwarder`
+- `audit.Publisher` interface + `PublishEvent` struct; `Writer.SetPublisher()`
+- `admin_log_forwarding.go` — List/Create/Update/Delete/Test endpoints
+- `cmd/api/main.go` — startup'ta enabled config'ları yükle, Manager'ı wire et, StopAll() graceful shutdown
+- `shared/pkg/src/api/types.ts` — LogForwardingConfig + SyslogConfig + SlackConfig types
+- `web/src/api/admin-log-forwarding.ts` + `web/src/pages/admin/log-forwarding.tsx` — Admin UI
+- Sidebar: "Log Yönlendirme" nav item (Radio icon)
+
+**Slack color coding:** kritik olaylar (login_fail, cert_rejected, recover) kırmızı; orta seviye (user_created, totp_reset, pwd_changed, item/folder delete) turuncu; bilgi yeşil.
 
 ### 2026-05-20 (Win) — PR-SEC3: Client Certificate (mTLS) Katmanı ✅
 

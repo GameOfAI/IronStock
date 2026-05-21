@@ -658,7 +658,7 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 - [x] **PR-SEC3 (mTLS Client Certificate)** — Built-in CA + external CA upload, per-user `requires_client_cert`, Ingress mTLS forward. ✅ 2026-05-22 (server/internal/clientcert/ + admin_client_certs.go uygulandı)
 
 **Kolay kazanımlar — Devolutions'dan ilham (günler):**
-- [ ] **Log forwarding** — Audit log event'larından Syslog (UDP/TCP) + Slack webhook entegrasyonu. SOC/SIEM için kritik. `POST /api/v1/admin/log-forwarding` config endpoint + background forwarder goroutine.
+- [x] **Log forwarding** — Audit log event'larından Syslog (UDP/TCP) + Slack webhook entegrasyonu. SOC/SIEM için kritik. ✅ 2026-05-22 (server/internal/logfwd/ + admin_log_forwarding.go + migration 00038 + web UI)
 - [x] **Scheduled export** — `GET /api/v1/admin/export?format=json|csv` endpoint. Admin Dashboard'da JSON/CSV butonları. ✅ 2026-05-19
 - [ ] **Zaman bazlı erişim** — `item_shares` + `folder_permissions`'a `valid_from TIMESTAMPTZ`, `valid_until TIMESTAMPTZ` alanları. `ResolveItemPermission` CTE'ye `AND (valid_until IS NULL OR valid_until > NOW())` eklenir. Migration + UI.
 - [ ] **Item arama iyileştirmesi** — HMAC blind index sadece tam eşleşme. Prefix için bigram HMAC array veya Postgres `ILIKE` (plaintext metadata).
