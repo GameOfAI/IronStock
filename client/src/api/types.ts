@@ -56,4 +56,18 @@ export type {
   RegisterCertRequest,
   UploadCARequest,
   CertRequiredRequest,
+  // Graph / Relationships
+  GraphResponse,
+  AddRelationshipRequest,
+  RelationshipType,
+  // Lifecycle
+  LifecycleStagesResponse,
+  ItemLifecycleStagesResponse,
+  SetItemLifecycleStagesRequest,
+  // Field versions
+  FieldVersionsResponse,
+  // Tags (full)
+  CreateTagRequest,
+  AddItemTagRequest,
+  FavoritesListResponse,
 } from '@envanter/shared/api/types';
