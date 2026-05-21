@@ -48,8 +48,9 @@ type Deps struct {
 	Notification *NotificationHandlers
 	Graph        *GraphHandlers
 	ShareLink    *ShareLinkHandlers
-	Lifecycle    *LifecycleHandlers
-	Pipeline     *PipelineHandlers
+	Lifecycle      *LifecycleHandlers
+	Pipeline       *PipelineHandlers
+	LogForwarding  *LogForwardingHandlers // PR-LOG1: audit log forwarding to syslog/slack
 }
 
 // NewRouter builds a chi router with the standard middleware stack.
@@ -251,6 +252,14 @@ func NewRouter(d Deps) http.Handler {
 				ar.Post("/users/{id}/client-certs/register", d.ClientCert.RegisterCert)
 				ar.Delete("/users/{id}/client-certs/{cert_id}", d.ClientCert.RevokeCert)
 				ar.Patch("/users/{id}/cert-required", d.ClientCert.SetCertRequired)
+			}
+			// Log forwarding management (PR-LOG1).
+			if d.LogForwarding != nil {
+				ar.Get("/log-forwarding", d.LogForwarding.ListConfigs)
+				ar.Post("/log-forwarding", d.LogForwarding.CreateConfig)
+				ar.Put("/log-forwarding/{id}", d.LogForwarding.UpdateConfig)
+				ar.Delete("/log-forwarding/{id}", d.LogForwarding.DeleteConfig)
+				ar.Post("/log-forwarding/{id}/test", d.LogForwarding.TestConfig)
 			}
 		})
 	}

@@ -18,6 +18,7 @@ import RecoverPage from '@/pages/recover';
 import InventoryPage from '@/pages/inventory';
 import AdminUsersPage, { AdminAuditLogPage, AdminDashboardPage } from '@/pages/admin';
 import AdminClientCertsPage from '@/pages/admin/client-certs';
+import AdminLogForwardingPage from '@/pages/admin/log-forwarding';
 import TagsPage from '@/pages/tags';
 import { GraphPage } from '@/pages/graph';
 import PipelineListPage from '@/pages/pipeline/index';
@@ -120,6 +121,7 @@ export default function App() {
                       <Route path="/admin/roles" element={<Navigate to="/admin/users?tab=roles" replace />} />
                       <Route path="/admin/audit-log" element={<AdminAuditLogPage />} />
                       <Route path="/admin/client-certs" element={<AdminClientCertsPage />} />
+                      <Route path="/admin/log-forwarding" element={<AdminLogForwardingPage />} />
                     </Route>
                   </Route>
                   </Route>

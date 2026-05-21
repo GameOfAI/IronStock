@@ -37,6 +37,7 @@ import {
   AlertOctagon,
   X,
   Fingerprint,
+  Radio,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -388,6 +389,7 @@ const NAV_LABELS: Record<string, string> = {
   '/admin/roles': 'Roller',
   '/admin/audit-log': 'Audit Log',
   '/admin/client-certs': 'Sertifikalar',
+  '/admin/log-forwarding': 'Log Yönlendirme',
   '/profile': 'Profil',
 };
 
@@ -585,6 +587,12 @@ export function AppShell() {
                   to="/admin/client-certs"
                   icon={Fingerprint}
                   label="Sertifikalar"
+                  collapsed={sidebarCollapsed && !mobileOpen}
+                />
+                <NavItem
+                  to="/admin/log-forwarding"
+                  icon={Radio}
+                  label="Log Yönlendirme"
                   collapsed={sidebarCollapsed && !mobileOpen}
                 />
               </>

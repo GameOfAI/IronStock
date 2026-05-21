@@ -28,6 +28,7 @@ import (
 	"envanter.app/server/internal/config"
 	"envanter.app/server/internal/db"
 	"envanter.app/server/internal/httpapi"
+	"envanter.app/server/internal/logfwd"
 	"envanter.app/server/internal/logging"
 	"envanter.app/server/internal/notify"
 	"envanter.app/server/internal/storage"
@@ -288,6 +289,47 @@ func run() error {
 		Logger:         logger,
 		AllowedOrigins: cfg.WSAllowedOrigins,
 	}
+
+	// --- Log forwarding manager (PR-LOG1) ---
+	// Loads enabled configs from DB, starts a goroutine per forwarder.
+	// The manager implements audit.Publisher so every committed audit entry is
+	// fanned out to all active forwarders.
+	logFwdManager := logfwd.NewManager(logger)
+	{
+		rows, err := pool.Query(rootCtx, `
+			SELECT id::text, target_type, config
+			FROM log_forwarding_configs
+			WHERE enabled = true
+		`)
+		if err != nil {
+			logger.Warn("log forwarding: failed to load configs", slog.String("error", err.Error()))
+		} else {
+			defer rows.Close()
+			for rows.Next() {
+				var id, targetType string
+				var config []byte
+				if err := rows.Scan(&id, &targetType, &config); err != nil {
+					logger.Warn("log forwarding: scan error", slog.String("error", err.Error()))
+					continue
+				}
+				f, err := logfwd.BuildForwarder(id, targetType, config)
+				if err != nil {
+					logger.Warn("log forwarding: build error", slog.String("id", id), slog.String("error", err.Error()))
+					continue
+				}
+				if f != nil {
+					logFwdManager.Add(f)
+				}
+			}
+		}
+	}
+	auditWriter.SetPublisher(logFwdManager)
+	logForwardingHandlers := &httpapi.LogForwardingHandlers{
+		DB:      pool,
+		Audit:   auditWriter,
+		Manager: logFwdManager,
+		Logger:  logger,
+	}
 	exportHandlers := &httpapi.ExportHandlers{
 		Service: authSvc,
 		Audit:   auditWriter,
@@ -335,18 +377,19 @@ func run() error {
 
 	// --- HTTP layer ---
 	router := httpapi.NewRouter(httpapi.Deps{
-		Logger:       logger,
-		DB:           pool,
-		Auth:         authHandlers,
-		Folder:       folderHandlers,
-		Item:         itemHandlers,
-		Attachment:   attachmentHandlers,
-		Admin:        adminHandlers,
-		ClientCert:   clientCertHandlers, // PR-SEC3
-		Group:        groupHandlers,
-		Tag:          tagHandlers,
-		Notification: notificationHandlers,
-		Graph:        graphHandlers,
+		Logger:         logger,
+		DB:             pool,
+		Auth:           authHandlers,
+		Folder:         folderHandlers,
+		Item:           itemHandlers,
+		Attachment:     attachmentHandlers,
+		Admin:          adminHandlers,
+		ClientCert:     clientCertHandlers, // PR-SEC3
+		Group:          groupHandlers,
+		Tag:            tagHandlers,
+		Notification:   notificationHandlers,
+		Graph:          graphHandlers,
+		LogForwarding:  logForwardingHandlers, // PR-LOG1
 		Catalog:      catalogHandlers,
 		WS:           wsHandlers,
 		ShareLink:    shareLinkHandlers,
@@ -387,6 +430,7 @@ func run() error {
 		logger.Error("graceful shutdown failed", slog.String("error", err.Error()))
 		return err
 	}
+	logFwdManager.StopAll()
 	logger.Info("shutdown complete")
 	return nil
 }

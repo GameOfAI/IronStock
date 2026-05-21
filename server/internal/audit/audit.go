@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -138,6 +139,12 @@ const (
 	ActionAuthClientCertRejected = "auth.client_cert_rejected"
 	// ActionAuthKeypairInitialized: placeholder keypair replaced with proper one on first client login.
 	ActionAuthKeypairInitialized = "auth.keypair_initialized"
+
+	// Log forwarding management (PR-LOG1).
+	ActionAdminLogForwardingCreated = "admin.log_forwarding_created"
+	ActionAdminLogForwardingUpdated = "admin.log_forwarding_updated"
+	ActionAdminLogForwardingDeleted = "admin.log_forwarding_deleted"
+	ActionAdminLogForwardingTested  = "admin.log_forwarding_tested"
 )
 
 // ResourceGroup is the audit resource type for group rows.
@@ -168,14 +175,37 @@ type Entry struct {
 	UserAgent string
 }
 
+// Publisher receives audit events for forwarding (logfwd.Manager implements this).
+type Publisher interface {
+	Publish(ev PublishEvent)
+}
+
+// PublishEvent is the forwarder-facing view of an audit entry.
+type PublishEvent struct {
+	ID           string
+	Action       string
+	ActorUserID  *string
+	ResourceType *string
+	ResourceID   *string
+	Details      json.RawMessage
+	CreatedAt    time.Time
+}
+
 // Writer persists audit entries.
 type Writer struct {
-	db *pgxpool.Pool
+	db        *pgxpool.Pool
+	publisher Publisher // optional — set via SetPublisher
 }
 
 // NewWriter wraps a connection pool.
 func NewWriter(db *pgxpool.Pool) *Writer {
 	return &Writer{db: db}
+}
+
+// SetPublisher registers a forwarder manager that receives every committed entry.
+// Safe to call before the server starts accepting requests.
+func (w *Writer) SetPublisher(p Publisher) {
+	w.publisher = p
 }
 
 // Write inserts an Entry. Best-effort: callers should log but not abort the
@@ -207,8 +237,48 @@ func (w *Writer) Write(ctx context.Context, e Entry) error {
 		nullAddr(e.IPAddress),
 		nullString(e.UserAgent),
 	}
-	if _, err := w.db.Exec(ctx, insertSQL, args...); err != nil {
-		return fmt.Errorf("audit: insert: %w", err)
+	var insertedID string
+	var createdAt time.Time
+	const insertWithIDSQL = `
+		INSERT INTO audit_log (
+			actor_user_id, action, resource_type, resource_id,
+			details, ip_address, user_agent
+		) VALUES ($1, $2, $3, $4, $5, $6, $7)
+		RETURNING id::text, created_at
+	`
+	if err := w.db.QueryRow(ctx, insertWithIDSQL, args...).Scan(&insertedID, &createdAt); err != nil {
+		// Fallback: try insert without RETURNING (shouldn't happen but safe).
+		if _, err2 := w.db.Exec(ctx, insertSQL, args...); err2 != nil {
+			return fmt.Errorf("audit: insert: %w", err2)
+		}
+	}
+
+	// Fan out to forwarders (non-blocking, fire-and-forget).
+	if w.publisher != nil && insertedID != "" {
+		var actorPtr *string
+		if e.ActorUserID != "" {
+			s := e.ActorUserID
+			actorPtr = &s
+		}
+		var resTypePtr *string
+		if e.ResourceType != "" {
+			s := e.ResourceType
+			resTypePtr = &s
+		}
+		var resIDPtr *string
+		if e.ResourceID != "" {
+			s := e.ResourceID
+			resIDPtr = &s
+		}
+		w.publisher.Publish(PublishEvent{
+			ID:           insertedID,
+			Action:       e.Action,
+			ActorUserID:  actorPtr,
+			ResourceType: resTypePtr,
+			ResourceID:   resIDPtr,
+			Details:      detailsJSON,
+			CreatedAt:    createdAt,
+		})
 	}
 	return nil
 }

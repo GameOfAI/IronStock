@@ -782,3 +782,48 @@ export interface RegisterCertRequest {
 export interface CertRequiredRequest {
   required: boolean;
 }
+
+// ─── Log Forwarding (PR-LOG1) ────────────────────────────────────────────────
+
+export type LogForwardingTargetType = 'syslog' | 'slack';
+
+export interface SyslogConfig {
+  protocol: 'udp' | 'tcp';
+  host: string;
+  port?: number;
+  app_name?: string;
+}
+
+export interface SlackConfig {
+  webhook_url: string;
+  channel?: string;
+  username?: string;
+}
+
+export interface LogForwardingConfig {
+  id: string;
+  name: string;
+  target_type: LogForwardingTargetType;
+  enabled: boolean;
+  config: SyslogConfig | SlackConfig;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+}
+
+export interface LogForwardingListResponse {
+  configs: LogForwardingConfig[];
+}
+
+export interface CreateLogForwardingRequest {
+  name: string;
+  target_type: LogForwardingTargetType;
+  enabled: boolean;
+  config: SyslogConfig | SlackConfig;
+}
+
+export interface UpdateLogForwardingRequest {
+  name?: string;
+  enabled?: boolean;
+  config?: SyslogConfig | SlackConfig;
+}
