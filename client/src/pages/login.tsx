@@ -89,7 +89,14 @@ export default function LoginPage() {
 
     setSubstep('deriving_key');
     const kekSalt = fromBase64(keypair.kek_salt);
-    const kekParams = keypair.kek_params as unknown as KEKParams;
+    const kekParams = keypair.kek_params as unknown as KEKParams & { alg?: string };
+    // Placeholder keypair — bootstrap admin veya henüz kurulmamış hesap.
+    // Bu hesabın şifresi web arayüzünden değiştirilmeli (proper keypair oluşturur).
+    if (kekParams?.alg === 'none') {
+      throw new Error(
+        'Bu hesabın şifresi henüz ayarlanmamış. Lütfen web arayüzünden (http://...:5173) giriş yapıp şifrenizi değiştirin.',
+      );
+    }
     const kek = await deriveKEK(password, kekSalt, kekParams);
 
     setSubstep('unlocking');
