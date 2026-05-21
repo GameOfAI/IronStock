@@ -224,7 +224,16 @@ export default function LoginPage() {
               {substepLabel(substep)}
             </Button>
 
-            <div className="flex items-center justify-center pt-2 text-xs">
+            <div className="flex items-center justify-center gap-4 pt-2 text-xs">
+              <button
+                type="button"
+                onClick={() => navigate('/config')}
+                className="text-muted-foreground underline hover:text-foreground"
+                disabled={busy}
+              >
+                Sunucu ayarını değiştir
+              </button>
+              <span className="text-muted-foreground/40">·</span>
               <button
                 type="button"
                 onClick={() => navigate('/admin-setup')}
