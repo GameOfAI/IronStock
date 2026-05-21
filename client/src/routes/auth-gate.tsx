@@ -1,6 +1,6 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
-import { selectIsAuthenticated, useAuthStore } from '@/store/auth';
+import { selectIsAdmin, selectIsAuthenticated, useAuthStore } from '@/store/auth';
 
 function Splash() {
   return (
@@ -35,6 +35,18 @@ export function MustSetupTOTPGate() {
   const mustSetupTOTP = useAuthStore((s) => s.mustSetupTOTP);
   if (mustSetupTOTP) {
     return <Navigate to="/totp/setup" replace />;
+  }
+  return <Outlet />;
+}
+
+/**
+ * AdminGate — admin rolü yoksa /inventory'e yönlendirir.
+ * Admin sayfalarını doğrudan URL ile erişime kapatır.
+ */
+export function AdminGate() {
+  const isAdmin = useAuthStore(selectIsAdmin);
+  if (!isAdmin) {
+    return <Navigate to="/inventory" replace />;
   }
   return <Outlet />;
 }

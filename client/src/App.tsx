@@ -8,7 +8,7 @@ import { useConnectionStore } from '@/store/connection';
 import { ThemeProvider } from '@/components/layout/theme-provider';
 import { AppShell } from '@/components/layout/app-shell';
 import { Toaster } from '@/components/ui/toaster';
-import { AuthGate, MustSetupTOTPGate } from '@/routes/auth-gate';
+import { AdminGate, AuthGate, MustSetupTOTPGate } from '@/routes/auth-gate';
 import { ConnectionGate } from '@/routes/connection-gate';
 import { useInactivityLock } from '@/hooks/use-inactivity-lock';
 import { WsProvider } from '@/components/ws-provider';
@@ -25,6 +25,9 @@ import InventoryPage from '@/pages/inventory';
 import AdminSetupPage from '@/pages/admin-setup';
 import AdminLoginPage from '@/pages/admin-login';
 import NotFoundPage from '@/pages/not-found';
+import AdminUsersPage from '@/pages/admin/users';
+import AdminAuditLogPage from '@/pages/admin/audit-log';
+import AdminClientCertsPage from '@/pages/admin/client-certs';
 
 /**
  * auth:logout custom event'i dinler — api/client.ts refresh başarısız olduğunda
@@ -168,6 +171,12 @@ export default function App() {
                   <Route element={<WsProvider><AppShell /></WsProvider>}>
                     <Route index element={<Navigate to="/inventory" replace />} />
                     <Route path="/inventory/*" element={<InventoryPage />} />
+                    {/* Admin routes — AdminGate /inventory'e yönlendirir (non-admin) */}
+                    <Route element={<AdminGate />}>
+                      <Route path="/admin" element={<AdminUsersPage />} />
+                      <Route path="/admin/audit-log" element={<AdminAuditLogPage />} />
+                      <Route path="/admin/client-certs" element={<AdminClientCertsPage />} />
+                    </Route>
                   </Route>
                 </Route>
               </Route>

@@ -2,25 +2,32 @@
  * AppShell — Tauri client için authenticated route layout.
  *
  *   ┌──────────────────────────────────────────────┐
- *   │  TopBar (logo, user, tema, logout)           │
+ *   │  TopBar (logo, user, tema, logout, lock)     │
  *   ├────────┬─────────────────────────────────────┤
  *   │ Side   │                                     │
  *   │ bar    │  <Outlet />                         │
  *   │ (nav)  │                                     │
  *   └────────┴─────────────────────────────────────┘
  *
- * Web AdminUI'dan farkları:
- * - Admin nav yok (client Faz 4'te inventory-only)
- * - WsStatusDot yok (PR-C4'te eklenir, WsProvider o PR'da taşınır)
- * - Lock butonu var (PR-C1'de Rust keyring entegre edilince aktif olur)
- * - Tauri window chrome olmadığı için kendi drag region'ı olabilir (TODO: Faz 4 son)
+ * Role-based nav: admin kullanıcılar admin sekmelerini görür.
  */
 
 import * as React from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { Folder, LogOut, Sun, Moon, Monitor, Menu, Lock } from 'lucide-react';
+import {
+  FileText,
+  Fingerprint,
+  Folder,
+  LogOut,
+  Sun,
+  Moon,
+  Monitor,
+  Menu,
+  Lock,
+  Shield,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useAuthStore } from '@/store/auth';
+import { useAuthStore, selectIsAdmin } from '@/store/auth';
 import { useUIStore } from '@/store/ui';
 import { useLogoutMutation } from '@/api/auth';
 import { cn } from '@/lib/cn';
@@ -83,6 +90,7 @@ function NavItem({ to, icon: Icon, label, collapsed }: NavItemProps) {
 export function AppShell() {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
+  const isAdmin = useAuthStore(selectIsAdmin);
   const clear = useAuthStore((s) => s.clear);
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
@@ -90,7 +98,6 @@ export function AppShell() {
   const [mobileOpen, setMobileOpen] = React.useState(false);
 
   async function handleLogout() {
-    // KEK'i keyring'den sil, ardından local state temizle, server'a bildir.
     if (user) await kekDelete(user.username);
     clear();
     navigate('/login', { replace: true });
@@ -98,7 +105,6 @@ export function AppShell() {
   }
 
   async function handleLock() {
-    // KEK'i keyring'den sil + memory temizle → tam re-login gerekir.
     if (user) await kekDelete(user.username);
     clear();
     navigate('/login', { replace: true });
@@ -177,17 +183,42 @@ export function AppShell() {
           aria-label="Ana navigasyon"
         >
           <nav className="flex flex-col gap-1 p-2" role="navigation">
+            {/* Envanter — tüm kullanıcılar */}
             <NavItem
               to="/inventory"
               icon={Folder}
               label="Envanter"
               collapsed={sidebarCollapsed && !mobileOpen}
             />
+
+            {/* Admin sekmeleri — sadece admin rolü */}
+            {isAdmin && (
+              <>
+                <NavItem
+                  to="/admin"
+                  icon={Shield}
+                  label="Kullanıcı Yönetimi"
+                  collapsed={sidebarCollapsed && !mobileOpen}
+                />
+                <NavItem
+                  to="/admin/audit-log"
+                  icon={FileText}
+                  label="Audit Log"
+                  collapsed={sidebarCollapsed && !mobileOpen}
+                />
+                <NavItem
+                  to="/admin/client-certs"
+                  icon={Fingerprint}
+                  label="Sertifikalar"
+                  collapsed={sidebarCollapsed && !mobileOpen}
+                />
+              </>
+            )}
           </nav>
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 overflow-auto bg-muted/20 p-4 md:p-6" role="main">
+        <main className="flex-1 overflow-auto bg-muted/20" role="main">
           <Outlet />
         </main>
       </div>
