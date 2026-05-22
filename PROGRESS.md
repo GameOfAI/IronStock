@@ -1,13 +1,13 @@
 # İlerleyiş
 
-Son güncelleme: 2026-05-22 (PR-LOG1 — Audit Log Forwarding tamamlandı)
+Son güncelleme: 2026-05-22 (PR-VAULT — HashiCorp Vault proxy entegrasyonu tamamlandı)
 
 ## Mevcut Durum
 
 - **Aktif Faz:** Post-v1.0.0 Kapsamlı Geliştirmeler (Faz 6+)
 - **Tamamlanan Faz:** Faz 0 + 1 + 2 + 3 + 4 + 5 ✅
-- **Son tamamlanan:** PR-SEC3 (mTLS) ✅ 2026-05-20 + PR-UX7 (client item-detail tabs) ✅ 2026-05-22 + PR-LOG1 (Log Forwarding) ✅ 2026-05-22
-- **Proje durumu:** MVP + tüm UX PR'ları + PR-F3 + PR-SEC1/SEC2/SEC3 + PR-LOG1 tamamlandı. Syslog/Slack audit fan-out eklendi. Sıradaki: "Zaman bazlı erişim" veya PR-N3 (Onay/checkout workflow).
+- **Son tamamlanan:** PR-SEARCH ✅ + PR-TIME ✅ + PR-VAULT ✅ 2026-05-22
+- **Proje durumu:** MVP + tüm UX PR'ları + PR-F3 + PR-SEC1/SEC2/SEC3 + PR-LOG1 + PR-SEARCH + PR-TIME + PR-VAULT tamamlandı. HashiCorp Vault proxy entegrasyonu (ADR-0007) production'a alındı. Sıradaki: PR-N3 (Onay/checkout workflow) veya PR-IMPORT (bulk import).
 
 ---
 
@@ -186,6 +186,52 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-05-22 (Win) — PR-VAULT: HashiCorp Vault Proxy Entegrasyonu ✅
+
+**Mimari (ADR-0007 implementasyonu):** Envanter sunucu Vault secret'larını DB'ye **yazmaz**. `items.external_source jsonb`'deki path referansını kullanarak her kullanıcı isteğinde Vault'tan canlı çeker (proxy), RAM'de passthrough yapar. E2E/envelope modeli bozulmaz.
+
+**Tamamlanan:**
+- `server/internal/vault/client.go` — AppRole auth + token cache (75% TTL) + KV v1/v2 destekli `ReadKV()` + `ListPaths()` + `mutex` güvenli token yenileme
+- `server/internal/config/config.go` — `ENVANTER_VAULT_{ADDR,ROLE_ID,SECRET_ID,NAMESPACE}` env vars
+- `server/internal/httpapi/vault_handlers.go` — `POST /api/v1/items/{id}/vault-fetch` (item read izni) + `GET /api/v1/vault/paths` (admin-only autocomplete)
+- `server/internal/audit/audit.go` — `ActionItemVaultFetch` + `ActionItemVaultFetchError` constants
+- `server/cmd/api/main.go` — `vault.New()` wire + nil guard (Vault konfigüre edilmemişse 503)
+- `shared/pkg/src/api/types.ts` — `ExternalSourceVault`, `VaultFieldValue`, `VaultFetchResponse`, `VaultPathsResponse` tipleri
+- `web/src/api/vault.ts` + `client/src/api/vault.ts` — `useVaultFetchMutation` (non-cacheable) + `useVaultPathsQuery`
+- `web/src/components/inventory/item-detail.tsx` — Vault panel: "Vault'tan Çek" butonu + 30sn auto-clear timer + gizle/göster toggle
+- `web/src/components/inventory/item-form-modal.tsx` — "Vault Kaynağı" collapsible bölümü: mount/path/kv_version/key_mapping editor + datalist autocomplete
+- `docs/adr/0007-external-secret-backends.md` — Durum "Implemented ✅ 2026-05-22" olarak güncellendi
+
+**Güvenlik notları:** Vault plaintext asla DB'ye yazılmaz, audit log'a yazılmaz (sadece metadata: path + field key + success/fail). 30 saniye sonra UI'dan otomatik temizlenir. Vault down iken native item'lar etkilenmez, sadece Vault-backed item'lar 503 döner.
+
+**Parking lot (gelecek):** Dynamic secrets (`POST /items/{id}/dynamic-cred`), AWS Secrets Manager / Azure Key Vault, OIDC SSO.
+
+---
+
+### 2026-05-22 (Win) — PR-TIME: Zaman Bazlı Erişim Pencereleri ✅
+
+**Mimari:** `item_shares` ve `folder_permissions` tablolarına `valid_from TIMESTAMPTZ` + `valid_until TIMESTAMPTZ` eklendi. `ResolveItemPermission` CTE'ye `AND (valid_until IS NULL OR valid_until > NOW())` koşulu eklendi.
+
+**Tamamlanan:**
+- `server/migrations/00040_time_based_access.sql` — iki tabloya nullable timestamp alanları
+- `server/internal/httpapi/` — share + folder permission endpoint'lerinde valid_from/until desteği
+- Frontend: share modal ve klasör izin ekranlarında tarih-saat picker'lar
+- `shared/pkg/src/api/types.ts` — `ShareItemRequest` ve permission tiplerinde yeni alanlar
+
+---
+
+### 2026-05-22 (Win) — PR-SEARCH: Item Substring Arama + Global Cross-Folder ✅
+
+**Mimari (ADR-0011):** ADR-0004'teki HMAC blind index (tam eşleşme only) yerini `name_plain TEXT` + `ILIKE '%query%'` aldı. Item name metadata kategorisinde — server zaten görüyor, E2E bozulmuyor.
+
+**Tamamlanan:**
+- `server/migrations/00039_name_plain.sql` — `items.name_plain TEXT` kolonu + `CREATE INDEX idx_items_name_plain` + mevcut row backfill
+- `server/internal/httpapi/item_handlers.go` — `GET /api/v1/items?search=` substring + `POST /api/v1/items/search` cross-folder endpoint (ACL-aware CTE)
+- `web/src/components/inventory/search-bar.tsx` + `client/src/components/inventory/search-bar.tsx` — global toggle switch eklendi
+- `docs/adr/0011-item-search-model.md` — YENİ (ADR-0004 §Searchable Encryption bölümünü geçersiz kılar)
+
+---
 
 ### 2026-05-22 (Win) — PR-LOG1: Audit Log Forwarding (Syslog + Slack) ✅
 
@@ -2243,8 +2289,11 @@ Kullanıcı review sırasında ürün için 4 ek boyut tanımladı; hepsi için 
 | 0004 | Şifreleme detayları: AES-256-GCM + Argon2id + X25519 + HMAC search | Kabul (2026-04-24) |
 | 0005 | Migration tool: goose | Kabul (2026-04-24) |
 | 0006 | Veri modeli: item_types, field_definitions, folder_permissions, item_relationships + admin rolü | Kabul (2026-04-24) |
-| 0007 | External secret backends: Vault proxy (manuel linking, Faz 5 impl) | Kabul (2026-04-24) |
+| 0007 | External secret backends: Vault proxy (manuel linking) | Implemented ✅ (2026-05-22) |
 | 0008 | Containerization + raw k8s + GHCR + ArgoCD (Helm yerine, ADR-0001 deploy satırını değiştirir) | Kabul (2026-04-25) |
+| 0009 | Web client state management: Zustand + TanStack Query + Tailwind 4 + shadcn/ui | Kabul (2026-04-27) |
+| 0010 | Bootstrap admin panel: acil yönetici erişimi (break-glass) | Proposed (2026-05-15) |
+| 0011 | Item arama: name_plain + ILIKE (ADR-0004 HMAC search bölümünü geçersiz kılar) | Implemented ✅ (2026-05-22) |
 
 ## Bloker / Risk / Not
 

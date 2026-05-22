@@ -1,9 +1,25 @@
 # 0007 — External Secret Backends (Vault Proxy Modeli)
 
-- **Durum:** Accepted (Faz 5+ implementation)
-- **Tarih:** 2026-04-24
+- **Durum:** Implemented ✅ 2026-05-22 (PR-VAULT)
+- **Tarih:** 2026-04-24 (karar) · 2026-05-22 (uygulama tamamlandı)
 - **Karar veren:** Burak Haşlaman (DevOps/SRE)
 - **İlgili ADR:** [0002](0002-security-model.md), [0004](0004-encryption-details.md), [0006](0006-data-model-extensions.md)
+
+## Uygulama Notu (2026-05-22)
+
+Faz 5 olarak planlanan Vault entegrasyonu PR-VAULT ile post-v1.0.0 kapsamlı geliştirmeler döneminde tamamlandı.
+
+**Uygulanan bileşenler:**
+- `server/internal/vault/client.go` — AppRole auth + token cache (%75 TTL) + KV v1/v2 + ListPaths
+- `server/internal/config/config.go` — `ENVANTER_VAULT_{ADDR,ROLE_ID,SECRET_ID,NAMESPACE}` env vars
+- `server/internal/httpapi/vault_handlers.go` — `POST /api/v1/items/{id}/vault-fetch` + `GET /api/v1/vault/paths`
+- Audit constants: `item.vault_fetch` / `item.vault_fetch_error` (ADR'daki `item.external_fetch`'ten revize edildi — daha spesifik isim)
+- Frontend: `useVaultFetchMutation` (non-cacheable, 30 sn auto-clear) + item-detail Vault panel + item-form Vault source editor
+
+**Parking lot (gelecek):**
+- Dynamic secrets flow (`POST /items/{id}/dynamic-cred`)
+- AWS Secrets Manager / Azure Key Vault (`external_source.type = "aws_sm"`)
+- OIDC SSO (Vault + IronStock ortak kimlik)
 
 ## Bağlam
 
