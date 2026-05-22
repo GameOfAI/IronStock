@@ -230,6 +230,8 @@ export interface Item {
   expires_at?: string | null;
   rotation_interval_days?: number | null;
   last_rotated_at?: string | null;
+  /** PR-VAULT: external secret backend source config. Present for Vault-backed items. */
+  external_source?: Record<string, unknown> | null;
 }
 
 export interface ItemListResponse {
@@ -829,4 +831,38 @@ export interface UpdateLogForwardingRequest {
   name?: string;
   enabled?: boolean;
   config?: SyslogConfig | SlackConfig;
+}
+
+// --- HashiCorp Vault Integration (PR-VAULT, ADR-0007) ---
+
+/**
+ * ExternalSourceVault is stored in items.external_source JSONB.
+ * The server never persists or logs secret values — only this path metadata.
+ */
+export interface ExternalSourceVault {
+  type: 'vault';
+  mount: string;
+  path: string;
+  kv_version?: 1 | 2;
+  /** Maps field_definition.key → vault data key */
+  key_mapping: Record<string, string>;
+}
+
+/**
+ * One field value returned by POST /api/v1/items/{id}/vault-fetch.
+ * Ephemeral — zero memory after display.
+ */
+export interface VaultFieldValue {
+  field_key: string;
+  value: string;
+}
+
+/** Response body of POST /api/v1/items/{id}/vault-fetch. */
+export interface VaultFetchResponse {
+  fields: VaultFieldValue[];
+}
+
+/** Response body of GET /api/v1/vault/paths (admin only). */
+export interface VaultPathsResponse {
+  paths: string[];
 }

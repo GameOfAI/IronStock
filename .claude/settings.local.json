@@ -2,7 +2,20 @@
   "permissions": {
     "allow": [
       "Bash(npm --version)",
-      "Bash(npm install *)"
+      "Bash(npm install *)",
+      "PowerShell(Set-Location \"C:\\\\Users\\\\Burak\\\\claude-cli-workspace\\\\IronStock\\\\.claude\\\\worktrees\\\\amazing-hoover-0f733e\"; docker compose -f deploy/compose/docker-compose.yml up -d server 2>&1; Write-Host \"EXIT:$LASTEXITCODE\")",
+      "PowerShell(docker exec envanter-dev-postgres-1 psql -U envanter -d envanter -c \"SELECT username, status, must_change_password FROM users WHERE username='admin';\" 2>&1)",
+      "Bash(/usr/local/go/bin/go build *)",
+      "Bash(where go *)",
+      "Read(//usr/local/go/**)",
+      "Bash(curl -s -X POST http://localhost:8080/api/v1/auth/login -H 'Content-Type: application/json' -d '{\"username\":\"admin\",\"master_password\":\"test\"}' -w '\\\\nHTTP_STATUS:%{http_code}')",
+      "Bash(npx tsc *)",
+      "Bash(npx vitest *)",
+      "Bash(grep -n \"tag.*click\\\\|navigate.*tag\\\\|tag=\\\\$\" /c/Users/Burak/claude-cli-workspace/IronStock/web/src/pages/tags.tsx)",
+      "Bash(cd /mnt/c/Users/Burak/claude-cli-workspace/IronStock/web && npx tsc --noEmit 2>&1 | head -60)",
+      "PowerShell($env:FORCE_COLOR = \"0\"; & node \"C:\\\\Program Files\\\\nodejs\\\\node_modules\\\\npm\\\\bin\\\\npm-cli.js\" --prefix \"C:\\\\Users\\\\Burak\\\\claude-cli-workspace\\\\IronStock\\\\web\" run test 2>&1 | Select-Object -Last 30)",
+      "PowerShell($out = cmd /c \"cd /d C:\\\\Users\\\\Burak\\\\claude-cli-workspace\\\\IronStock && git push origin main 2>&1\"; Write-Host \"Exit: $LASTEXITCODE\"; $out | ForEach-Object { Write-Host $_ })",
+      "mcp__Claude_in_Chrome__tabs_context_mcp"
     ]
   }
 }

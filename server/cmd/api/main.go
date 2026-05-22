@@ -32,6 +32,7 @@ import (
 	"envanter.app/server/internal/logging"
 	"envanter.app/server/internal/notify"
 	"envanter.app/server/internal/storage"
+	"envanter.app/server/internal/vault"
 	"envanter.app/server/internal/ws"
 )
 
@@ -378,6 +379,27 @@ func run() error {
 		Logger:  logger,
 	}
 
+	// --- HashiCorp Vault client (PR-VAULT, ADR-0007) ---
+	// Optional integration: all three ENVANTER_VAULT_* vars must be set.
+	// When not configured, Vault-backed items return 503 on vault-fetch.
+	vaultClient := vault.New(vault.Config{
+		Addr:      cfg.VaultAddr,
+		RoleID:    cfg.VaultRoleID,
+		SecretID:  cfg.VaultSecretID,
+		Namespace: cfg.VaultNamespace,
+	})
+	if vault.IsNil(vaultClient) {
+		logger.Info("vault not configured — Vault-backed items will return 503")
+	} else {
+		logger.Info("vault configured", slog.String("addr", cfg.VaultAddr))
+	}
+	vaultHandlers := &httpapi.VaultHandlers{
+		Service: authSvc,
+		Vault:   vaultClient,
+		Audit:   auditWriter,
+		Logger:  logger,
+	}
+
 	// --- HTTP layer ---
 	router := httpapi.NewRouter(httpapi.Deps{
 		Logger:         logger,
@@ -399,6 +421,7 @@ func run() error {
 		Lifecycle:    lifecycleHandlers,
 		Pipeline:     pipelineHandlers,
 		Export:       exportHandlers,
+		Vault:        vaultHandlers, // PR-VAULT
 	})
 
 	srv := &http.Server{

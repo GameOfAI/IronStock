@@ -145,6 +145,12 @@ const (
 	ActionAdminLogForwardingUpdated = "admin.log_forwarding_updated"
 	ActionAdminLogForwardingDeleted = "admin.log_forwarding_deleted"
 	ActionAdminLogForwardingTested  = "admin.log_forwarding_tested"
+
+	// Vault integration (PR-VAULT, ADR-0007).
+	// ActionItemVaultFetch: user triggered a Vault secret fetch for an item.
+	// Vault plaintext is NEVER included in details — only metadata (path, success).
+	ActionItemVaultFetch      = "item.vault_fetch"
+	ActionItemVaultFetchError = "item.vault_fetch_error"
 )
 
 // ResourceGroup is the audit resource type for group rows.

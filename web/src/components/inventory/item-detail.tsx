@@ -9,12 +9,15 @@
  *  - Geçmiş     → field version timeline
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   ArrowRight,
   ArrowLeft,
   Clock,
+  DatabaseZap,
+  Eye,
+  EyeOff,
   Info,
   Loader2,
   MousePointerClick,
@@ -39,7 +42,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import type { FieldDefinition, ItemType, RelationshipType } from '@/api/types';
+import type { ExternalSourceVault, FieldDefinition, ItemType, RelationshipType, VaultFieldValue } from '@/api/types';
+import { useVaultFetchMutation } from '@/api/vault';
 import { useItem, useRecordRotationMutation, useFieldVersionsQuery } from '@/api/items';
 import {
   useAddFavoriteMutation,
@@ -109,12 +113,53 @@ function buildFieldDefMap(defs: FieldDefinition[]): Map<number, FieldDefinition>
 // Main component
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Parse external_source and return ExternalSourceVault when type=vault.
+function parseVaultSource(raw: Record<string, unknown> | null | undefined): ExternalSourceVault | null {
+  if (!raw || raw['type'] !== 'vault') return null;
+  return raw as unknown as ExternalSourceVault;
+}
+
 export function ItemDetail({ itemId, fieldDefinitions, itemTypes: _itemTypes }: ItemDetailProps) {
   const itemQuery = useItem(itemId);
   const privateKey = useAuthStore((s) => s.privateKey);
   const [decryption, setDecryption] = useState<DecryptionState>({ status: 'idle' });
   const { toast } = useToast();
   const rotateMut = useRecordRotationMutation(itemId ?? '');
+
+  // PR-VAULT: ephemeral vault values — never cached, auto-cleared after 30 s.
+  const vaultMut = useVaultFetchMutation(itemId ?? '');
+  const [vaultFields, setVaultFields] = useState<VaultFieldValue[] | null>(null);
+  const [vaultVisible, setVaultVisible] = useState(false);
+  const vaultClearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clear vault values whenever the selected item changes.
+  useEffect(() => {
+    setVaultFields(null);
+    setVaultVisible(false);
+    if (vaultClearTimer.current) clearTimeout(vaultClearTimer.current);
+  }, [itemId]);
+
+  function handleVaultFetch() {
+    vaultMut.mutate(undefined, {
+      onSuccess: (data) => {
+        setVaultFields(data.fields);
+        setVaultVisible(true);
+        if (vaultClearTimer.current) clearTimeout(vaultClearTimer.current);
+        vaultClearTimer.current = setTimeout(() => {
+          setVaultFields(null);
+          setVaultVisible(false);
+          toast({ title: 'Vault değerleri temizlendi', description: '30 saniyelik güvenli görüntüleme süresi doldu.' });
+        }, 30_000);
+      },
+      onError: (err) => {
+        toast({
+          title: 'Vault fetch başarısız',
+          description: err instanceof Error ? err.message : 'Sunucu hatası.',
+          variant: 'destructive',
+        });
+      },
+    });
+  }
 
   // Favorites
   const { data: favData } = useFavoriteStatusQuery(itemId);
@@ -353,6 +398,74 @@ export function ItemDetail({ itemId, fieldDefinitions, itemTypes: _itemTypes }: 
                   )}
                 </section>
               )}
+
+              {/* PR-VAULT: Vault-backed secret reveal panel */}
+              {(() => {
+                const vaultSrc = parseVaultSource(item.external_source as Record<string, unknown> | null);
+                if (!vaultSrc) return null;
+                return (
+                  <section>
+                    <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Vault Kaynağı</h3>
+                    <div className="rounded-md border bg-muted/30 p-3 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <DatabaseZap className="h-4 w-4 text-emerald-600 dark:text-emerald-400" aria-hidden />
+                          <Badge variant="outline" className="font-mono text-[10px]">
+                            {vaultSrc.mount}/{vaultSrc.path}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {vaultFields && (
+                            <button
+                              type="button"
+                              aria-label={vaultVisible ? 'Gizle' : 'Göster'}
+                              className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                              onClick={() => setVaultVisible((v) => !v)}
+                            >
+                              {vaultVisible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                            </button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1.5 h-7 text-xs"
+                            disabled={vaultMut.isPending}
+                            onClick={handleVaultFetch}
+                          >
+                            {vaultMut.isPending
+                              ? <Loader2 className="h-3 w-3 animate-spin" />
+                              : <DatabaseZap className="h-3 w-3" />
+                            }
+                            {vaultFields ? 'Yenile' : "Vault'tan Çek"}
+                          </Button>
+                        </div>
+                      </div>
+
+                      {vaultFields && vaultVisible && (
+                        <div className="rounded-md border bg-background divide-y">
+                          {vaultFields.map((f) => {
+                            const label = Object.entries(vaultSrc.key_mapping ?? {}).find(([, v]) => v === f.field_key)?.[0] ?? f.field_key;
+                            return (
+                              <div key={f.field_key} className="flex items-center justify-between px-3 py-2 text-xs gap-3">
+                                <span className="text-muted-foreground font-medium shrink-0">{label}</span>
+                                <span className="font-mono break-all select-all">{f.value}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {vaultFields && !vaultVisible && (
+                        <p className="text-xs text-muted-foreground italic">Değerler gizlendi.</p>
+                      )}
+
+                      <p className="text-[10px] text-muted-foreground">
+                        Vault değerleri 30 saniye sonra otomatik temizlenir.
+                      </p>
+                    </div>
+                  </section>
+                );
+              })()}
 
               {/* Metadata */}
               <section>

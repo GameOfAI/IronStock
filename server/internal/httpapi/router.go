@@ -51,6 +51,7 @@ type Deps struct {
 	Lifecycle      *LifecycleHandlers
 	Pipeline       *PipelineHandlers
 	LogForwarding  *LogForwardingHandlers // PR-LOG1: audit log forwarding to syslog/slack
+	Vault          *VaultHandlers         // PR-VAULT: HashiCorp Vault proxy (ADR-0007)
 }
 
 // NewRouter builds a chi router with the standard middleware stack.
@@ -384,6 +385,16 @@ func NewRouter(d Deps) http.Handler {
 			cr.Get("/users/me/keypair", d.Catalog.GetMyKeypair)
 			cr.Get("/users/{id}/public-key", d.Catalog.GetUserPublicKey)
 		})
+	}
+
+	// PR-VAULT: HashiCorp Vault proxy routes (ADR-0007).
+	// vault-fetch: any authenticated user with item read permission.
+	// vault/paths: admin only (path listing leaks Vault structure).
+	if d.Vault != nil && d.Auth != nil {
+		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+			Post("/api/v1/items/{id}/vault-fetch", d.Vault.VaultFetch)
+		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+			Get("/api/v1/vault/paths", d.Vault.VaultListPaths)
 	}
 
 	return r

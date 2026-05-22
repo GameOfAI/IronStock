@@ -69,6 +69,14 @@ type Config struct {
 	// Production MUST set ENVANTER_WS_ALLOWED_ORIGINS to the real frontend
 	// origin, e.g. "app.example.com,*.example.com".
 	WSAllowedOrigins []string // ENVANTER_WS_ALLOWED_ORIGINS
+
+	// HashiCorp Vault integration (PR-VAULT, ADR-0007).
+	// All three fields must be set for Vault to be enabled.
+	// When unset, Vault-backed items return "vault not configured" error.
+	VaultAddr      string // ENVANTER_VAULT_ADDR       — e.g. "https://vault.cluster.local:8200"
+	VaultRoleID    string // ENVANTER_VAULT_ROLE_ID    — AppRole role_id
+	VaultSecretID  string // ENVANTER_VAULT_SECRET_ID  — AppRole secret_id
+	VaultNamespace string // ENVANTER_VAULT_NAMESPACE  — Vault Enterprise namespace (optional)
 }
 
 // Load reads config from environment, applies defaults, and validates.
@@ -96,6 +104,10 @@ func Load() (*Config, error) {
 		BootstrapEnabled:      envBoolOr("ENVANTER_BOOTSTRAP_ENABLED", false),
 		DefaultAdminPassword:  os.Getenv("ENVANTER_DEFAULT_ADMIN_PASSWORD"),
 		WSAllowedOrigins:      envStringSliceOr("ENVANTER_WS_ALLOWED_ORIGINS", []string{"localhost:*", "127.0.0.1:*"}),
+		VaultAddr:             os.Getenv("ENVANTER_VAULT_ADDR"),
+		VaultRoleID:           os.Getenv("ENVANTER_VAULT_ROLE_ID"),
+		VaultSecretID:         os.Getenv("ENVANTER_VAULT_SECRET_ID"),
+		VaultNamespace:        os.Getenv("ENVANTER_VAULT_NAMESPACE"),
 	}
 	if err := cfg.Validate(); err != nil {
 		return nil, err

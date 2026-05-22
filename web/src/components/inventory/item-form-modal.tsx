@@ -1,5 +1,5 @@
 import { useEffect, useReducer, useState } from 'react';
-import { ChevronDown, ChevronRight, Eye, EyeOff, HelpCircle, Lock, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, DatabaseZap, Eye, EyeOff, HelpCircle, Lock, Loader2, Plus, Trash2 } from 'lucide-react';
 import { TemplateGallery } from './item-form-templates';
 import type { ItemTemplate } from './item-form-templates';
 import {
@@ -22,7 +22,8 @@ import {
 import { useCreateItemMutation, useUpdateItemMutation } from '@/api/items';
 import { useAuthStore } from '@/store/auth';
 import { generateDEK, encryptField, toBase64, fromBase64, openDEKWithKEK, decryptField } from '@/lib/crypto';
-import type { FieldDefinition, Item, ItemType } from '@/api/types';
+import type { ExternalSourceVault, FieldDefinition, Item, ItemType } from '@/api/types';
+import { useVaultPathsQuery } from '@/api/vault';
 
 interface Props {
   open: boolean;
@@ -110,6 +111,16 @@ export function ItemFormModal({
 
   // Cached DEK for edit mode — re-used on save to avoid re-wrapping.
   const [editDek, setEditDek] = useState<Uint8Array | null>(null);
+
+  // PR-VAULT: external Vault source configuration (create mode only).
+  const [useVault, setUseVault] = useState(false);
+  const [vaultMount, setVaultMount] = useState('secret');
+  const [vaultPath, setVaultPath] = useState('');
+  const [vaultKvVersion, setVaultKvVersion] = useState<1 | 2>(2);
+  const [vaultKeyMapping, setVaultKeyMapping] = useState<{ fieldKey: string; vaultKey: string }[]>([]);
+  const [vaultPanelOpen, setVaultPanelOpen] = useState(false);
+  // Path autocomplete (admin only; non-admins get empty list, no error).
+  const vaultPathsQuery = useVaultPathsQuery(useVault ? vaultMount : '', useVault ? vaultPath : '');
 
   const privateKey = useAuthStore((s) => s.privateKey);
   const user = useAuthStore((s) => s.user);
@@ -279,6 +290,18 @@ export function ItemFormModal({
             }),
         );
 
+        // Build vault external_source if vault mode enabled.
+        let externalSource: ExternalSourceVault | null = null;
+        if (useVault && vaultMount && vaultPath) {
+          const mapping: Record<string, string> = {};
+          for (const { fieldKey, vaultKey } of vaultKeyMapping) {
+            if (fieldKey.trim() && vaultKey.trim()) {
+              mapping[fieldKey.trim()] = vaultKey.trim();
+            }
+          }
+          externalSource = { type: 'vault', mount: vaultMount, path: vaultPath, kv_version: vaultKvVersion, key_mapping: mapping };
+        }
+
         await createMutation.mutateAsync({
           id: crypto.randomUUID(),
           folder_id: folderId,
@@ -290,6 +313,7 @@ export function ItemFormModal({
           fields: encryptedFields,
           owner_dek_wrapped: toBase64(ownerDEKWrapped),
           owner_wrap_nonce: toBase64(wrapNonce),
+          external_source: externalSource,
         });
       }
       onOpenChange(false);
@@ -471,6 +495,86 @@ export function ItemFormModal({
             </div>
           )}
 
+
+          {/* PR-VAULT: external Vault source (create mode only) */}
+          {!isEdit && (
+            <div className="rounded-md border border-dashed">
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 px-3 py-2.5 text-left"
+                onClick={() => {
+                  if (!useVault) { setUseVault(true); setVaultPanelOpen(true); }
+                  else setVaultPanelOpen((v) => !v);
+                }}
+              >
+                <DatabaseZap className={`h-4 w-4 shrink-0 ${useVault ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`} />
+                <span className="flex-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Vault Kaynağı
+                  {useVault && <span className="ml-2 text-emerald-600 dark:text-emerald-400 normal-case font-normal">(etkin)</span>}
+                </span>
+                {vaultPanelOpen ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+              </button>
+              {vaultPanelOpen && (
+                <div className="border-t px-3 pb-3 pt-3 space-y-3">
+                  <p className="text-xs text-muted-foreground">Secret değerleri DB'ye kaydedilmez — Vault'tan canlı çekilir.</p>
+                  <div className="flex items-center gap-2">
+                    <label className="flex items-center gap-2 cursor-pointer text-sm select-none">
+                      <input type="checkbox" checked={useVault} onChange={(e) => setUseVault(e.target.checked)} className="h-4 w-4 rounded accent-emerald-600" />
+                      Vault kaynağını etkinleştir
+                    </label>
+                  </div>
+                  {useVault && (
+                    <>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="vault-mount">Mount</Label>
+                          <Input id="vault-mount" value={vaultMount} onChange={(e) => setVaultMount(e.target.value)} placeholder="secret" disabled={isPending} className="font-mono text-sm" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="vault-kv">KV Sürümü</Label>
+                          <Select value={String(vaultKvVersion)} onValueChange={(v) => setVaultKvVersion(Number(v) as 1 | 2)} disabled={isPending}>
+                            <SelectTrigger id="vault-kv"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="2">KV v2 (önerilen)</SelectItem>
+                              <SelectItem value="1">KV v1</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="vault-path">Path</Label>
+                        <Input id="vault-path" value={vaultPath} onChange={(e) => setVaultPath(e.target.value)} placeholder="prod/db/postgres" disabled={isPending} className="font-mono text-sm" list="vault-path-suggestions" />
+                        {(vaultPathsQuery.data?.paths ?? []).length > 0 && (
+                          <datalist id="vault-path-suggestions">
+                            {(vaultPathsQuery.data?.paths ?? []).map((p) => <option key={p} value={p} />)}
+                          </datalist>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-xs">Anahtar Eşlemesi (field_key → vault_key)</Label>
+                          <button type="button" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground" onClick={() => setVaultKeyMapping((m) => [...m, { fieldKey: '', vaultKey: '' }])}>
+                            <Plus className="h-3 w-3" /> Ekle
+                          </button>
+                        </div>
+                        {vaultKeyMapping.length === 0 && <p className="text-xs text-muted-foreground italic">Eşleme yok — tüm Vault key'leri döner.</p>}
+                        {vaultKeyMapping.map((row, idx) => (
+                          <div key={idx} className="flex items-center gap-2">
+                            <Input value={row.fieldKey} onChange={(e) => setVaultKeyMapping((m) => m.map((r, i) => i === idx ? { ...r, fieldKey: e.target.value } : r))} placeholder="password" disabled={isPending} className="font-mono text-xs h-7 flex-1" />
+                            <span className="text-muted-foreground text-xs shrink-0">→</span>
+                            <Input value={row.vaultKey} onChange={(e) => setVaultKeyMapping((m) => m.map((r, i) => i === idx ? { ...r, vaultKey: e.target.value } : r))} placeholder="db_password" disabled={isPending} className="font-mono text-xs h-7 flex-1" />
+                            <button type="button" aria-label="Kaldır" className="text-muted-foreground hover:text-destructive shrink-0" onClick={() => setVaultKeyMapping((m) => m.filter((_, i) => i !== idx))}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* PR-N1: Credential Expiry / Rotation */}
           <div className="space-y-3 rounded-md border border-dashed p-3">

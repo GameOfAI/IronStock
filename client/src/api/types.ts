@@ -70,4 +70,9 @@ export type {
   CreateTagRequest,
   AddItemTagRequest,
   FavoritesListResponse,
+  // Vault (PR-VAULT)
+  ExternalSourceVault,
+  VaultFieldValue,
+  VaultFetchResponse,
+  VaultPathsResponse,
 } from '@envanter/shared/api/types';
