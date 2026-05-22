@@ -29,6 +29,7 @@ import AdminLoginPage from '@/pages/admin-login';
 import ChangePasswordPage from '@/pages/change-password';
 import ProfilePage from '@/pages/profile';
 import SharePage from '@/pages/share';
+import ImportPage from '@/pages/import';
 import NotFoundPage from '@/pages/not-found';
 
 /**
@@ -112,6 +113,7 @@ export default function App() {
                     <Route path="/pipeline/lifecycle" element={<LifecyclePage />} />
                     <Route path="/pipeline/:id" element={<DiagramPage />} />
                     <Route path="/profile" element={<ProfilePage />} />
+                    <Route path="/import" element={<ImportPage />} />
 
                     {/* Admin */}
                     <Route element={<RoleGate role="admin" />}>

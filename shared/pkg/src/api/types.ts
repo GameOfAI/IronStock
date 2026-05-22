@@ -913,3 +913,41 @@ export interface VaultFetchResponse {
 export interface VaultPathsResponse {
   paths: string[];
 }
+
+// --- Bulk Import (PR-IMPORT) ---
+
+/** One parsed row returned by POST /api/v1/import/csv/preview. */
+export interface CSVPreviewRow {
+  index: number;
+  raw_data: Record<string, string>;
+}
+
+/** Response body of POST /api/v1/import/csv/preview. */
+export interface CSVPreviewResponse {
+  headers: string[];
+  rows: CSVPreviewRow[];
+  total: number;
+}
+
+/** One item in a batch import request. Fields are already client-encrypted. */
+export interface BatchImportItem {
+  id: string;              // client-generated UUID v7
+  folder_id: string;
+  item_type_id: number;
+  name: string;
+  description?: string;
+  fields: ItemFieldInput[];
+  owner_dek_wrapped: string; // base64
+  owner_wrap_nonce: string;  // base64, 12B
+  expires_at?: string | null;
+  rotation_interval_days?: number | null;
+}
+
+export interface BatchImportRequest {
+  items: BatchImportItem[];
+}
+
+export interface BatchImportResponse {
+  created: number;
+  errors: string[];
+}

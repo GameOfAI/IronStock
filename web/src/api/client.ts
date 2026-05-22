@@ -29,6 +29,11 @@ import type { ApiErrorResponse, RefreshResponse } from './types';
 export interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
+  /**
+   * Raw body for non-JSON requests (e.g. FormData for multipart uploads).
+   * When set, Content-Type is NOT added — let the browser set it with the boundary.
+   */
+  rawBody?: BodyInit;
   /** When true, send WITHOUT Authorization (for /auth/login, /register). */
   unauthenticated?: boolean;
   /** Extra query params (string-stringified, undefined values dropped). */
@@ -121,10 +126,11 @@ export async function apiFetch<T = unknown>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
-  const { method = 'GET', body, unauthenticated, query, noRetry, signal } = options;
+  const { method = 'GET', body, rawBody, unauthenticated, query, noRetry, signal } = options;
 
   const headers: Record<string, string> = {};
   if (body !== undefined) headers['Content-Type'] = 'application/json';
+  // rawBody (FormData etc.) — NO Content-Type header, browser sets it with boundary.
 
   if (!unauthenticated) {
     const token = getAccessToken();
@@ -136,7 +142,11 @@ export async function apiFetch<T = unknown>(
     headers,
     signal,
   };
-  if (body !== undefined) init.body = JSON.stringify(body);
+  if (rawBody !== undefined) {
+    init.body = rawBody;
+  } else if (body !== undefined) {
+    init.body = JSON.stringify(body);
+  }
 
   const url = buildURL(path, query);
   let res: Response;

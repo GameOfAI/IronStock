@@ -80,4 +80,10 @@ export type {
   VaultFieldValue,
   VaultFetchResponse,
   VaultPathsResponse,
+  // Import (PR-IMPORT)
+  CSVPreviewRow,
+  CSVPreviewResponse,
+  BatchImportItem,
+  BatchImportRequest,
+  BatchImportResponse,
 } from '@envanter/shared/api/types';

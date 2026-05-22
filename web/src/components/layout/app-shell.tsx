@@ -38,6 +38,7 @@ import {
   X,
   Fingerprint,
   Radio,
+  Upload,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -383,6 +384,7 @@ const NAV_LABELS: Record<string, string> = {
   '/graph': 'İlişki Haritası',
   '/pipeline': 'Pipeline Diyagramları',
   '/pipeline/lifecycle': 'Lifecycle Lanes',
+  '/import': 'Toplu İçe Aktarma',
   '/admin': 'Admin Paneli',
   '/admin/users': 'Kullanıcı Yönetimi',
   '/admin/groups': 'Gruplar',
@@ -567,6 +569,12 @@ export function AppShell() {
               to="/pipeline/lifecycle"
               icon={Layers}
               label="Lifecycle Lanes"
+              collapsed={sidebarCollapsed && !mobileOpen}
+            />
+            <NavItem
+              to="/import"
+              icon={Upload}
+              label="Toplu Aktarma"
               collapsed={sidebarCollapsed && !mobileOpen}
             />
             {isAdmin && (

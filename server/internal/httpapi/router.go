@@ -347,6 +347,14 @@ func NewRouter(d Deps) http.Handler {
 		})
 	}
 
+	// Import routes (PR-IMPORT).
+	if d.Item != nil && d.Auth != nil {
+		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+			Post("/api/v1/import/csv/preview", d.Item.CSVPreview)
+		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+			Post("/api/v1/import/batch", d.Item.BatchImport)
+	}
+
 	// Notification routes (PR-N8).
 	if d.Notification != nil && d.Auth != nil {
 		r.Route("/api/v1/notifications", func(nr chi.Router) {
