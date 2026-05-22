@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-05-22 (**Post-v1.0.0 Kapsamlı Geliştirmeler** — PR-GROUP-SHARE + PR-IMPORT + PR-N3 + PR-LDAP tamamlandı. Planlanan tüm geliştirmeler tamamlandı ✅)
+Son güncelleme: 2026-05-22 — Durum taraması: PR-SEC1/SEC2/SEC3/TIME/LOG1/VAULT/GROUP-SHARE/IMPORT/N3/LDAP tamamlandı ✅. Eksik: PR-F3 (Tauri offline cache) ve PR-SEC3 Tauri mTLS (.p12 picker).
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 

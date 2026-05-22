@@ -1,13 +1,34 @@
 # İlerleyiş
 
-Son güncelleme: 2026-05-22 (PR-GROUP-SHARE + PR-IMPORT + PR-N3 + PR-LDAP tamamlandı)
+Son güncelleme: 2026-05-22 (durum taraması — gerçek tamamlanma tablosu eklendi)
 
 ## Mevcut Durum
 
 - **Aktif Faz:** Post-v1.0.0 Kapsamlı Geliştirmeler (Faz 6+)
 - **Tamamlanan Faz:** Faz 0 + 1 + 2 + 3 + 4 + 5 ✅
-- **Son tamamlanan:** PR-GROUP-SHARE ✅ + PR-IMPORT ✅ + PR-N3 ✅ + PR-LDAP ✅ 2026-05-22
-- **Proje durumu:** MVP + tüm UX PR'ları + PR-F3 + PR-SEC1/SEC2/SEC3 + PR-LOG1 + PR-SEARCH + PR-TIME + PR-VAULT + PR-GROUP-SHARE + PR-IMPORT + PR-N3 + PR-LDAP tamamlandı. SSO/LDAP/OIDC entegrasyonu eklendi: Azure AD, Okta ve LDAP/AD desteği, auto-provisioning, admin SSO yapılandırma sayfası ve login akışı SSO butonları. Planlı tüm geliştirmeler tamamlandı.
+
+### Tamamlanan PR'lar (kod taramasıyla doğrulandı — 2026-05-22)
+
+| PR | Açıklama | Backend | Frontend | Notlar |
+|----|----------|---------|----------|--------|
+| PR-SEC1 | TOTP per-user enforcement + QR | ✅ migration 00034, auth_login 3-dal akışı, admin_users toggle | ✅ totp-qr component, MustSetupTOTPGate, admin kullanıcı modal | |
+| PR-SEC2 | First-login forced TOTP wizard | ✅ must_setup_totp login response | ✅ MustSetupTOTPGate + auth-gate.tsx | |
+| PR-SEC3 | mTLS client certificate katmanı | ✅ migration 00035/36/37, clientcert/ pkg, admin_client_certs.go, auth_login cert validation | ✅ admin/client-certs.tsx | Tauri .p12 picker eksik (bkz. eksikler) |
+| PR-TIME | Zaman bazlı erişim penceresi | ✅ migration 00040 (item_shares + folder_permissions valid_from/until) | ✅ | |
+| PR-LOG1 | Log yönlendirme (Syslog/Splunk) | ✅ migration 00038, admin_log_forwarding.go | ✅ admin/log-forwarding.tsx | |
+| PR-VAULT | HashiCorp Vault proxy | ✅ vault_handlers.go | ✅ | |
+| PR-GROUP-SHARE | Item-level grup paylaşımı | ✅ migration 00041, item_shares güncelleme | ✅ | |
+| PR-IMPORT | CSV + KeePass import sihirbazı | ✅ import_handlers.go | ✅ pages/import.tsx | |
+| PR-N3 | Onay/Checkout workflow | ✅ migration 00042, access_request_handlers.go | ✅ pages/access-requests.tsx | |
+| PR-LDAP | SSO/LDAP/OIDC entegrasyonu | ✅ migration 00043, auth_sso.go, admin_sso.go | ✅ admin/sso.tsx, sso-callback.tsx, login SSO butonları | go mod tidy gerekli |
+
+### Eksik / Tamamlanmamış
+
+| Özellik | Durum | Notlar |
+|---------|-------|--------|
+| **PR-F3: Tauri Offline Cache** | ❌ Yapılmadı | client tarafında offline SQLite cache yok |
+| **PR-SEC3: Tauri mTLS (.p12 picker)** | ❌ Yapılmadı | client/src/pages/config.tsx'te cert file picker yok; Tauri tls_fetch PKCS12 identity desteği yok |
+| **`go mod tidy`** | ⚠️ Kullanıcı aksiyonu | server/ dizininde çalıştırılmalı (go-ldap/ldap/v3 download + go.sum güncelleme) |
 
 ---
 
