@@ -190,6 +190,7 @@ func NewRouter(d Deps) http.Handler {
 			ir.Use(timeoutMW)
 			ir.Use(RequireAccessToken(d.Auth.Service.JWT))
 			ir.Get("/", d.Item.List)
+			ir.Get("/search", d.Item.Search) // PR-SEARCH: cross-folder substring search
 			ir.Post("/", d.Item.Create)
 			ir.Get("/{id}", d.Item.Get)
 			ir.Put("/{id}", d.Item.Update)

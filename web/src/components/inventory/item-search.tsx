@@ -1,9 +1,8 @@
 /**
  * ItemSearch — debounced search input for the item list.
  *
- * Server HMAC blind-index search → exact match (substring değil). UI'da
- * "Tam isim girin (ör. mysql-prod)" hint'i gösteriyoruz, false negative
- * sürpriz olmasın.
+ * PR-SEARCH: name_plain ILIKE substring search (partial match).
+ * Backfilled items: HMAC fallback for un-migrated rows (transparent to user).
  *
  * 300ms debounce; üst component her commit'te `onCommit` ile URL search
  * params'a yazar.
@@ -27,7 +26,7 @@ export function ItemSearch({
   initial,
   onCommit,
   disabled,
-  placeholder = 'Tam item adı (ör. mysql-prod)',
+  placeholder = 'İsim veya açıklama ara...',
 }: ItemSearchProps) {
   const [draft, setDraft] = useState(initial);
   const lastCommittedRef = useRef(initial);

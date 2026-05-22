@@ -7,11 +7,12 @@ interface ItemSearchProps {
   initial: string;
   onCommit(value: string): void;
   disabled?: boolean;
+  placeholder?: string;
 }
 
 const DEBOUNCE_MS = 300;
 
-export function ItemSearch({ initial, onCommit, disabled }: ItemSearchProps) {
+export function ItemSearch({ initial, onCommit, disabled, placeholder = 'İsim veya açıklama ara...' }: ItemSearchProps) {
   const [draft, setDraft] = useState(initial);
   const lastCommittedRef = useRef(initial);
 
@@ -40,7 +41,7 @@ export function ItemSearch({ initial, onCommit, disabled }: ItemSearchProps) {
       <Input
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
-        placeholder="Tam item adı (ör. mysql-prod)"
+        placeholder={placeholder}
         disabled={disabled}
         className="pl-9 pr-9"
         aria-label="Item ara"

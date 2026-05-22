@@ -1,5 +1,5 @@
 /**
- * Item endpoints — read + write hooks (PR-W4 read, PR-W5 write).
+ * Item endpoints — read + write hooks (PR-W4 read, PR-W5 write, PR-SEARCH global search).
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -100,6 +100,24 @@ export function useFieldVersionsQuery(itemId: string | null, fieldDefId: number 
       ),
     enabled: itemId !== null && fieldDefId !== null,
     staleTime: 30_000,
+  });
+}
+
+/**
+ * PR-SEARCH: Cross-folder global search.
+ * Calls GET /api/v1/items/search?q=<term> (min 2 chars).
+ * Returns items from all folders the user can access.
+ */
+export function useGlobalItemSearch(q: string) {
+  const trimmed = q.trim();
+  return useQuery({
+    queryKey: ['items', 'global-search', trimmed],
+    queryFn: () =>
+      apiFetch<ItemListResponse>('/api/v1/items/search', {
+        query: { q: trimmed },
+      }),
+    enabled: trimmed.length >= 2,
+    staleTime: 10_000,
   });
 }
 

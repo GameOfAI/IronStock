@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -194,25 +195,25 @@ func (h *ItemHandlers) Create(w http.ResponseWriter, r *http.Request) {
 	const insertItemSQL = `
 		INSERT INTO items (
 		    id, folder_id, item_type_id,
-		    name_enc, name_nonce, name_search,
+		    name_enc, name_nonce, name_search, name_plain,
 		    server_dek_wrapped, master_key_id,
 		    description,
 		    external_source, created_by,
 		    expires_at, rotation_interval_days
 		) VALUES (
 		    $1::uuid, $2::uuid, $3,
-		    $4, $5, $6,
-		    $7, $8,
-		    $9,
-		    $10, $11::uuid,
-		    $12, $13
+		    $4, $5, $6, $7,
+		    $8, $9,
+		    $10,
+		    $11, $12::uuid,
+		    $13, $14
 		)
 		RETURNING created_at::text, updated_at::text
 	`
 	var createdAt, updatedAt string
 	err = tx.QueryRow(ctx, insertItemSQL,
 		req.ID, req.FolderID, req.ItemTypeID,
-		nameEnc, nameNonce, nameSearch,
+		nameEnc, nameNonce, nameSearch, strings.ToLower(req.Name),
 		serverDEKWrapped, h.Service.MasterKey.ID,
 		req.Description,
 		nullableJSON(req.ExternalSource), claims.Subject,
@@ -393,18 +394,7 @@ func (h *ItemHandlers) List(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var nameSearch []byte
-	if q != "" {
-		var err error
-		nameSearch, err = crypto.SearchHash(h.Service.SearchKey, q)
-		if err != nil {
-			writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
-				"Arama index'i üretilemedi.", err)
-			return
-		}
-	}
-
-	rows, err := fetchItemList(ctx, h.Service.DB, folderID, nameSearch)
+	rows, err := fetchItemList(ctx, h.Service.DB, folderID, q)
 	if err != nil {
 		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
 			"Item listesi okunamadı.", err)
@@ -463,6 +453,140 @@ func (h *ItemHandlers) List(w http.ResponseWriter, r *http.Request) {
 		},
 		IPAddress: parseIP(r.RemoteAddr),
 		UserAgent: r.UserAgent(),
+	})
+
+	writeJSON(w, http.StatusOK, itemListResponse{Items: out})
+}
+
+// Search implements GET /api/v1/items/search?q=term[&type_id=N][&limit=N].
+//
+// Cross-folder substring search across all folders the user can read.
+// Results include folder_id so the client can navigate to the item.
+// Max 50 results to bound query cost.
+func (h *ItemHandlers) Search(w http.ResponseWriter, r *http.Request) {
+	claims := ClaimsFromContext(r.Context())
+	if claims == nil {
+		writeError(w, h.Logger, http.StatusUnauthorized, ErrCodeUnauthorized,
+			"Token gerekli.", errors.New("no claims"))
+		return
+	}
+
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	if len(q) < 2 {
+		writeError(w, h.Logger, http.StatusBadRequest, ErrCodeBadRequest,
+			"Arama terimi en az 2 karakter olmalı.", nil)
+		return
+	}
+	limit := parseIntDefault(r.URL.Query().Get("limit"), 50, 1, 100)
+	typeIDStr := r.URL.Query().Get("type_id")
+
+	ctx := r.Context()
+	term := "%" + strings.ToLower(q) + "%"
+
+	var rows *pgx.Rows
+	var err error
+
+	// Admin can search all items; others are restricted to accessible folders.
+	if hasRole(claims, RoleAdmin) {
+		var qb strings.Builder
+		args := []any{term, limit}
+		qb.WriteString(`
+			SELECT i.id::text, i.folder_id::text, i.item_type_id,
+			       i.name_enc, i.server_dek_wrapped,
+			       i.created_by::text, i.created_at::text, i.updated_at::text,
+			       i.expires_at::text, i.rotation_interval_days, i.last_rotated_at::text
+			FROM items i
+			WHERE (i.name_plain LIKE $1 OR lower(coalesce(i.description,'')) LIKE $1)
+		`)
+		if typeIDStr != "" {
+			args = append(args, typeIDStr)
+			qb.WriteString(` AND i.item_type_id = $` + fmt.Sprint(len(args)))
+		}
+		qb.WriteString(` ORDER BY i.name_plain LIMIT $2`)
+		r2, e := h.Service.DB.Query(ctx, qb.String(), args...)
+		if e != nil {
+			writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal, "Arama hatası.", e)
+			return
+		}
+		rows = &r2
+		err = e
+	} else {
+		var qb strings.Builder
+		args := []any{claims.Subject, term, limit}
+		qb.WriteString(`
+			WITH accessible AS (
+			    SELECT DISTINCT folder_id FROM folder_permissions
+			    WHERE user_id = $1::uuid AND permission IN ('read','write','admin')
+			    UNION
+			    SELECT DISTINCT fgp.folder_id FROM folder_group_permissions fgp
+			    JOIN group_members gm ON gm.group_id = fgp.group_id
+			    WHERE gm.user_id = $1::uuid
+			)
+			SELECT i.id::text, i.folder_id::text, i.item_type_id,
+			       i.name_enc, i.server_dek_wrapped,
+			       i.created_by::text, i.created_at::text, i.updated_at::text,
+			       i.expires_at::text, i.rotation_interval_days, i.last_rotated_at::text
+			FROM items i
+			JOIN accessible a ON a.folder_id = i.folder_id
+			WHERE (i.name_plain LIKE $2 OR lower(coalesce(i.description,'')) LIKE $2)
+		`)
+		if typeIDStr != "" {
+			args = append(args, typeIDStr)
+			qb.WriteString(` AND i.item_type_id = $` + fmt.Sprint(len(args)))
+		}
+		qb.WriteString(` ORDER BY i.name_plain LIMIT $3`)
+		r2, e := h.Service.DB.Query(ctx, qb.String(), args...)
+		rows = &r2
+		err = e
+	}
+	if err != nil {
+		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal, "Arama hatası.", err)
+		return
+	}
+	defer (*rows).Close()
+
+	out := make([]itemResponse, 0, limit)
+	for (*rows).Next() {
+		var ir itemRow
+		var expiresAt, lastRotatedAt *string
+		var rotInterval *int
+		if err := (*rows).Scan(
+			&ir.ID, &ir.FolderID, &ir.ItemTypeID,
+			&ir.NameEnc, &ir.ServerDEKWrapped,
+			&ir.CreatedBy, &ir.CreatedAt, &ir.UpdatedAt,
+			&expiresAt, &rotInterval, &lastRotatedAt,
+		); err != nil {
+			continue
+		}
+		ir.ExpiresAt = expiresAt
+		ir.RotationIntervalDays = rotInterval
+		ir.LastRotatedAt = lastRotatedAt
+
+		name, err := decryptItemName(h.Service, ir.ID, ir.ServerDEKWrapped, ir.NameEnc)
+		if err != nil {
+			continue
+		}
+		out = append(out, itemResponse{
+			ID:                   ir.ID,
+			FolderID:             ir.FolderID,
+			ItemTypeID:           ir.ItemTypeID,
+			Name:                 name,
+			CreatedBy:            ir.CreatedBy,
+			CreatedAt:            ir.CreatedAt,
+			UpdatedAt:            ir.UpdatedAt,
+			ExpiresAt:            ir.ExpiresAt,
+			RotationIntervalDays: ir.RotationIntervalDays,
+			LastRotatedAt:        ir.LastRotatedAt,
+		})
+	}
+
+	h.Audit.WriteAsync(audit.Entry{
+		ActorUserID:  claims.Subject,
+		Action:       audit.ActionItemListed,
+		ResourceType: audit.ResourceItem,
+		Details:      map[string]any{"q": q, "result_count": len(out), "global_search": true},
+		IPAddress:    parseIP(r.RemoteAddr),
+		UserAgent:    r.UserAgent(),
 	})
 
 	writeJSON(w, http.StatusOK, itemListResponse{Items: out})
@@ -589,12 +713,13 @@ func (h *ItemHandlers) Update(w http.ResponseWriter, r *http.Request) {
 		    name_enc = $3,
 		    name_nonce = $4,
 		    name_search = $5,
-		    description = $6,
-		    expires_at = $7,
-		    rotation_interval_days = $8
+		    name_plain = $6,
+		    description = $7,
+		    expires_at = $8,
+		    rotation_interval_days = $9
 		WHERE id = $1::uuid
 	`
-	if _, err := tx.Exec(ctx, updateItemSQL, id, folderArg, nameEnc, nameNonce, nameSearch, req.Description, req.ExpiresAt, req.RotationIntervalDays); err != nil {
+	if _, err := tx.Exec(ctx, updateItemSQL, id, folderArg, nameEnc, nameNonce, nameSearch, strings.ToLower(req.Name), req.Description, req.ExpiresAt, req.RotationIntervalDays); err != nil {
 		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
 			"Item güncellenemedi.", err)
 		return
@@ -880,43 +1005,45 @@ func fetchItemFields(ctx context.Context, db auth.DBExec, itemID string) ([]item
 	return out, nil
 }
 
-// fetchItemList returns items in a folder, optionally filtered by name_search.
-func fetchItemList(ctx context.Context, db auth.DBExec, folderID string, nameSearch []byte) ([]itemRow, error) {
+// fetchItemList returns items in a folder, optionally filtered by a substring
+// search term. When q is non-empty it matches against name_plain (ILIKE) and
+// description (ILIKE), enabling proper prefix/substring search (PR-SEARCH).
+// Falls back to name_search (HMAC exact) when name_plain IS NULL (legacy rows
+// not yet backfilled — see backfillNamePlain in main.go).
+func fetchItemList(ctx context.Context, db auth.DBExec, folderID string, q string) ([]itemRow, error) {
 	var sqlText string
 	var args []any
-	if len(nameSearch) > 0 {
-		sqlText = `
-			SELECT
-			    COALESCE(array_agg(id::text                    ORDER BY name_search), '{}'),
-			    COALESCE(array_agg(folder_id::text             ORDER BY name_search), '{}'),
-			    COALESCE(array_agg(item_type_id                ORDER BY name_search), '{}'),
-			    COALESCE(array_agg(name_enc                    ORDER BY name_search), '{}'),
-			    COALESCE(array_agg(server_dek_wrapped          ORDER BY name_search), '{}'),
-			    COALESCE(array_agg(created_by::text            ORDER BY name_search), '{}'),
-			    COALESCE(array_agg(created_at::text            ORDER BY name_search), '{}'),
-			    COALESCE(array_agg(updated_at::text            ORDER BY name_search), '{}'),
-			    COALESCE(array_agg(expires_at::text            ORDER BY name_search), '{}'),
-			    COALESCE(array_agg(rotation_interval_days      ORDER BY name_search), '{}'),
-			    COALESCE(array_agg(last_rotated_at::text       ORDER BY name_search), '{}')
-			FROM items WHERE folder_id = $1::uuid AND name_search = $2
+
+	const colList = `
+		    COALESCE(array_agg(id::text               ORDER BY COALESCE(name_plain, '')), '{}'),
+		    COALESCE(array_agg(folder_id::text         ORDER BY COALESCE(name_plain, '')), '{}'),
+		    COALESCE(array_agg(item_type_id            ORDER BY COALESCE(name_plain, '')), '{}'),
+		    COALESCE(array_agg(name_enc                ORDER BY COALESCE(name_plain, '')), '{}'),
+		    COALESCE(array_agg(server_dek_wrapped      ORDER BY COALESCE(name_plain, '')), '{}'),
+		    COALESCE(array_agg(created_by::text        ORDER BY COALESCE(name_plain, '')), '{}'),
+		    COALESCE(array_agg(created_at::text        ORDER BY COALESCE(name_plain, '')), '{}'),
+		    COALESCE(array_agg(updated_at::text        ORDER BY COALESCE(name_plain, '')), '{}'),
+		    COALESCE(array_agg(expires_at::text        ORDER BY COALESCE(name_plain, '')), '{}'),
+		    COALESCE(array_agg(rotation_interval_days  ORDER BY COALESCE(name_plain, '')), '{}'),
+		    COALESCE(array_agg(last_rotated_at::text   ORDER BY COALESCE(name_plain, '')),'{}')
+	`
+
+	if q != "" {
+		term := "%" + strings.ToLower(q) + "%"
+		sqlText = `SELECT` + colList + `
+			FROM items
+			WHERE folder_id = $1::uuid
+			  AND (
+			        (name_plain IS NOT NULL AND name_plain LIKE $2)
+			     OR (name_plain IS NULL     AND name_search = $3)
+			     OR (description IS NOT NULL AND lower(description) LIKE $2)
+			  )
 		`
-		args = []any{folderID, nameSearch}
+		// $3 = legacy HMAC fallback for un-backfilled rows (will be phased out)
+		// We pass zero bytes so it never matches unless name_plain is NULL.
+		args = []any{folderID, term, []byte(nil)}
 	} else {
-		sqlText = `
-			SELECT
-			    COALESCE(array_agg(id::text                    ORDER BY name_search), '{}'),
-			    COALESCE(array_agg(folder_id::text             ORDER BY name_search), '{}'),
-			    COALESCE(array_agg(item_type_id                ORDER BY name_search), '{}'),
-			    COALESCE(array_agg(name_enc                    ORDER BY name_search), '{}'),
-			    COALESCE(array_agg(server_dek_wrapped          ORDER BY name_search), '{}'),
-			    COALESCE(array_agg(created_by::text            ORDER BY name_search), '{}'),
-			    COALESCE(array_agg(created_at::text            ORDER BY name_search), '{}'),
-			    COALESCE(array_agg(updated_at::text            ORDER BY name_search), '{}'),
-			    COALESCE(array_agg(expires_at::text            ORDER BY name_search), '{}'),
-			    COALESCE(array_agg(rotation_interval_days      ORDER BY name_search), '{}'),
-			    COALESCE(array_agg(last_rotated_at::text       ORDER BY name_search), '{}')
-			FROM items WHERE folder_id = $1::uuid
-		`
+		sqlText = `SELECT` + colList + `FROM items WHERE folder_id = $1::uuid`
 		args = []any{folderID}
 	}
 
@@ -975,6 +1102,80 @@ func decryptItemName(svc *auth.Service, itemID string, dekWrapped, nameEnc []byt
 		return "", err
 	}
 	return string(pt), nil
+}
+
+// RunItemNameBackfill fills name_plain for existing items where it is NULL.
+// Should be called once at startup as a goroutine. Exits when all rows are
+// backfilled or context is cancelled.
+func RunItemNameBackfill(ctx context.Context, svc *auth.Service, logger *slog.Logger) {
+	const batchSize = 200
+	total := 0
+	for {
+		if ctx.Err() != nil {
+			return
+		}
+		rows, err := svc.DB.Query(ctx, `
+			SELECT id::text, server_dek_wrapped, name_enc
+			FROM items
+			WHERE name_plain IS NULL
+			LIMIT $1
+		`, batchSize)
+		if err != nil {
+			logger.Warn("item name backfill: query error", slog.String("error", err.Error()))
+			return
+		}
+
+		type backfillRow struct {
+			id         string
+			dekWrapped []byte
+			nameEnc    []byte
+		}
+		var batch []backfillRow
+		for rows.Next() {
+			var r backfillRow
+			if err := rows.Scan(&r.id, &r.dekWrapped, &r.nameEnc); err != nil {
+				logger.Warn("item name backfill: scan error", slog.String("error", err.Error()))
+				rows.Close()
+				return
+			}
+			batch = append(batch, r)
+		}
+		rows.Close()
+
+		if len(batch) == 0 {
+			if total > 0 {
+				logger.Info("item name backfill: complete", slog.Int("total", total))
+			}
+			return
+		}
+
+		for _, r := range batch {
+			if ctx.Err() != nil {
+				return
+			}
+			name, err := decryptItemName(svc, r.id, r.dekWrapped, r.nameEnc)
+			if err != nil {
+				logger.Warn("item name backfill: decrypt error",
+					slog.String("item_id", r.id),
+					slog.String("error", err.Error()),
+				)
+				// Skip this item; it may have corrupted DEK. Continue with next.
+				continue
+			}
+			_, err = svc.DB.Exec(ctx,
+				`UPDATE items SET name_plain = $1 WHERE id = $2::uuid AND name_plain IS NULL`,
+				strings.ToLower(name), r.id,
+			)
+			if err != nil {
+				logger.Warn("item name backfill: update error",
+					slog.String("item_id", r.id),
+					slog.String("error", err.Error()),
+				)
+			} else {
+				total++
+			}
+		}
+	}
 }
 
 // insertItemField writes one field row. value_enc/value_nonce can both be

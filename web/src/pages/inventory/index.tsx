@@ -12,10 +12,10 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Copy, FolderPlus, FolderTree as FolderTreeIcon, Pencil, Plus, Share2, Trash2 } from 'lucide-react';
+import { Copy, FolderPlus, FolderTree as FolderTreeIcon, Globe, Pencil, Plus, Share2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useFieldDefinitions, useItemTypes } from '@/api/catalog';
-import { useItem, useItems } from '@/api/items';
+import { useItem, useItems, useGlobalItemSearch } from '@/api/items';
 import { useFolder } from '@/api/folders';
 import { useAuthStore } from '@/store/auth';
 import { useToast } from '@/hooks/use-toast';
@@ -48,6 +48,8 @@ export default function InventoryPage() {
   const [folderModal, setFolderModal] = useState<FolderModal>(null);
   const [itemModal, setItemModal] = useState<ItemModal>(null);
   const [activeItem, setActiveItem] = useState<Item | null>(null);
+  // PR-SEARCH: Global cross-folder search toggle
+  const [globalSearch, setGlobalSearch] = useState(false);
   // PR-UX4: Tip filtre chip'leri — boş set = hepsi göster
   const [activeTypeIds, setActiveTypeIds] = useState<Set<number>>(new Set());
   const [duplicateFrom, setDuplicateFrom] = useState<{
@@ -62,7 +64,8 @@ export default function InventoryPage() {
 
   const fieldDefsQuery = useFieldDefinitions();
   const itemTypesQuery = useItemTypes();
-  const itemsQuery = useItems(folderId, query);
+  const itemsQuery = useItems(globalSearch ? null : folderId, globalSearch ? undefined : query);
+  const globalSearchQuery = useGlobalItemSearch(globalSearch ? query : '');
   const folderQuery = useFolder(folderId);
   // Full item (with encrypted fields + DEK) for duplicate decryption.
   const fullItemQuery = useItem(itemId);
@@ -98,19 +101,24 @@ export default function InventoryPage() {
     [updateParams],
   );
 
+  // PR-SEARCH: Global search active items or folder items
+  const activeItems = globalSearch
+    ? (globalSearchQuery.data?.items ?? (query.trim().length >= 2 ? undefined : []))
+    : itemsQuery.data?.items;
+
   // PR-UX4: Mevcut klasördeki unique tip ID'leri (chip'leri oluşturmak için)
   const presentTypeIds = useMemo(
-    () => Array.from(new Set((itemsQuery.data?.items ?? []).map((i) => i.item_type_id))).sort(),
-    [itemsQuery.data?.items],
+    () => Array.from(new Set((activeItems ?? []).map((i) => i.item_type_id))).sort(),
+    [activeItems],
   );
 
   // Tip filtresi uygula
   const filteredItems = useMemo(() => {
-    const all = itemsQuery.data?.items;
+    const all = activeItems;
     if (!all) return undefined;
     if (activeTypeIds.size === 0) return all;
     return all.filter((i) => activeTypeIds.has(i.item_type_id));
-  }, [itemsQuery.data?.items, activeTypeIds]);
+  }, [activeItems, activeTypeIds]);
 
   function toggleTypeFilter(typeId: number) {
     setActiveTypeIds((prev) => {
@@ -121,7 +129,7 @@ export default function InventoryPage() {
     });
   }
 
-  const selectedItem = activeItem ?? itemsQuery.data?.items.find((i) => i.id === itemId) ?? null;
+  const selectedItem = activeItem ?? (activeItems ?? []).find((i) => i.id === itemId) ?? null;
 
   function openItemModal(modal: ItemModal, item?: Item) {
     setActiveItem(item ?? null);
@@ -255,9 +263,29 @@ export default function InventoryPage() {
         <section className="flex min-h-0 flex-col overflow-hidden border-r border-slate-800 bg-slate-950">
           <div className="flex items-center gap-2 border-b border-slate-800 p-2">
             <div className="flex-1">
-              <ItemSearch initial={query} onCommit={handleSearchCommit} disabled={!folderId} />
+              <ItemSearch
+                initial={query}
+                onCommit={handleSearchCommit}
+                disabled={!folderId && !globalSearch}
+                placeholder={globalSearch ? 'Tüm klasörlerde ara (min. 2 karakter)...' : undefined}
+              />
             </div>
-            {folderId && (
+            {/* PR-SEARCH: Global search toggle */}
+            <Button
+              size="icon"
+              variant={globalSearch ? 'default' : 'ghost'}
+              className="h-8 w-8 shrink-0"
+              aria-label={globalSearch ? 'Klasör aramasına dön' : 'Tüm klasörlerde ara'}
+              title={globalSearch ? 'Klasör aramasına dön' : 'Tüm klasörlerde ara'}
+              onClick={() => {
+                setGlobalSearch((v) => !v);
+                // Clear query when toggling
+                handleSearchCommit('');
+              }}
+            >
+              <Globe size={14} />
+            </Button>
+            {folderId && !globalSearch && (
               <Button
                 size="sm"
                 variant="outline"
@@ -357,9 +385,13 @@ export default function InventoryPage() {
           <div className="flex-1 overflow-y-auto">
             <ItemList
               items={filteredItems}
-              isLoading={itemsQuery.isLoading || itemsQuery.isFetching}
-              isError={itemsQuery.isError}
-              folderSelected={!!folderId}
+              isLoading={
+                globalSearch
+                  ? globalSearchQuery.isLoading || globalSearchQuery.isFetching
+                  : itemsQuery.isLoading || itemsQuery.isFetching
+              }
+              isError={globalSearch ? globalSearchQuery.isError : itemsQuery.isError}
+              folderSelected={globalSearch ? true : !!folderId}
               searchQuery={query}
               selectedItemId={itemId}
               onSelect={handleSelectItem}

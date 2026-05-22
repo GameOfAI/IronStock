@@ -239,6 +239,9 @@ func run() error {
 		Logger:  logger,
 		Hub:     hub,
 	}
+	// PR-SEARCH: Backfill name_plain for existing items (runs once, exits when done).
+	go httpapi.RunItemNameBackfill(rootCtx, authSvc, logger)
+
 	adminHandlers := &httpapi.AdminHandlers{
 		Service: authSvc,
 		Audit:   auditWriter,

@@ -9,11 +9,11 @@
 
 import { useCallback, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { Globe, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useFieldDefinitions, useItemTypes } from '@/api/catalog';
-import { useItems } from '@/api/items';
+import { useItems, useGlobalItemSearch } from '@/api/items';
 import type { Item } from '@/api/types';
 import { FolderTree } from '@/components/inventory/folder-tree';
 import { ItemList } from '@/components/inventory/item-list';
@@ -28,16 +28,23 @@ export default function InventoryPage() {
   const itemId = searchParams.get('item');
   const query = searchParams.get('q') ?? '';
 
+  const [globalSearch, setGlobalSearch] = useState(false);
+
   const fieldDefsQuery = useFieldDefinitions();
   const itemTypesQuery = useItemTypes();
-  const itemsQuery = useItems(folderId, query);
+  const itemsQuery = useItems(globalSearch ? null : folderId, globalSearch ? undefined : query);
+  const globalSearchQuery = useGlobalItemSearch(globalSearch ? query : '');
 
   const [formOpen, setFormOpen] = useState(false);
   const [editItem, setEditItem] = useState<Item | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
-  const selectedItem = itemsQuery.data?.items.find((i) => i.id === itemId) ?? null;
+  const activeItems = globalSearch
+    ? (globalSearchQuery.data?.items ?? (query.trim().length >= 2 ? undefined : []))
+    : itemsQuery.data?.items;
+
+  const selectedItem = (activeItems ?? []).find((i) => i.id === itemId) ?? null;
 
   const updateParams = useCallback(
     (mut: (p: URLSearchParams) => void) => {
@@ -107,46 +114,71 @@ export default function InventoryPage() {
           <section className="flex min-h-0 flex-col overflow-hidden">
             <div className="flex items-center gap-2 border-b p-2">
               <div className="flex-1">
-                <ItemSearch initial={query} onCommit={handleSearchCommit} disabled={!folderId} />
+                <ItemSearch
+                  initial={query}
+                  onCommit={handleSearchCommit}
+                  disabled={!folderId && !globalSearch}
+                  placeholder={globalSearch ? 'Tüm klasörlerde ara (min. 2 karakter)...' : undefined}
+                />
               </div>
               <div className="flex shrink-0 items-center gap-1">
+                {/* PR-SEARCH: Global search toggle */}
                 <Button
                   size="sm"
-                  variant="default"
-                  disabled={!folderId}
-                  onClick={handleNewItem}
-                  title="Yeni item"
+                  variant={globalSearch ? 'default' : 'ghost'}
+                  title={globalSearch ? 'Klasör aramasına dön' : 'Tüm klasörlerde ara'}
+                  onClick={() => {
+                    setGlobalSearch((v) => !v);
+                    handleSearchCommit('');
+                  }}
                 >
-                  <Plus className="h-4 w-4" />
-                  <span className="ml-1 hidden sm:inline">Yeni</span>
+                  <Globe className="h-4 w-4" />
                 </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={!selectedItem}
-                  onClick={handleEditItem}
-                  title="Düzenle"
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={!selectedItem}
-                  onClick={handleDeleteItem}
-                  title="Sil"
-                  className="text-destructive hover:text-destructive"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                {!globalSearch && (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="default"
+                      disabled={!folderId}
+                      onClick={handleNewItem}
+                      title="Yeni item"
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span className="ml-1 hidden sm:inline">Yeni</span>
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={!selectedItem}
+                      onClick={handleEditItem}
+                      title="Düzenle"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={!selectedItem}
+                      onClick={handleDeleteItem}
+                      title="Sil"
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
             <div className="flex-1 overflow-y-auto">
               <ItemList
-                items={itemsQuery.data?.items}
-                isLoading={itemsQuery.isLoading || itemsQuery.isFetching}
-                isError={itemsQuery.isError}
-                folderSelected={!!folderId}
+                items={activeItems}
+                isLoading={
+                  globalSearch
+                    ? globalSearchQuery.isLoading || globalSearchQuery.isFetching
+                    : itemsQuery.isLoading || itemsQuery.isFetching
+                }
+                isError={globalSearch ? globalSearchQuery.isError : itemsQuery.isError}
+                folderSelected={globalSearch ? true : !!folderId}
                 searchQuery={query}
                 selectedItemId={itemId}
                 onSelect={handleSelectItem}

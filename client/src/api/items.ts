@@ -69,6 +69,20 @@ export function useFieldVersionsQuery(itemId: string | null, fieldDefId: number 
 }
 
 /** PR-N1: Record that a credential has been manually rotated. Sets last_rotated_at = now(). */
+/** PR-SEARCH: Cross-folder global search. Min 2 chars. */
+export function useGlobalItemSearch(q: string) {
+  const trimmed = q.trim();
+  return useQuery({
+    queryKey: ['items', 'global-search', trimmed],
+    queryFn: () =>
+      apiFetch<ItemListResponse>('/api/v1/items/search', {
+        query: { q: trimmed },
+      }),
+    enabled: trimmed.length >= 2,
+    staleTime: 10_000,
+  });
+}
+
 export function useRecordRotationMutation(itemId: string) {
   const qc = useQueryClient();
   return useMutation({
