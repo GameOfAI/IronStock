@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-05-22 (**Post-v1.0.0 Kapsamlı Geliştirmeler** — PR-SEARCH (substring arama + global), PR-TIME (zaman bazlı erişim), PR-VAULT (HashiCorp Vault proxy, ADR-0007) tamamlandı. Sıradaki: PR-N3 (Onay/checkout workflow) veya PR-IMPORT (bulk import).)
+Son güncelleme: 2026-05-22 (**Post-v1.0.0 Kapsamlı Geliştirmeler** — PR-GROUP-SHARE (item-level grup paylaşımı, 4-sinyal ACL) + PR-IMPORT (toplu CSV+KeePass import sihirbazı) tamamlandı. Sıradaki: PR-N3 (Onay/checkout workflow) ve PR-LDAP (SSO/LDAP).)
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 
@@ -667,8 +667,8 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 - [ ] **SSO / OIDC entegrasyonu** — Azure AD (Entra ID) ve Okta. Kurumsal ortamlarda AD zorunlu; bu olmadan enterprise satışı güç. SAML 2.0 + OIDC. Backend: `POST /auth/sso/callback` + `users.external_id` kolonu. Önce Entra ID, sonra Okta.
 - [ ] **PR-N3 (Onay/Checkout Workflow)** — Kritik credential erişimi → onay isteği → admin onayı → zaman-sınırlı görüntüleme. `access_requests` tablosu. WS event'lar. Büyük iş, ayrı plan session.
 - [ ] **Bağlı kayıtlar (Linked Entries)** — `item_links` tablosu: `source_item_id → target_item_id, field_def_id`. Kaynak alan güncellenince bağlı item'lar da güncellenir (re-encrypt). Örn: tek SSH key birden fazla sunucuda kullanılıyor.
-- [ ] **Bulk import/export** — CSV + KeePassXC .kdbx import parser (Go `keepassxc-go` library). Takım geçişleri için şart.
-- [ ] **Share modal grup desteği** — `item_shares`'e `group_id` sütunu + `ResolveItemPermission` CTE'ye group path. Frontend: kullanıcı picker'a "Gruplar" tab'ı.
+- [x] **Bulk import/export** — CSV + KeePass .kdbx import sihirbazı (kdbxweb istemci-taraflı; server stdlib csv). Toplu şifreli item oluşturma, E2E guarantee. ✅ 2026-05-22 (PR-IMPORT)
+- [x] **Share modal grup desteği** — `item_group_shares` tablosu + `ResolveItemPermission` 4-sinyal (owner > user share > group share > folder ACL). Frontend: paylaşım modalına "Grup" sekmesi. ✅ 2026-05-22 (PR-GROUP-SHARE)
 
 **Uzun vadeli — büyük özellikler (ay):**
 - [ ] **Otomatik parola rotasyonu** — Rotation scheduler + agent/runner ile SSH/API üzerinden credential push. Backend'de rotation policy engine. Devolutions'da PAM add-on; IronStock'ta built-in olabilir.

@@ -1,13 +1,13 @@
 # İlerleyiş
 
-Son güncelleme: 2026-05-22 (PR-VAULT — HashiCorp Vault proxy entegrasyonu tamamlandı)
+Son güncelleme: 2026-05-22 (PR-GROUP-SHARE + PR-IMPORT tamamlandı)
 
 ## Mevcut Durum
 
 - **Aktif Faz:** Post-v1.0.0 Kapsamlı Geliştirmeler (Faz 6+)
 - **Tamamlanan Faz:** Faz 0 + 1 + 2 + 3 + 4 + 5 ✅
-- **Son tamamlanan:** PR-SEARCH ✅ + PR-TIME ✅ + PR-VAULT ✅ 2026-05-22
-- **Proje durumu:** MVP + tüm UX PR'ları + PR-F3 + PR-SEC1/SEC2/SEC3 + PR-LOG1 + PR-SEARCH + PR-TIME + PR-VAULT tamamlandı. HashiCorp Vault proxy entegrasyonu (ADR-0007) production'a alındı. Sıradaki: PR-N3 (Onay/checkout workflow) veya PR-IMPORT (bulk import).
+- **Son tamamlanan:** PR-GROUP-SHARE ✅ + PR-IMPORT ✅ 2026-05-22
+- **Proje durumu:** MVP + tüm UX PR'ları + PR-F3 + PR-SEC1/SEC2/SEC3 + PR-LOG1 + PR-SEARCH + PR-TIME + PR-VAULT + PR-GROUP-SHARE + PR-IMPORT tamamlandı. Toplu CSV+KeePass import wizard ve item-level grup paylaşımı eklendi. Sıradaki: PR-N3 (Onay/checkout workflow) ve PR-LDAP (SSO/LDAP).
 
 ---
 
@@ -144,6 +144,8 @@ IronStock şu an **"güvenli credential vault + DevOps görselleştirme"** kesi�
 | PR-SEC1 | TOTP per-user enforcement + Login UX + QR | ✅ DONE |
 | PR-SEC2 | First-login forced TOTP setup wizard | ✅ DONE |
 | PR-SEC3 | Client Certificate (mTLS) | 📋 TODO |
+| PR-GROUP-SHARE | Item-level grup paylaşımı (ACL + E2E DEK wrap) | ✅ DONE |
+| PR-IMPORT | Toplu CSV + KeePass import sihirbazı | ✅ DONE |
 
 ## Faz Durumu
 
@@ -186,6 +188,40 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-05-22 (Win) — PR-IMPORT: Toplu CSV + KeePass Import Sihirbazı ✅
+
+**Mimari:** İki kaynak destekleniyor — CSV (sunucu önizleme) ve KeePass .kdbx (istemci-taraflı şifre çözme). E2E garantisi: şifreler tarayıcıda şifrelenir, sunucu plaintext görmez.
+
+**Tamamlanan:**
+- `server/internal/httpapi/import_handlers.go` — `CSVPreview` (POST /api/v1/import/csv/preview, stdlib encoding/csv, 500 satır önizleme, 10 MB limit, BOM temizleme) + `BatchImport` (POST /api/v1/import/batch, 1000 item limit, klasör ACL kontrolü, server-side envelope şifreleme, owner share row, audit event)
+- `server/internal/httpapi/router.go` — iki yeni import route'u
+- `web/src/lib/kdbx-parser.ts` — kdbxweb ile .kdbx şifre çözme, recursive grup yürüyüşü, `ProtectedValue.getText()` ile secret alanlar
+- `web/src/pages/import.tsx` — 4 adımlı sihirbaz (seç → önizle → içe aktarıyor → tamamlandı); CSV kolon otomatik algılama; KeePass master parola girişi; E2E: `generateDEK` + `encryptField` + `sealDEK` submit öncesi; per-item hata raporu
+- `web/src/api/import.ts` — `useCSVPreviewMutation`, `useBatchImportMutation`
+- `web/src/api/client.ts` — `rawBody?: BodyInit` desteği (multipart FormData yüklemeleri için)
+- `shared/pkg/src/api/types.ts` + `client/src/api/types.ts` — `CSVPreviewResponse`, `BatchImportItem`, `BatchImportRequest`, `BatchImportResponse` tipleri
+- `web/package.json` — `uuid@11` eklendi (istemci taraflı UUIDv7 item ID üretimi için)
+- `web/src/App.tsx` + `web/src/components/layout/app-shell.tsx` — "Toplu Aktarma" nav item + `/import` route
+
+---
+
+### 2026-05-22 (Win) — PR-GROUP-SHARE: Item-Level Grup Paylaşımı ✅
+
+**Mimari:** `item_group_shares` tablosu ACL takibi için; her grup üyesi için `item_shares` satırları E2E DEK wrap'ları için. `ResolveItemPermission` 3-sinyalden 4-sinyale geçti (owner > user share > group share > folder ACL). Yeni üyeler için re-share gerekiyor (folder_group_permissions ile aynı tasarım).
+
+**Tamamlanan:**
+- `server/migrations/00041_item_group_shares.sql` — `item_group_shares` tablosu, unique (item_id, group_id), zaman penceresi kısıtı, aktif indeksler
+- `server/internal/auth/items.go` — `ResolveItemPermission` güncellendi: grup üyelik JOIN + `valid_from/until` koşulları
+- `server/internal/audit/audit.go` — `ActionItemGroupShared`, `ActionItemGroupUnshared` sabitleri
+- `server/internal/httpapi/item_shares.go` — `ListShares`, `ShareGroup`, `UnshareGroup` handler'ları; `GET /api/v1/items/{id}/shares` birleşik (kullanıcı + grup)
+- `server/internal/httpapi/router.go` — grup paylaşım route'ları
+- `shared/pkg/src/api/types.ts` — `GroupShareMemberDEK`, `ShareGroupRequest`, `ItemShareEntry`, `ItemGroupShareEntry`, `ItemSharesListResponse`
+- `web/src/api/catalog.ts` — `useUserPublicKeys(userIds)` paralel public key fetch için
+- `web/src/api/items.ts` — `useItemSharesQuery`, `useShareGroupMutation`, `useUnshareGroupMutation`
+- `web/src/components/inventory/item-share-modal.tsx` — Tabs ile "Kullanıcı" ve "Grup" sekmeleri; grup seçici, üye sayısı görünümü, E2E not
+
+---
 
 ### 2026-05-22 (Win) — PR-VAULT: HashiCorp Vault Proxy Entegrasyonu ✅
 
