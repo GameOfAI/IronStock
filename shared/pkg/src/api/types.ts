@@ -232,6 +232,10 @@ export interface Item {
   last_rotated_at?: string | null;
   /** PR-VAULT: external secret backend source config. Present for Vault-backed items. */
   external_source?: Record<string, unknown> | null;
+  /** PR-N3: When true, non-owners must request access to view secret fields. */
+  requires_approval?: boolean;
+  /** PR-N3: Present when requires_approval=true and caller has no active approved request. */
+  my_access_request?: AccessRequestInfo | null;
 }
 
 export interface ItemListResponse {
@@ -950,4 +954,56 @@ export interface BatchImportRequest {
 export interface BatchImportResponse {
   created: number;
   errors: string[];
+}
+
+// ---- Onay/Checkout Workflow (PR-N3) ----------------------------------------
+
+export type AccessRequestStatus = 'pending' | 'approved' | 'denied' | 'expired' | 'cancelled';
+
+/** Embedded in Item when requires_approval=true and caller has no active access. */
+export interface AccessRequestInfo {
+  id: string;
+  status: AccessRequestStatus;
+  access_duration_minutes: number;
+  requested_at: string;
+  responded_at?: string | null;
+  expires_at?: string | null;
+  deny_reason?: string | null;
+}
+
+export interface AccessRequest {
+  id: string;
+  item_id: string;
+  item_name?: string;
+  requester_id: string;
+  requester_name?: string;
+  status: AccessRequestStatus;
+  reason?: string | null;
+  deny_reason?: string | null;
+  access_duration_minutes: number;
+  requested_at: string;
+  responded_at?: string | null;
+  approved_by?: string | null;
+  expires_at?: string | null;
+}
+
+export interface AccessRequestsListResponse {
+  requests: AccessRequest[];
+}
+
+export interface CreateAccessRequestRequest {
+  reason?: string;
+  access_duration_minutes: number;
+}
+
+export interface ApproveAccessRequestRequest {
+  access_duration_minutes?: number;
+}
+
+export interface DenyAccessRequestRequest {
+  reason: string;
+}
+
+export interface ToggleApprovalRequiredRequest {
+  required: boolean;
 }

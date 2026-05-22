@@ -153,6 +153,16 @@ const (
 	// Vault plaintext is NEVER included in details — only metadata (path, success).
 	ActionItemVaultFetch      = "item.vault_fetch"
 	ActionItemVaultFetchError = "item.vault_fetch_error"
+
+	// Onay/Checkout Workflow (PR-N3).
+	// ActionAccessRequestCreated: user requests access to an approval-gated item.
+	ActionAccessRequestCreated  = "access_request.created"
+	ActionAccessRequestApproved = "access_request.approved"
+	ActionAccessRequestDenied   = "access_request.denied"
+	ActionAccessRequestCancelled = "access_request.cancelled"
+	ActionAccessRequestExpired  = "access_request.expired"
+	// ActionItemApprovalToggled: admin enables/disables requires_approval on an item.
+	ActionItemApprovalToggled = "item.approval_toggled"
 )
 
 // ResourceGroup is the audit resource type for group rows.

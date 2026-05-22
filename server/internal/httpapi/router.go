@@ -355,6 +355,24 @@ func NewRouter(d Deps) http.Handler {
 			Post("/api/v1/import/batch", d.Item.BatchImport)
 	}
 
+	// Onay/Checkout Workflow routes (PR-N3).
+	if d.Item != nil && d.Auth != nil {
+		// Per-item: create request + approval toggle (admin).
+		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+			Post("/api/v1/items/{id}/access-requests", d.Item.CreateAccessRequest)
+		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+			Patch("/api/v1/items/{id}/approval-required", d.Item.ToggleApprovalRequired)
+		// Global: list + approve/deny/cancel.
+		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+			Get("/api/v1/access-requests", d.Item.ListAccessRequests)
+		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+			Post("/api/v1/access-requests/{req_id}/approve", d.Item.ApproveAccessRequest)
+		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+			Post("/api/v1/access-requests/{req_id}/deny", d.Item.DenyAccessRequest)
+		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+			Delete("/api/v1/access-requests/{req_id}", d.Item.CancelAccessRequest)
+	}
+
 	// Notification routes (PR-N8).
 	if d.Notification != nil && d.Auth != nil {
 		r.Route("/api/v1/notifications", func(nr chi.Router) {

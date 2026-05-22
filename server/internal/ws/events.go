@@ -28,6 +28,13 @@ const (
 	// (PR-N4). All connected admin clients show an immediate alert banner.
 	// resource_id = the break-glass user's UUID.
 	EventBreakGlassLogin = "auth.break_glass"
+
+	// Onay/Checkout Workflow (PR-N3).
+	// resource_id = access_request UUID.
+	// Admins receive Created; requester receives Approved/Denied.
+	EventAccessRequestCreated  = "access_request.created"
+	EventAccessRequestApproved = "access_request.approved"
+	EventAccessRequestDenied   = "access_request.denied"
 )
 
 // Event is the JSON payload sent over the wire.

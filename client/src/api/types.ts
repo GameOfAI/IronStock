@@ -86,4 +86,13 @@ export type {
   BatchImportItem,
   BatchImportRequest,
   BatchImportResponse,
+  // Onay/Checkout Workflow (PR-N3)
+  AccessRequestStatus,
+  AccessRequestInfo,
+  AccessRequest,
+  AccessRequestsListResponse,
+  CreateAccessRequestRequest,
+  ApproveAccessRequestRequest,
+  DenyAccessRequestRequest,
+  ToggleApprovalRequiredRequest,
 } from '@envanter/shared/api/types';

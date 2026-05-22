@@ -39,6 +39,7 @@ import {
   Fingerprint,
   Radio,
   Upload,
+  ClipboardCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -385,6 +386,7 @@ const NAV_LABELS: Record<string, string> = {
   '/pipeline': 'Pipeline Diyagramları',
   '/pipeline/lifecycle': 'Lifecycle Lanes',
   '/import': 'Toplu İçe Aktarma',
+  '/access-requests': 'Onay İstekleri',
   '/admin': 'Admin Paneli',
   '/admin/users': 'Kullanıcı Yönetimi',
   '/admin/groups': 'Gruplar',
@@ -575,6 +577,12 @@ export function AppShell() {
               to="/import"
               icon={Upload}
               label="Toplu Aktarma"
+              collapsed={sidebarCollapsed && !mobileOpen}
+            />
+            <NavItem
+              to="/access-requests"
+              icon={ClipboardCheck}
+              label="Onay İstekleri"
               collapsed={sidebarCollapsed && !mobileOpen}
             />
             {isAdmin && (
