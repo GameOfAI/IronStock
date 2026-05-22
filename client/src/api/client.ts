@@ -35,6 +35,10 @@ let inflightRefresh: Promise<string> | null = null;
 let _baseUrl = '';
 /** TLS skip-verify flag — geliştirme ortamında self-signed sertifikalar için. */
 let _tlsSkipVerify = false;
+/** mTLS client sertifikası — base64 PKCS12 içeriği. Boş string = cert yok. */
+let _clientCertP12Base64 = '';
+/** mTLS client sertifikası parolası. */
+let _clientCertPassword = '';
 
 export function setBaseUrl(url: string): void {
   _baseUrl = url.replace(/\/$/, '');
@@ -48,14 +52,30 @@ export function setTlsSkipVerify(value: boolean): void {
   _tlsSkipVerify = value;
 }
 
+/** mTLS client sertifikasını (PKCS12 base64) ve parolasını ayarlar. */
+export function setClientCert(p12Base64: string, password: string): void {
+  _clientCertP12Base64 = p12Base64;
+  _clientCertPassword = password;
+}
+
+export function hasClientCert(): boolean {
+  return _clientCertP12Base64.length > 0;
+}
+
 /**
- * TLS bypass desteği olan fetch wrapper.
+ * TLS bypass + mTLS client sertifikası destekli fetch wrapper.
  *
- * Tauri ortamında `_tlsSkipVerify` aktifse self-signed sertifikalı sunuculara
- * Rust reqwest üzerinden bağlanır. Aksi hâlde standart browser `fetch()` kullanılır.
+ * Tauri ortamında aşağıdaki iki koşuldan biri sağlandığında Rust reqwest kullanılır:
+ *   1. `_tlsSkipVerify = true` — self-signed sertifikalı geliştirme ortamı
+ *   2. `_clientCertP12Base64` dolu — mTLS client certificate gönderilecek
+ *
+ * Aksi hâlde standart browser `fetch()` kullanılır (production, sertifikasız).
  */
 export async function rawFetch(url: string, init: RequestInit = {}): Promise<Response> {
-  if (_tlsSkipVerify && typeof window !== 'undefined' && '__TAURI__' in window) {
+  const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
+  const needsRust = isTauri && (_tlsSkipVerify || _clientCertP12Base64.length > 0);
+
+  if (needsRust) {
     const { invoke } = await import('@tauri-apps/api/core');
     const headers: Record<string, string> = {};
     if (init.headers) {
@@ -63,13 +83,14 @@ export async function rawFetch(url: string, init: RequestInit = {}): Promise<Res
         headers[k] = v;
       }
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = (await invoke('tls_fetch', {
       url,
       method: init.method ?? 'GET',
       headers,
       body: (init.body as string | null | undefined) ?? null,
-      tlsSkipVerify: true,
+      tlsSkipVerify: _tlsSkipVerify,
+      clientCertP12Base64: _clientCertP12Base64 || null,
+      clientCertPassword: _clientCertPassword || null,
     })) as { status: number; body: string };
     return new Response(result.body || null, { status: result.status });
   }

@@ -41,11 +41,17 @@ pub fn kek_delete(username: String) -> Result<(), String> {
 
 // --- TLS-aware HTTP fetch ---
 
-/// TLS doğrulaması isteğe bağlı bypass edilebilen HTTP komutu.
+/// TLS doğrulaması ve mTLS client sertifikası destekli HTTP komutu.
 ///
-/// Browser `fetch()` TLS sertifika hatalarını geçemez (WebView2 sistem sertifika
-/// deposunu kullanır). Geliştirme ortamlarında self-signed sertifikalarla çalışmak
-/// için `tls_skip_verify = true` ile bu komut kullanılır.
+/// Browser `fetch()` iki durumda yetersiz kalır:
+///   1. TLS sertifika doğrulaması — WebView2 sistem deposunu kullanır, self-signed geçemez.
+///   2. mTLS client certificate — tarayıcı WebView2'nin PKCS12 identity'sini programatik
+///      olarak ayarlayamaz; Rust reqwest native-tls ile bu mümkündür.
+///
+/// Parametreler:
+///   - `tls_skip_verify`          : true → geliştirme ortamı, self-signed kabul
+///   - `client_cert_p12_base64`   : base64-encoded PKCS12 (.p12/.pfx) baytları
+///   - `client_cert_password`     : PKCS12 açma parolası (boş string kabul edilir)
 ///
 /// ⚠️ `tls_skip_verify = true` sadece geliştirme / dahili ağ kullanımı içindir.
 #[tauri::command]
@@ -55,13 +61,32 @@ pub async fn tls_fetch(
     headers: HashMap<String, String>,
     body: Option<String>,
     tls_skip_verify: bool,
+    client_cert_p12_base64: Option<String>,
+    client_cert_password: Option<String>,
 ) -> Result<TlsFetchResponse, String> {
-    let client = reqwest::Client::builder()
-        .danger_accept_invalid_certs(tls_skip_verify)
-        .build()
-        .map_err(|e| e.to_string())?;
+    use base64::Engine as _;
 
-    let http_method: reqwest::Method = method.parse().map_err(|_| format!("Geçersiz HTTP metodu: {method}"))?;
+    let mut builder = reqwest::Client::builder()
+        .danger_accept_invalid_certs(tls_skip_verify);
+
+    // mTLS: PKCS12 client sertifikası yükle.
+    if let Some(p12_b64) = client_cert_p12_base64.filter(|s| !s.is_empty()) {
+        let p12_bytes = base64::engine::general_purpose::STANDARD
+            .decode(&p12_b64)
+            .map_err(|e| format!("Client sertifikası (base64) çözülemedi: {e}"))?;
+
+        let password = client_cert_password.unwrap_or_default();
+
+        let identity = reqwest::Identity::from_pkcs12_der(&p12_bytes, &password)
+            .map_err(|e| format!("Client sertifikası (.p12) yüklenemedi: {e}"))?;
+
+        builder = builder.identity(identity);
+    }
+
+    let client = builder.build().map_err(|e| e.to_string())?;
+
+    let http_method: reqwest::Method =
+        method.parse().map_err(|_| format!("Geçersiz HTTP metodu: {method}"))?;
     let mut req = client.request(http_method, &url);
 
     for (k, v) in &headers {
