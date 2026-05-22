@@ -20,7 +20,7 @@
 
 import * as React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Key, Loader2, ShieldCheck } from 'lucide-react';
+import { Eye, EyeOff, Key, Loader2, ShieldCheck, LogIn } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -37,6 +37,8 @@ import type { SessionUser } from '@/store/auth';
 import { decryptPrivateKey, deriveKEK, fromBase64 } from '@/lib/crypto';
 import type { KEKParams } from '@/lib/crypto';
 import { ApiError, ErrCode } from '@/api/errors';
+import { usePublicSSOProvidersQuery } from '@/api/admin-sso';
+import type { SSOProviderInfo } from '@/api/types';
 
 // --- Password input with show/hide toggle ---
 
@@ -94,6 +96,123 @@ function substepLabel(s: Substep): string {
   }
 }
 
+// ─── LDAP login dialog ───
+
+interface LDAPDialogProps {
+  provider: SSOProviderInfo;
+  open: boolean;
+  onClose: () => void;
+}
+
+function LDAPDialog({ provider, open, onClose }: LDAPDialogProps) {
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  const setBootstrapSession = useAuthStore((s) => s.setBootstrapSession);
+  const [ldapUsername, setLdapUsername] = React.useState('');
+  const [ldapPassword, setLdapPassword] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
+
+  async function handleLDAPSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (busy || !ldapUsername || !ldapPassword) return;
+    setBusy(true);
+    try {
+      const res = await fetch('/api/v1/auth/ldap/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider_id: provider.id,
+          username: ldapUsername,
+          password: ldapPassword,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ message: 'LDAP girişi başarısız.' }));
+        throw new Error(body.message ?? 'LDAP girişi başarısız.');
+      }
+      const data = await res.json() as {
+        access_token: string;
+        refresh_token: string;
+        user_id: string;
+        roles: string[];
+      };
+      // LDAP users don't have a KEK-derived keypair → bootstrap session.
+      setBootstrapSession({
+        user: { id: data.user_id, username: ldapUsername, roles: data.roles ?? [] },
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token,
+      });
+      navigate('/inventory', { replace: true });
+    } catch (err) {
+      toast({
+        title: 'LDAP girişi başarısız',
+        description: err instanceof Error ? err.message : 'Bilinmeyen hata.',
+        variant: 'destructive',
+      });
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="border-slate-800 bg-slate-900 sm:max-w-sm" onInteractOutside={(e) => e.preventDefault()}>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-slate-100">
+            <LogIn className="h-5 w-5 text-blue-400" />
+            {provider.name} ile Giriş
+          </DialogTitle>
+          <DialogDescription className="text-slate-400">
+            Kurumsal LDAP / Active Directory kimlik bilgilerinizi girin.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleLDAPSubmit} className="flex flex-col gap-4 pt-2">
+          <div className="flex flex-col gap-1.5">
+            <label className="font-mono text-[10px] uppercase tracking-wider text-slate-400">Kullanıcı Adı</label>
+            <input
+              value={ldapUsername}
+              onChange={(e) => setLdapUsername(e.target.value)}
+              placeholder="john.doe"
+              autoComplete="username"
+              required
+              disabled={busy}
+              className="w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2.5 text-sm text-slate-200 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/40 disabled:opacity-60"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="font-mono text-[10px] uppercase tracking-wider text-slate-400">Parola</label>
+            <PasswordInput
+              value={ldapPassword}
+              onChange={(e) => setLdapPassword(e.target.value)}
+              autoComplete="current-password"
+              required
+              disabled={busy}
+            />
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={busy}
+              className="rounded-md border border-slate-700 bg-transparent px-4 py-2 text-[13px] text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+            >
+              İptal
+            </button>
+            <button
+              type="submit"
+              disabled={busy || !ldapUsername || !ldapPassword}
+              className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
+            >
+              {busy ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Giriş yapılıyor…</> : 'Giriş Yap'}
+            </button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Main LoginPage ───
+
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -101,6 +220,15 @@ export default function LoginPage() {
   const setSession = useAuthStore((s) => s.setSession);
   const setBootstrapSession = useAuthStore((s) => s.setBootstrapSession);
   const loginMut = useLoginMutation();
+
+  // SSO providers (public endpoint — no auth required)
+  const { data: ssoData } = usePublicSSOProvidersQuery();
+  const ssoProviders = ssoData?.providers ?? [];
+  const oidcProviders = ssoProviders.filter((p) => p.provider_type === 'oidc');
+  const ldapProviders = ssoProviders.filter((p) => p.provider_type === 'ldap');
+
+  // LDAP dialog state
+  const [activeLDAPProvider, setActiveLDAPProvider] = React.useState<SSOProviderInfo | null>(null);
 
   const [username, setUsername] = React.useState('');
   const [password, setPassword] = React.useState('');
@@ -275,6 +403,15 @@ export default function LoginPage() {
           </div>
         </div>
 
+        {/* LDAP dialog */}
+        {activeLDAPProvider && (
+          <LDAPDialog
+            provider={activeLDAPProvider}
+            open={!!activeLDAPProvider}
+            onClose={() => setActiveLDAPProvider(null)}
+          />
+        )}
+
         {/* Main card */}
         <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl shadow-black/60 backdrop-blur-sm">
           <form onSubmit={onSubmit} className="space-y-4">
@@ -352,6 +489,42 @@ export default function LoginPage() {
               </Link>
             </div>
           </form>
+
+          {/* SSO providers section */}
+          {ssoProviders.length > 0 && (
+            <div className="mt-5">
+              <div className="flex items-center gap-3">
+                <span className="h-px flex-1 bg-slate-800" />
+                <span className="text-[11px] text-slate-500">veya SSO ile devam et</span>
+                <span className="h-px flex-1 bg-slate-800" />
+              </div>
+              <div className="mt-3 flex flex-col gap-2">
+                {/* OIDC providers → browser redirect to /authorize */}
+                {oidcProviders.map((p) => (
+                  <a
+                    key={p.id}
+                    href={`/api/v1/auth/sso/${p.id}/authorize`}
+                    className="flex w-full items-center justify-center gap-2 rounded-md border border-slate-700 bg-slate-900 py-2.5 text-[13px] text-slate-300 transition hover:border-blue-600/60 hover:bg-slate-800 hover:text-slate-100"
+                  >
+                    <LogIn className="h-3.5 w-3.5 text-blue-400" />
+                    {p.name} ile Giriş Yap
+                  </a>
+                ))}
+                {/* LDAP providers → inline dialog */}
+                {ldapProviders.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setActiveLDAPProvider(p)}
+                    className="flex w-full items-center justify-center gap-2 rounded-md border border-slate-700 bg-slate-900 py-2.5 text-[13px] text-slate-300 transition hover:border-blue-600/60 hover:bg-slate-800 hover:text-slate-100"
+                  >
+                    <LogIn className="h-3.5 w-3.5 text-amber-400" />
+                    {p.name} ile Giriş Yap (LDAP)
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <p className="mt-4 text-center font-mono text-[10px] text-slate-600">

@@ -18,6 +18,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Folder,
   Shield,
+  ShieldCheck,
   FileText,
   LogOut,
   Sun,
@@ -394,6 +395,7 @@ const NAV_LABELS: Record<string, string> = {
   '/admin/audit-log': 'Audit Log',
   '/admin/client-certs': 'Sertifikalar',
   '/admin/log-forwarding': 'Log Yönlendirme',
+  '/admin/sso': 'SSO / LDAP',
   '/profile': 'Profil',
 };
 
@@ -609,6 +611,12 @@ export function AppShell() {
                   to="/admin/log-forwarding"
                   icon={Radio}
                   label="Log Yönlendirme"
+                  collapsed={sidebarCollapsed && !mobileOpen}
+                />
+                <NavItem
+                  to="/admin/sso"
+                  icon={ShieldCheck}
+                  label="SSO / LDAP"
                   collapsed={sidebarCollapsed && !mobileOpen}
                 />
               </>

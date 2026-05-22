@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-05-22 (**Post-v1.0.0 Kapsamlı Geliştirmeler** — PR-GROUP-SHARE (item-level grup paylaşımı, 4-sinyal ACL) + PR-IMPORT (toplu CSV+KeePass import sihirbazı) tamamlandı. Sıradaki: PR-N3 (Onay/checkout workflow) ve PR-LDAP (SSO/LDAP).)
+Son güncelleme: 2026-05-22 (**Post-v1.0.0 Kapsamlı Geliştirmeler** — PR-GROUP-SHARE + PR-IMPORT + PR-N3 + PR-LDAP tamamlandı. Planlanan tüm geliştirmeler tamamlandı ✅)
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 

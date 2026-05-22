@@ -1007,3 +1007,88 @@ export interface DenyAccessRequestRequest {
 export interface ToggleApprovalRequiredRequest {
   required: boolean;
 }
+
+// --- SSO/LDAP (PR-LDAP) ---
+
+export type SSOProviderType = 'oidc' | 'ldap';
+
+/** Public metadata for an SSO provider (no secrets). */
+export interface SSOProviderInfo {
+  id: string;
+  name: string;
+  provider_type: SSOProviderType;
+}
+
+/** Full admin view of an SSO provider (no secrets — booleans indicate presence). */
+export interface SSOProvider {
+  id: string;
+  name: string;
+  provider_type: SSOProviderType;
+  enabled: boolean;
+  // OIDC
+  discovery_url?: string | null;
+  client_id?: string | null;
+  has_client_secret: boolean;
+  scopes?: string[];
+  // LDAP
+  ldap_url?: string | null;
+  ldap_bind_dn?: string | null;
+  has_ldap_bind_password: boolean;
+  ldap_user_search_base?: string | null;
+  ldap_user_filter?: string;
+  ldap_attr_username?: string;
+  ldap_attr_email?: string;
+  ldap_attr_display_name?: string;
+  ldap_use_starttls: boolean;
+  ldap_skip_tls_verify: boolean;
+  // Provisioning
+  auto_provision: boolean;
+  default_role: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SSOProvidersListResponse {
+  providers: SSOProviderInfo[];
+}
+
+export interface AdminSSOProvidersListResponse {
+  providers: SSOProvider[];
+}
+
+export interface CreateSSOProviderRequest {
+  name: string;
+  provider_type: SSOProviderType;
+  enabled: boolean;
+  auto_provision: boolean;
+  default_role: string;
+  // OIDC
+  discovery_url?: string;
+  client_id?: string;
+  client_secret?: string;
+  scopes?: string[];
+  // LDAP
+  ldap_url?: string;
+  ldap_bind_dn?: string;
+  ldap_bind_password?: string;
+  ldap_user_search_base?: string;
+  ldap_user_filter?: string;
+  ldap_attr_username?: string;
+  ldap_attr_email?: string;
+  ldap_attr_display_name?: string;
+  ldap_use_starttls?: boolean;
+  ldap_skip_tls_verify?: boolean;
+}
+
+export interface LDAPLoginRequest {
+  provider_id: string;
+  username: string;
+  password: string;
+}
+
+export interface LDAPTestResult {
+  ok: boolean;
+  message?: string;
+  error?: string;
+}
+

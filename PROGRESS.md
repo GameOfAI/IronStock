@@ -1,13 +1,13 @@
 # İlerleyiş
 
-Son güncelleme: 2026-05-22 (PR-GROUP-SHARE + PR-IMPORT tamamlandı)
+Son güncelleme: 2026-05-22 (PR-GROUP-SHARE + PR-IMPORT + PR-N3 + PR-LDAP tamamlandı)
 
 ## Mevcut Durum
 
 - **Aktif Faz:** Post-v1.0.0 Kapsamlı Geliştirmeler (Faz 6+)
 - **Tamamlanan Faz:** Faz 0 + 1 + 2 + 3 + 4 + 5 ✅
-- **Son tamamlanan:** PR-GROUP-SHARE ✅ + PR-IMPORT ✅ 2026-05-22
-- **Proje durumu:** MVP + tüm UX PR'ları + PR-F3 + PR-SEC1/SEC2/SEC3 + PR-LOG1 + PR-SEARCH + PR-TIME + PR-VAULT + PR-GROUP-SHARE + PR-IMPORT tamamlandı. Toplu CSV+KeePass import wizard ve item-level grup paylaşımı eklendi. Sıradaki: PR-N3 (Onay/checkout workflow) ve PR-LDAP (SSO/LDAP).
+- **Son tamamlanan:** PR-GROUP-SHARE ✅ + PR-IMPORT ✅ + PR-N3 ✅ + PR-LDAP ✅ 2026-05-22
+- **Proje durumu:** MVP + tüm UX PR'ları + PR-F3 + PR-SEC1/SEC2/SEC3 + PR-LOG1 + PR-SEARCH + PR-TIME + PR-VAULT + PR-GROUP-SHARE + PR-IMPORT + PR-N3 + PR-LDAP tamamlandı. SSO/LDAP/OIDC entegrasyonu eklendi: Azure AD, Okta ve LDAP/AD desteği, auto-provisioning, admin SSO yapılandırma sayfası ve login akışı SSO butonları. Planlı tüm geliştirmeler tamamlandı.
 
 ---
 
@@ -140,7 +140,7 @@ IronStock şu an **"güvenli credential vault + DevOps görselleştirme"** kesi�
 | PR-UX8 | Admin Dashboard (6 widget: güvenlik skoru, expiry, user stats, audit) | ✅ DONE |
 | PR-UX9 | Item form şablon galerisi (11 quickstart şablonu) | ✅ DONE |
 | PR-F3 | Tauri Client Sync | ✅ DONE |
-| PR-N3 | Onay Workflow / Dual Control | ⏳ Faz 6+ (büyük iş) |
+| PR-N3 | Onay Workflow / Dual Control | ✅ DONE |
 | PR-SEC1 | TOTP per-user enforcement + Login UX + QR | ✅ DONE |
 | PR-SEC2 | First-login forced TOTP setup wizard | ✅ DONE |
 | PR-SEC3 | Client Certificate (mTLS) | 📋 TODO |

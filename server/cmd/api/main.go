@@ -372,6 +372,12 @@ func run() error {
 		return fmt.Errorf("ensure default admin: %w", err)
 	}
 
+	ssoHandlers := &httpapi.SSOHandlers{
+		Service: authSvc,
+		Audit:   auditWriter,
+		Logger:  logger,
+	}
+
 	shareLinkHandlers := &httpapi.ShareLinkHandlers{
 		DB:      pool,
 		Service: authSvc,
@@ -410,6 +416,7 @@ func run() error {
 		Attachment:     attachmentHandlers,
 		Admin:          adminHandlers,
 		ClientCert:     clientCertHandlers, // PR-SEC3
+		SSO:            ssoHandlers,         // PR-LDAP
 		Group:          groupHandlers,
 		Tag:            tagHandlers,
 		Notification:   notificationHandlers,

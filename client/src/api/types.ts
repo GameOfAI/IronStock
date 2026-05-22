@@ -95,4 +95,13 @@ export type {
   ApproveAccessRequestRequest,
   DenyAccessRequestRequest,
   ToggleApprovalRequiredRequest,
+  // SSO/LDAP (PR-LDAP)
+  SSOProviderType,
+  SSOProviderInfo,
+  SSOProvider,
+  SSOProvidersListResponse,
+  AdminSSOProvidersListResponse,
+  CreateSSOProviderRequest,
+  LDAPLoginRequest,
+  LDAPTestResult,
 } from '@envanter/shared/api/types';

@@ -19,6 +19,8 @@ import InventoryPage from '@/pages/inventory';
 import AdminUsersPage, { AdminAuditLogPage, AdminDashboardPage } from '@/pages/admin';
 import AdminClientCertsPage from '@/pages/admin/client-certs';
 import AdminLogForwardingPage from '@/pages/admin/log-forwarding';
+import AdminSSOPage from '@/pages/admin/sso';
+import SSOCallbackPage from '@/pages/sso-callback';
 import TagsPage from '@/pages/tags';
 import { GraphPage } from '@/pages/graph';
 import PipelineListPage from '@/pages/pipeline/index';
@@ -89,6 +91,8 @@ export default function App() {
             <Route path="/admin-login" element={<AdminLoginPage />} />
             {/* PR-N5: Public one-time share link — no auth required */}
             <Route path="/share/:token" element={<SharePage />} />
+            {/* PR-LDAP: OIDC callback landing — sets auth store from hash fragment */}
+            <Route path="/sso-callback" element={<SSOCallbackPage />} />
 
             {/* Authenticated — WsProvider starts WebSocket after login */}
             <Route element={<AuthGate />}>
@@ -126,6 +130,7 @@ export default function App() {
                       <Route path="/admin/audit-log" element={<AdminAuditLogPage />} />
                       <Route path="/admin/client-certs" element={<AdminClientCertsPage />} />
                       <Route path="/admin/log-forwarding" element={<AdminLogForwardingPage />} />
+                      <Route path="/admin/sso" element={<AdminSSOPage />} />
                     </Route>
                   </Route>
                   </Route>

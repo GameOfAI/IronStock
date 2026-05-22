@@ -156,13 +156,21 @@ const (
 
 	// Onay/Checkout Workflow (PR-N3).
 	// ActionAccessRequestCreated: user requests access to an approval-gated item.
-	ActionAccessRequestCreated  = "access_request.created"
-	ActionAccessRequestApproved = "access_request.approved"
-	ActionAccessRequestDenied   = "access_request.denied"
+	ActionAccessRequestCreated   = "access_request.created"
+	ActionAccessRequestApproved  = "access_request.approved"
+	ActionAccessRequestDenied    = "access_request.denied"
 	ActionAccessRequestCancelled = "access_request.cancelled"
-	ActionAccessRequestExpired  = "access_request.expired"
+	ActionAccessRequestExpired   = "access_request.expired"
 	// ActionItemApprovalToggled: admin enables/disables requires_approval on an item.
 	ActionItemApprovalToggled = "item.approval_toggled"
+
+	// SSO/LDAP integration (PR-LDAP).
+	// ActionAdminSSOProviderCreated: admin creates an SSO/LDAP provider config.
+	ActionAdminSSOProviderCreated = "admin.sso_provider_created"
+	// ActionAdminSSOProviderUpdated: admin updates an SSO/LDAP provider config.
+	ActionAdminSSOProviderUpdated = "admin.sso_provider_updated"
+	// ActionAdminSSOProviderDeleted: admin deletes an SSO/LDAP provider.
+	ActionAdminSSOProviderDeleted = "admin.sso_provider_deleted"
 )
 
 // ResourceGroup is the audit resource type for group rows.

@@ -40,6 +40,7 @@ type Deps struct {
 	Attachment   *AttachmentHandlers
 	Admin        *AdminHandlers
 	ClientCert   *ClientCertHandlers // PR-SEC3: mTLS client certificate management
+	SSO          *SSOHandlers        // PR-LDAP: SSO/LDAP provider admin CRUD
 	Group        *GroupHandlers
 	Catalog      *CatalogHandlers
 	WS           *WSHandlers
@@ -171,6 +172,20 @@ func NewRouter(d Deps) http.Handler {
 		})
 	}
 
+	// PR-LDAP: SSO/LDAP login routes (public, rate-limited).
+	// GET  /api/v1/auth/sso/providers         — list enabled providers (login page)
+	// POST /api/v1/auth/ldap/login            — LDAP credential exchange
+	// GET  /api/v1/auth/sso/{id}/authorize    — OIDC authorize redirect
+	// GET  /api/v1/auth/sso/{id}/callback     — OIDC token callback (browser redirect)
+	if d.Auth != nil {
+		authBruteRLSSO := NewIPRateLimiter(rate.Every(12*time.Second), 5)
+		r.With(timeoutMW).Get("/api/v1/auth/sso/providers", d.Auth.ListSSOProviders)
+		r.With(timeoutMW, authBruteRLSSO.Middleware).Post("/api/v1/auth/ldap/login", d.Auth.LDAPLogin)
+		r.With(timeoutMW).Get("/api/v1/auth/sso/{provider_id}/authorize", d.Auth.OIDCAuthorize)
+		// Callback has NO timeout — it does a network round-trip to the OIDC token endpoint.
+		r.Get("/api/v1/auth/sso/{provider_id}/callback", d.Auth.OIDCCallback)
+	}
+
 	// Inventory routes — folder + item. Bearer access required.
 	if d.Folder != nil && d.Auth != nil {
 		r.Route("/api/v1/folders", func(fr chi.Router) {
@@ -265,6 +280,14 @@ func NewRouter(d Deps) http.Handler {
 				ar.Put("/log-forwarding/{id}", d.LogForwarding.UpdateConfig)
 				ar.Delete("/log-forwarding/{id}", d.LogForwarding.DeleteConfig)
 				ar.Post("/log-forwarding/{id}/test", d.LogForwarding.TestConfig)
+			}
+			// SSO/LDAP provider management (PR-LDAP).
+			if d.SSO != nil {
+				ar.Get("/sso/providers", d.SSO.ListSSOProviders)
+				ar.Post("/sso/providers", d.SSO.CreateSSOProvider)
+				ar.Put("/sso/providers/{id}", d.SSO.UpdateSSOProvider)
+				ar.Delete("/sso/providers/{id}", d.SSO.DeleteSSOProvider)
+				ar.Post("/sso/providers/{id}/test", d.SSO.TestLDAPConnection)
 			}
 		})
 	}
