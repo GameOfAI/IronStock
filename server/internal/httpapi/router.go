@@ -196,8 +196,11 @@ func NewRouter(d Deps) http.Handler {
 			ir.Get("/{id}", d.Item.Get)
 			ir.Put("/{id}", d.Item.Update)
 			ir.Delete("/{id}", d.Item.Delete)
+			ir.Get("/{id}/shares", d.Item.ListShares)                                // PR-GROUP-SHARE
 			ir.Post("/{id}/shares", d.Item.Share)
 			ir.Delete("/{id}/shares/{user_id}", d.Item.Unshare)
+			ir.Post("/{id}/group-shares", d.Item.ShareGroup)                         // PR-GROUP-SHARE
+			ir.Delete("/{id}/group-shares/{group_id}", d.Item.UnshareGroup)          // PR-GROUP-SHARE
 			ir.Post("/{id}/rotate", d.Item.RecordRotation)                           // PR-N1
 			ir.Get("/{id}/fields/{field_def_id}/versions", d.Item.ListFieldVersions) // PR-N2
 

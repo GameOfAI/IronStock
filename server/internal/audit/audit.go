@@ -49,8 +49,10 @@ const (
 	ActionItemUpdated      = "item.updated"
 	ActionItemDeleted      = "item.deleted"
 	ActionItemFieldUpdated = "item.field_updated"
-	ActionItemShared       = "item.shared"
-	ActionItemUnshared     = "item.unshared"
+	ActionItemShared        = "item.shared"
+	ActionItemUnshared      = "item.unshared"
+	ActionItemGroupShared   = "item.group_shared"   // PR-GROUP-SHARE
+	ActionItemGroupUnshared = "item.group_unshared" // PR-GROUP-SHARE
 
 	// Read-event audit (PR-N6). Written async so hot-path latency is unaffected.
 	// Vault/CyberArk model: every read is traceable in the audit log.

@@ -260,6 +260,53 @@ export interface ShareItemRequest {
   valid_until?: string | null;
 }
 
+// --- Group shares (PR-GROUP-SHARE) ---
+
+/** One group member's wrapped DEK inside a ShareGroupRequest. */
+export interface GroupShareMemberDEK {
+  user_id: string;
+  dek_wrapped: string; // base64
+  wrap_nonce: string;  // base64, 12B
+}
+
+export interface ShareGroupRequest {
+  group_id: string;
+  permission: 'read' | 'write';
+  /** Per-member DEK wraps. Client fetches all group members + public keys first. */
+  members: GroupShareMemberDEK[];
+  valid_from?: string | null;
+  valid_until?: string | null;
+}
+
+export interface ItemShareEntry {
+  id: string;
+  user_id: string;
+  username: string;
+  permission: 'read' | 'write';
+  granted_by: string;
+  granted_at: string;
+  revoked_at?: string | null;
+  valid_from?: string | null;
+  valid_until?: string | null;
+}
+
+export interface ItemGroupShareEntry {
+  id: string;
+  group_id: string;
+  group_name: string;
+  permission: 'read' | 'write';
+  granted_by: string;
+  granted_at: string;
+  revoked_at?: string | null;
+  valid_from?: string | null;
+  valid_until?: string | null;
+}
+
+export interface ItemSharesListResponse {
+  users: ItemShareEntry[];
+  groups: ItemGroupShareEntry[];
+}
+
 // --- Admin ---
 
 export interface AdminUser {
