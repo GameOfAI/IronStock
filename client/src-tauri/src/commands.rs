@@ -110,6 +110,67 @@ pub struct TlsFetchResponse {
     pub body: String,
 }
 
+// --- Offline cache commands ---
+//
+// Query cache'i app veri dizinine (AppData/envanter-client/cache/) JSON dosyaları
+// olarak yazar. Her "slot" için tek bir dosya kullanılır (genellikle "queries.json").
+// Bu komutlar offline mod için TanStack Query cache'ini persist etmek amacıyla kullanılır.
+
+/// Bir önbellek slotuna veri yazar. `slot` dosya adının güvenli bileşenidir ("queries", vb.).
+/// Veriler AppData/envanter-client/cache/<slot>.json dosyasına yazılır.
+#[tauri::command]
+pub async fn cache_write(app: tauri::AppHandle, slot: String, data: String) -> Result<(), String> {
+    use base64::Engine as _;
+    let cache_dir = app
+        .path()
+        .app_cache_dir()
+        .map_err(|e| format!("Cache dizini alınamadı: {e}"))?;
+    std::fs::create_dir_all(&cache_dir)
+        .map_err(|e| format!("Cache dizini oluşturulamadı: {e}"))?;
+    // Slot adını URL-safe base64 ile encode et — filesystem-safe karakter garantisi.
+    let safe_name = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(slot.as_bytes());
+    let path = cache_dir.join(format!("{safe_name}.json"));
+    std::fs::write(&path, data.as_bytes())
+        .map_err(|e| format!("Cache yazılamadı: {e}"))
+}
+
+/// Bir önbellek slotunu okur. Dosya yoksa None döner; hata durumunda Err döner.
+#[tauri::command]
+pub async fn cache_read(app: tauri::AppHandle, slot: String) -> Result<Option<String>, String> {
+    use base64::Engine as _;
+    let cache_dir = app
+        .path()
+        .app_cache_dir()
+        .map_err(|e| format!("Cache dizini alınamadı: {e}"))?;
+    let safe_name = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(slot.as_bytes());
+    let path = cache_dir.join(format!("{safe_name}.json"));
+    match std::fs::read_to_string(&path) {
+        Ok(data) => Ok(Some(data)),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(format!("Cache okunamadı: {e}")),
+    }
+}
+
+/// Tüm önbellek slotlarını temizler (çıkış, hesap değişikliği, vb. için).
+#[tauri::command]
+pub async fn cache_clear(app: tauri::AppHandle) -> Result<(), String> {
+    let cache_dir = app
+        .path()
+        .app_cache_dir()
+        .map_err(|e| format!("Cache dizini alınamadı: {e}"))?;
+    if !cache_dir.exists() {
+        return Ok(());
+    }
+    let entries = std::fs::read_dir(&cache_dir)
+        .map_err(|e| format!("Cache dizini okunamadı: {e}"))?;
+    for entry in entries.flatten() {
+        if entry.path().extension().is_some_and(|ext| ext == "json") {
+            let _ = std::fs::remove_file(entry.path());
+        }
+    }
+    Ok(())
+}
+
 // --- Inactivity commands ---
 
 /// Frontend her kullanıcı aktivitesinde bu komutu çağırır; Rust timer'ı sıfırlar.

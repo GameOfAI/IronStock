@@ -30,6 +30,9 @@ pub fn run() {
             commands::activity_ping,
             commands::set_inactivity_timeout,
             commands::tls_fetch,
+            commands::cache_write,
+            commands::cache_read,
+            commands::cache_clear,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

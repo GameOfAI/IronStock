@@ -1,6 +1,8 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-05-22 — Durum taraması: PR-SEC1/SEC2/SEC3/TIME/LOG1/VAULT/GROUP-SHARE/IMPORT/N3/LDAP tamamlandı ✅. Eksik: PR-F3 (Tauri offline cache) ve PR-SEC3 Tauri mTLS (.p12 picker).
+Son güncelleme: 2026-05-22 — TÜM PLANLI GELİŞTİRMELER TAMAMLANDI ✅
+PR-SEC1/SEC2/SEC3 (mTLS + Tauri .p12) + PR-F3 (Tauri offline cache) + PR-TIME/LOG1/VAULT/GROUP-SHARE/IMPORT/N3/LDAP.
+Kalan tek kullanıcı aksiyonu: server/ dizininde `go mod tidy`.
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 

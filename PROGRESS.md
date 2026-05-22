@@ -26,9 +26,14 @@ Son güncelleme: 2026-05-22 (durum taraması — gerçek tamamlanma tablosu ekle
 
 | Özellik | Durum | Notlar |
 |---------|-------|--------|
-| **PR-F3: Tauri Offline Cache** | ❌ Yapılmadı | client tarafında offline SQLite cache yok |
-| **PR-SEC3: Tauri mTLS (.p12 picker)** | ❌ Yapılmadı | client/src/pages/config.tsx'te cert file picker yok; Tauri tls_fetch PKCS12 identity desteği yok |
 | **`go mod tidy`** | ⚠️ Kullanıcı aksiyonu | server/ dizininde çalıştırılmalı (go-ldap/ldap/v3 download + go.sum güncelleme) |
+
+### Tamamlanan (bu session — 2026-05-22 devam)
+
+| PR | Açıklama | Durum |
+|----|----------|-------|
+| **PR-SEC3: Tauri mTLS** | .p12 picker (config.tsx), PKCS12 Identity (commands.rs, native-tls), connection store cert alanları, rawFetch cert geçişi | ✅ Tamamlandı |
+| **PR-F3: Tauri Offline Cache** | Rust cache_write/read/clear komutları, offline-cache.ts (serialize/hydrate/subscribe), App.tsx OfflineCacheManager, gcTime 30dk | ✅ Tamamlandı |
 
 ---
 

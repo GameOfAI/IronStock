@@ -5,7 +5,9 @@ export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 30_000,
-      gcTime: 5 * 60_000,
+      // PR-F3: gcTime uzatıldı — offline modda in-memory cache oturum boyunca yaşar.
+      // Disk cache (offline-cache.ts) sayesinde yeniden açılışta da veri sunulur.
+      gcTime: 30 * 60_000, // 30 dakika (varsayılan 5dk'dan artırıldı)
       refetchOnWindowFocus: false,
       retry(failureCount, error) {
         if (error instanceof ApiError && error.status > 0) return false;
