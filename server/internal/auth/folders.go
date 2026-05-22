@@ -83,7 +83,7 @@ func ResolveFolderPermission(
 		    JOIN ancestors a ON f.id = a.parent_id
 		),
 		perms AS (
-		    -- Direct per-user ACL
+		    -- Direct per-user ACL (PR-TIME: time window filter)
 		    SELECT
 		        a.depth,
 		        a.created_by,
@@ -94,8 +94,10 @@ func ResolveFolderPermission(
 		        ON fp.folder_id = a.id
 		       AND fp.user_id = $2::uuid
 		       AND fp.revoked_at IS NULL
+		       AND (fp.valid_from IS NULL OR fp.valid_from <= NOW())
+		       AND (fp.valid_until IS NULL OR fp.valid_until > NOW())
 		    UNION ALL
-		    -- Group-based ACL (PR-F6b)
+		    -- Group-based ACL (PR-F6b, PR-TIME: time window filter)
 		    SELECT
 		        a.depth,
 		        a.created_by,
@@ -105,6 +107,8 @@ func ResolveFolderPermission(
 		    JOIN folder_group_permissions fgp
 		        ON fgp.folder_id = a.id
 		       AND fgp.revoked_at IS NULL
+		       AND (fgp.valid_from IS NULL OR fgp.valid_from <= NOW())
+		       AND (fgp.valid_until IS NULL OR fgp.valid_until > NOW())
 		    JOIN group_members gm
 		        ON gm.group_id = fgp.group_id
 		       AND gm.user_id = $2::uuid

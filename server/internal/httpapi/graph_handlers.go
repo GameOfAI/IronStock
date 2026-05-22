@@ -113,16 +113,20 @@ func (h *GraphHandlers) Graph(w http.ResponseWriter, r *http.Request) {
 		// This is a documented limitation of the graph endpoint.
 		nodeSQL = `
 			WITH folder_grants AS (
-			    -- Direct per-user folder ACL
+			    -- Direct per-user folder ACL (PR-TIME: time window)
 			    SELECT folder_id FROM folder_permissions
 			    WHERE user_id = $1::uuid AND revoked_at IS NULL
+			      AND (valid_from IS NULL OR valid_from <= NOW())
+			      AND (valid_until IS NULL OR valid_until > NOW())
 			    UNION
-			    -- Group-based folder ACL (PR-F6b)
+			    -- Group-based folder ACL (PR-F6b, PR-TIME: time window)
 			    SELECT fgp.folder_id
 			    FROM folder_group_permissions fgp
 			    JOIN group_members gm ON gm.group_id = fgp.group_id
 			                          AND gm.user_id = $1::uuid
 			    WHERE fgp.revoked_at IS NULL
+			      AND (fgp.valid_from IS NULL OR fgp.valid_from <= NOW())
+			      AND (fgp.valid_until IS NULL OR fgp.valid_until > NOW())
 			    UNION
 			    -- Owner of the folder
 			    SELECT id FROM folders WHERE created_by = $1::uuid
@@ -134,6 +138,8 @@ func (h *GraphHandlers) Graph(w http.ResponseWriter, r *http.Request) {
 			   OR i.id IN (
 			          SELECT item_id FROM item_shares
 			          WHERE user_id = $1::uuid AND revoked_at IS NULL
+			            AND (valid_from IS NULL OR valid_from <= NOW())
+			            AND (valid_until IS NULL OR valid_until > NOW())
 			      )
 			   OR i.folder_id IN (SELECT folder_id FROM folder_grants)
 			ORDER BY i.created_at
@@ -199,12 +205,22 @@ func (h *GraphHandlers) Graph(w http.ResponseWriter, r *http.Request) {
 			WHERE source_item_id IN (
 			    SELECT id FROM items
 			    WHERE created_by = $1::uuid
-			       OR id IN (SELECT item_id FROM item_shares WHERE user_id = $1::uuid AND revoked_at IS NULL)
+			       OR id IN (
+			              SELECT item_id FROM item_shares
+			              WHERE user_id = $1::uuid AND revoked_at IS NULL
+			                AND (valid_from IS NULL OR valid_from <= NOW())
+			                AND (valid_until IS NULL OR valid_until > NOW())
+			          )
 			)
 			  AND target_item_id IN (
 			    SELECT id FROM items
 			    WHERE created_by = $1::uuid
-			       OR id IN (SELECT item_id FROM item_shares WHERE user_id = $1::uuid AND revoked_at IS NULL)
+			       OR id IN (
+			              SELECT item_id FROM item_shares
+			              WHERE user_id = $1::uuid AND revoked_at IS NULL
+			                AND (valid_from IS NULL OR valid_from <= NOW())
+			                AND (valid_until IS NULL OR valid_until > NOW())
+			          )
 			)
 			ORDER BY created_at
 		`

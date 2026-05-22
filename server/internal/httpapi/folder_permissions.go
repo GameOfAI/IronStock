@@ -3,6 +3,7 @@ package httpapi
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -10,10 +11,14 @@ import (
 	"envanter.app/server/internal/auth"
 )
 
+// grantPermissionRequest is the body of POST /api/v1/folders/{id}/permissions.
+// valid_from / valid_until are optional time-window fields (PR-TIME).
 type grantPermissionRequest struct {
-	UserID            string `json:"user_id"`
-	Permission        string `json:"permission"` // 'read' | 'write'
-	InheritToChildren bool   `json:"inherit_to_children"`
+	UserID            string     `json:"user_id"`
+	Permission        string     `json:"permission"` // 'read' | 'write'
+	InheritToChildren bool       `json:"inherit_to_children"`
+	ValidFrom         *time.Time `json:"valid_from"`  // optional, RFC 3339
+	ValidUntil        *time.Time `json:"valid_until"` // optional, RFC 3339
 }
 
 // GrantPermission implements POST /api/v1/folders/{id}/permissions.
@@ -56,6 +61,12 @@ func (h *FolderHandlers) GrantPermission(w http.ResponseWriter, r *http.Request)
 			"Kendinize yetki veremezsiniz.", errors.New("self-grant"))
 		return
 	}
+	// PR-TIME: validate time window if both fields provided.
+	if req.ValidFrom != nil && req.ValidUntil != nil && !req.ValidFrom.Before(*req.ValidUntil) {
+		writeError(w, h.Logger, http.StatusBadRequest, ErrCodeBadRequest,
+			"valid_from valid_until'dan önce olmalı.", errors.New("invalid time window"))
+		return
+	}
 
 	ctx := r.Context()
 
@@ -75,21 +86,25 @@ func (h *FolderHandlers) GrantPermission(w http.ResponseWriter, r *http.Request)
 	}
 
 	// UPSERT: re-granting the same user updates fields (incl. revoked_at=NULL
-	// to undo a prior revoke).
+	// to undo a prior revoke). PR-TIME: valid_from/valid_until included.
 	const upsertSQL = `
 		INSERT INTO folder_permissions
-		    (folder_id, user_id, permission, inherit_to_children, granted_by, revoked_at)
+		    (folder_id, user_id, permission, inherit_to_children,
+		     granted_by, revoked_at, valid_from, valid_until)
 		VALUES
-		    ($1::uuid, $2::uuid, $3, $4, $5::uuid, NULL)
+		    ($1::uuid, $2::uuid, $3, $4, $5::uuid, NULL, $6, $7)
 		ON CONFLICT (folder_id, user_id) DO UPDATE SET
 		    permission          = EXCLUDED.permission,
 		    inherit_to_children = EXCLUDED.inherit_to_children,
 		    granted_by          = EXCLUDED.granted_by,
 		    granted_at          = now(),
-		    revoked_at          = NULL
+		    revoked_at          = NULL,
+		    valid_from          = EXCLUDED.valid_from,
+		    valid_until         = EXCLUDED.valid_until
 	`
 	if _, err := h.Service.DB.Exec(ctx, upsertSQL,
-		folderID, req.UserID, req.Permission, req.InheritToChildren, claims.Subject,
+		folderID, req.UserID, req.Permission, req.InheritToChildren,
+		claims.Subject, req.ValidFrom, req.ValidUntil,
 	); err != nil {
 		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
 			"Yetki kaydedilemedi.", err)
@@ -105,6 +120,8 @@ func (h *FolderHandlers) GrantPermission(w http.ResponseWriter, r *http.Request)
 			"target_user_id":      req.UserID,
 			"permission":          req.Permission,
 			"inherit_to_children": req.InheritToChildren,
+			"valid_from":          req.ValidFrom,
+			"valid_until":         req.ValidUntil,
 		},
 		IPAddress: parseIP(r.RemoteAddr),
 		UserAgent: r.UserAgent(),

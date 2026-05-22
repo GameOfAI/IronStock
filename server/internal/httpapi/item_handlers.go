@@ -517,10 +517,16 @@ func (h *ItemHandlers) Search(w http.ResponseWriter, r *http.Request) {
 			WITH accessible AS (
 			    SELECT DISTINCT folder_id FROM folder_permissions
 			    WHERE user_id = $1::uuid AND permission IN ('read','write','admin')
+			      AND revoked_at IS NULL
+			      AND (valid_from IS NULL OR valid_from <= NOW())
+			      AND (valid_until IS NULL OR valid_until > NOW())
 			    UNION
 			    SELECT DISTINCT fgp.folder_id FROM folder_group_permissions fgp
 			    JOIN group_members gm ON gm.group_id = fgp.group_id
 			    WHERE gm.user_id = $1::uuid
+			      AND fgp.revoked_at IS NULL
+			      AND (fgp.valid_from IS NULL OR fgp.valid_from <= NOW())
+			      AND (fgp.valid_until IS NULL OR fgp.valid_until > NOW())
 			)
 			SELECT i.id::text, i.folder_id::text, i.item_type_id,
 			       i.name_enc, i.server_dek_wrapped,

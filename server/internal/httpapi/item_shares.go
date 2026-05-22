@@ -3,6 +3,7 @@ package httpapi
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -18,11 +19,16 @@ import (
 // (kept in their RAM after decrypting their own item_share row) and wraps
 // it with the recipient's X25519 public_key (sealed-box). Server stores
 // the opaque blob; never sees the DEK.
+//
+// valid_from / valid_until are optional time-window fields (PR-TIME).
+// NULL = no bound (immediate / permanent).
 type shareItemRequest struct {
-	UserID     string `json:"user_id"`
-	Permission string `json:"permission"` // 'read' | 'write'
-	DEKWrapped []byte `json:"dek_wrapped"`
-	WrapNonce  []byte `json:"wrap_nonce"` // 12B
+	UserID     string     `json:"user_id"`
+	Permission string     `json:"permission"` // 'read' | 'write'
+	DEKWrapped []byte     `json:"dek_wrapped"`
+	WrapNonce  []byte     `json:"wrap_nonce"` // 12B
+	ValidFrom  *time.Time `json:"valid_from"`  // optional, RFC 3339
+	ValidUntil *time.Time `json:"valid_until"` // optional, RFC 3339
 }
 
 // Share implements POST /api/v1/items/{id}/shares.
@@ -75,6 +81,12 @@ func (h *ItemHandlers) Share(w http.ResponseWriter, r *http.Request) {
 			errors.New("self-share"))
 		return
 	}
+	// PR-TIME: validate time window if both fields provided.
+	if req.ValidFrom != nil && req.ValidUntil != nil && !req.ValidFrom.Before(*req.ValidUntil) {
+		writeError(w, h.Logger, http.StatusBadRequest, ErrCodeBadRequest,
+			"valid_from valid_until'dan önce olmalı.", errors.New("invalid time window"))
+		return
+	}
 
 	ctx := r.Context()
 
@@ -95,20 +107,23 @@ func (h *ItemHandlers) Share(w http.ResponseWriter, r *http.Request) {
 
 	const upsertSQL = `
 		INSERT INTO item_shares
-		    (item_id, user_id, e2e_dek_wrapped, wrap_nonce, permission, granted_by, revoked_at)
+		    (item_id, user_id, e2e_dek_wrapped, wrap_nonce, permission,
+		     granted_by, revoked_at, valid_from, valid_until)
 		VALUES
-		    ($1::uuid, $2::uuid, $3, $4, $5, $6::uuid, NULL)
+		    ($1::uuid, $2::uuid, $3, $4, $5, $6::uuid, NULL, $7, $8)
 		ON CONFLICT (item_id, user_id) DO UPDATE SET
 		    e2e_dek_wrapped = EXCLUDED.e2e_dek_wrapped,
 		    wrap_nonce      = EXCLUDED.wrap_nonce,
 		    permission      = EXCLUDED.permission,
 		    granted_by      = EXCLUDED.granted_by,
 		    granted_at      = now(),
-		    revoked_at      = NULL
+		    revoked_at      = NULL,
+		    valid_from      = EXCLUDED.valid_from,
+		    valid_until     = EXCLUDED.valid_until
 	`
 	if _, err := h.Service.DB.Exec(ctx, upsertSQL,
 		itemID, req.UserID, req.DEKWrapped, req.WrapNonce,
-		req.Permission, claims.Subject,
+		req.Permission, claims.Subject, req.ValidFrom, req.ValidUntil,
 	); err != nil {
 		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
 			"Paylaşım kaydedilemedi.", err)
@@ -123,6 +138,8 @@ func (h *ItemHandlers) Share(w http.ResponseWriter, r *http.Request) {
 		Details: map[string]any{
 			"target_user_id": req.UserID,
 			"permission":     req.Permission,
+			"valid_from":     req.ValidFrom,
+			"valid_until":    req.ValidUntil,
 		},
 		IPAddress: parseIP(r.RemoteAddr),
 		UserAgent: r.UserAgent(),

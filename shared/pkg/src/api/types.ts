@@ -253,6 +253,9 @@ export interface ShareItemRequest {
   permission: 'read' | 'write';
   dek_wrapped: string; // base64
   wrap_nonce: string; // base64, 12B
+  /** PR-TIME: optional time window. ISO 8601. NULL = no bound. */
+  valid_from?: string | null;
+  valid_until?: string | null;
 }
 
 // --- Admin ---

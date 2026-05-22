@@ -1,15 +1,16 @@
 /**
- * ItemShareModal — share an item with another user (PR-UX5).
+ * ItemShareModal — share an item with another user (PR-UX5, PR-TIME).
  *
  * Flow:
  * 1. Owner's `owner_dek_wrapped` + `owner_wrap_nonce` → openDEKWithKEK → plaintext DEK
  * 2. Fetch recipient's public key via `useUserPublicKey(recipientId)`
  * 3. Seal DEK with recipient's X25519 public key → `sealDEK`
- * 4. POST /items/{id}/shares { user_id, permission, dek_wrapped, wrap_nonce }
+ * 4. POST /items/{id}/shares { user_id, permission, dek_wrapped, wrap_nonce,
+ *                              valid_from?, valid_until? }
  */
 
 import { useState } from 'react';
-import { Loader2, Search, Share2 } from 'lucide-react';
+import { Calendar, Loader2, Search, Share2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -53,6 +54,8 @@ export function ItemShareModal({ open, onOpenChange, item }: Props) {
   const [recipientId, setRecipientId] = useState('');
   const [recipientName, setRecipientName] = useState('');
   const [permission, setPermission] = useState<'read' | 'write'>('read');
+  const [validFrom, setValidFrom] = useState('');
+  const [validUntil, setValidUntil] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [userPickerOpen, setUserPickerOpen] = useState(false);
   const [userSearch, setUserSearch] = useState('');
@@ -79,6 +82,8 @@ export function ItemShareModal({ open, onOpenChange, item }: Props) {
     setRecipientId('');
     setRecipientName('');
     setPermission('read');
+    setValidFrom('');
+    setValidUntil('');
     setError(null);
     onOpenChange(false);
   }
@@ -96,6 +101,11 @@ export function ItemShareModal({ open, onOpenChange, item }: Props) {
 
     if (!recipientId) {
       setError('Bir kullanıcı seçin.');
+      return;
+    }
+    // PR-TIME: validate time window
+    if (validFrom && validUntil && new Date(validFrom) >= new Date(validUntil)) {
+      setError('Başlangıç tarihi bitiş tarihinden önce olmalı.');
       return;
     }
     if (!privateKey) {
@@ -123,12 +133,14 @@ export function ItemShareModal({ open, onOpenChange, item }: Props) {
       const recipientPubKey = fromBase64(pubKeyQuery.data.public_key);
       const { wrapped, nonce } = await sealDEK(dek, recipientPubKey);
 
-      // 3. POST share
+      // 3. POST share (PR-TIME: include optional time window)
       await shareMutation.mutateAsync({
         user_id: recipientId,
         permission,
         dek_wrapped: toBase64(wrapped),
         wrap_nonce: toBase64(nonce),
+        valid_from: validFrom ? new Date(validFrom).toISOString() : null,
+        valid_until: validUntil ? new Date(validUntil).toISOString() : null,
       });
 
       handleClose();
@@ -230,6 +242,52 @@ export function ItemShareModal({ open, onOpenChange, item }: Props) {
                 <SelectItem value="write">Yazma</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          {/* PR-TIME: Optional time window */}
+          <div className="space-y-1.5">
+            <Label className="flex items-center gap-1.5 text-sm">
+              <Calendar className="h-3.5 w-3.5" />
+              Erişim Penceresi
+              <span className="text-xs text-muted-foreground font-normal">(opsiyonel)</span>
+            </Label>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label htmlFor="share-valid-from" className="text-xs text-muted-foreground">
+                  Başlangıç
+                </Label>
+                <Input
+                  id="share-valid-from"
+                  type="datetime-local"
+                  value={validFrom}
+                  onChange={(e) => setValidFrom(e.target.value)}
+                  disabled={isPending}
+                  className="text-xs"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="share-valid-until" className="text-xs text-muted-foreground">
+                  Bitiş
+                </Label>
+                <Input
+                  id="share-valid-until"
+                  type="datetime-local"
+                  value={validUntil}
+                  onChange={(e) => setValidUntil(e.target.value)}
+                  disabled={isPending}
+                  className="text-xs"
+                />
+              </div>
+            </div>
+            {(validFrom || validUntil) && (
+              <p className="text-xs text-muted-foreground">
+                {validFrom && validUntil
+                  ? `${new Date(validFrom).toLocaleString('tr-TR')} — ${new Date(validUntil).toLocaleString('tr-TR')}`
+                  : validFrom
+                  ? `${new Date(validFrom).toLocaleString('tr-TR')} tarihinden itibaren`
+                  : `${new Date(validUntil).toLocaleString('tr-TR')} tarihine kadar`}
+              </p>
+            )}
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}

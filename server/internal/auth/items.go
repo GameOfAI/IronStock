@@ -82,12 +82,14 @@ func ResolveItemPermission(
 		return ItemPermWrite, nil
 	}
 
-	// 2. Direct item share (active grant).
+	// 2. Direct item share (active grant, within time window).
 	var sharePerm *string
 	err = q.QueryRow(ctx, `
 		SELECT permission
 		FROM item_shares
 		WHERE item_id = $1::uuid AND user_id = $2::uuid AND revoked_at IS NULL
+		  AND (valid_from IS NULL OR valid_from <= NOW())
+		  AND (valid_until IS NULL OR valid_until > NOW())
 		LIMIT 1
 	`, itemID, userID).Scan(&sharePerm)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
