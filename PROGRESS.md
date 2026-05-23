@@ -1,6 +1,6 @@
 # İlerleyiş
 
-Son güncelleme: 2026-05-23 (PR-DUP: Duplicate detection — CheckDuplicates API + amber uyarı UI + 4 birim test)
+Son güncelleme: 2026-05-23 (PR-HEALTH: Item health score — migration 00054 + score engine + 2 endpoint + health tab + dashboard widget + 13 test)
 
 ## Mevcut Durum
 
@@ -47,6 +47,7 @@ Son güncelleme: 2026-05-23 (PR-DUP: Duplicate detection — CheckDuplicates API
 | **PR-SEARCH-FT: Full-Text + Trigram Arama** | migration 00052 (pg_trgm extension, GIN index idx_items_name_plain_trgm + idx_items_description_trgm + idx_tags_label_plain_trgm); item_handlers.go Search() ?fuzzy=true parametresi — trigram benzerlik sorgusu (% operator + similarity() ORDER BY) vs ILIKE substring (mevcut davranış); audit log fuzzy flag eklendi; web: useGlobalItemSearch(q, fuzzy) güncellemesi, inventory index.tsx fuzzy durumu + ~ buton (global search açıkken); 4 birim test (QueryParam, WhereClause, TermType, MinLength) | ✅ Tamamlandı |
 | **PR-TPL: Kullanıcı Tanımlı Şablonlar** | migration 00053 (item_templates: name+description+item_type_id+fields JSONB+tags+is_public+created_by, updated_at trigger, GIN-suitable indexes); `httpapi/item_templates.go` TemplateHandlers (List GET scope=mine/public/all, Create POST, Update PUT owner/admin check, Delete DELETE owner/admin check); router wiring + main.go wiring; web: `api/templates.ts` (useTemplatesQuery + useCreateTemplateMutation + useUpdateTemplateMutation + useDeleteTemplateMutation), `components/inventory/template-gallery.tsx` (TemplateGallery: arama, liste, silme, hızlı oluşturma formu, herkese açık/özel göstergesi); 5 birim test (compile guard, scope, default scope, required fields, ownership) | ✅ Tamamlandı |
 | **PR-DUP: Duplicate Detection** | `httpapi/item_duplicates.go` CheckDuplicates GET /api/v1/items/duplicates?name=&exclude_id=&limit= (admin: vault-wide; non-admin: accessible folders CTE JOIN); server-side HMAC blind index (crypto.SearchHash) — hiçbir plaintext loglanmaz; FormatArgN exported helper; router wiring (ir.Get "/duplicates"); web: `api/items.ts` useItemDuplicatesQuery (name+excludeId, staleTime 5s), `item-form-modal.tsx` dupQuery + showDupWarning + amber uyarı banner (eşleşen item adları listesi + "yine de devam edebilirsiniz" notu); 4 birim test (ZeroValue, FormatArgN, NameRequired, LimitBounds) | ✅ Tamamlandı |
+| **PR-HEALTH: Item Health Score** | migration 00054 (items.health_score SMALLINT 0-100, partial index); `internal/health/score.go` ItemMeta struct + Score() + ScoreWithBreakdown() + Severity() — kurallar: expired(-25), expiring<7d(-15), rotation_stale>90d(-10), no_description(-5), no_tags(-5), isolated(-5), k8s_unreachable(-15), floor 0; `httpapi/item_health.go` GetHealth GET /api/v1/items/{id}/health (permission check + best-effort score cache UPDATE) + GetHealthReport GET /api/v1/items/health-report?threshold&limit (admin-only, cached column query); router wiring; web: `api/health.ts` (useItemHealthQuery + useHealthReportQuery), item-detail.tsx "Sağlık" tab (score badge + breakdown list), admin/dashboard.tsx UnhealthyItemsWidget (skor < 70 listesi); 13 birim test (score engine 10 + compile/response guards 3) | ✅ Tamamlandı |
 
 ---
 

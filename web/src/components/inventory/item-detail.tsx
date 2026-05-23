@@ -49,6 +49,7 @@ import { useVaultFetchMutation, useIssueDynamicCredMutation, useRevokeDynamicCre
 import type { DynamicCred } from '@/api/vault';
 import { useCreateAccessRequestMutation, useCancelAccessRequestMutation } from '@/api/access-requests';
 import { useItem, useRecordRotationMutation, useFieldVersionsQuery } from '@/api/items';
+import { useItemHealthQuery } from '@/api/health';
 import {
   useAddFavoriteMutation,
   useRemoveFavoriteMutation,
@@ -397,6 +398,7 @@ export function ItemDetail({ itemId, fieldDefinitions, itemTypes: _itemTypes }: 
             <TabsTrigger value="baglanti">Bağlantılar</TabsTrigger>
             <TabsTrigger value="yasam">Yaşam Döngüsü</TabsTrigger>
             <TabsTrigger value="gecmis">Geçmiş</TabsTrigger>
+            <TabsTrigger value="saglik">Sağlık</TabsTrigger>
           </TabsList>
 
           {/* ── GENEL ────────────────────────────────────────────────────────── */}
@@ -732,6 +734,11 @@ export function ItemDetail({ itemId, fieldDefinitions, itemTypes: _itemTypes }: 
           {/* ── GEÇMİŞ ──────────────────────────────────────────────────────── */}
           <TabsContent value="gecmis" className="px-0" forceMount>
             <HistoryTab itemId={item.id} fields={fields} fieldDefMap={fieldDefMap} />
+          </TabsContent>
+
+          {/* ── SAĞLIK ──────────────────────────────────────────────────────── */}
+          <TabsContent value="saglik" className="px-0" forceMount>
+            <HealthTab itemId={item.id} />
           </TabsContent>
         </Tabs>
       </div>
@@ -1255,5 +1262,75 @@ function ApprovalPanel({ itemId, item }: { itemId: string; item: { my_access_req
         )}
       </div>
     </section>
+  );
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sağlık Tab — PR-HEALTH
+// ─────────────────────────────────────────────────────────────────────────────
+
+const severityConfig = {
+  healthy:  { label: 'İyi',     className: 'bg-green-100 text-green-800 border-green-300 dark:bg-green-950 dark:text-green-200' },
+  warning:  { label: 'Uyarı',  className: 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-200' },
+  critical: { label: 'Kritik', className: 'bg-red-100 text-red-800 border-red-300 dark:bg-red-950 dark:text-red-200' },
+} as const;
+
+function HealthTab({ itemId }: { itemId: string }) {
+  const { data, isLoading, isError } = useItemHealthQuery(itemId);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3 p-4">
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-24 w-full" />
+      </div>
+    );
+  }
+
+  if (isError || !data) {
+    return (
+      <div className="p-4 text-sm text-muted-foreground">
+        Sağlık skoru alınamadı.
+      </div>
+    );
+  }
+
+  const sev = severityConfig[data.severity] ?? severityConfig.critical;
+
+  return (
+    <div className="space-y-4 p-4">
+      {/* Score header */}
+      <div className={`flex items-center gap-4 rounded-lg border px-4 py-3 ${sev.className}`}>
+        <span className="text-4xl font-bold leading-none">{data.score}</span>
+        <div>
+          <p className="text-sm font-semibold">{sev.label}</p>
+          <p className="text-xs opacity-75">/ 100 sağlık skoru</p>
+        </div>
+      </div>
+
+      {/* Breakdown */}
+      {data.breakdown.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Tüm kriterler karşılanıyor.</p>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Düşen Puanlar
+          </p>
+          {data.breakdown.map((b) => (
+            <div
+              key={b.rule}
+              className="flex items-start justify-between rounded-md border bg-muted/30 px-3 py-2 text-sm"
+            >
+              <div>
+                <p className="font-medium">{b.rule.replace(/_/g, ' ')}</p>
+                {b.detail && <p className="text-xs text-muted-foreground">{b.detail}</p>}
+              </div>
+              <span className="ml-4 shrink-0 font-mono text-destructive">-{b.deduction}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

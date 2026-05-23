@@ -34,6 +34,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useUsers, useAuditLog, downloadAdminExport, downloadEncryptedExport, type ExportFormat } from '@/api/admin';
+import { useHealthReportQuery } from '@/api/health';
 import { useNotificationsQuery } from '@/api/notifications';
 import { RelativeTime } from '@/components/common/relative-time';
 import { cn } from '@/lib/cn';
@@ -545,7 +546,58 @@ export default function AdminDashboardPage() {
           </Card>
         </div>
       </div>
+
+      {/* ── PR-HEALTH: Sağlıksız Item'lar widget ───────────────────────── */}
+      <UnhealthyItemsWidget />
     </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PR-HEALTH: Sağlıksız Item'lar widget
+// ─────────────────────────────────────────────────────────────────────────────
+
+const sevColors: Record<string, string> = {
+  healthy:  'text-green-600',
+  warning:  'text-amber-600',
+  critical: 'text-red-600',
+};
+
+function UnhealthyItemsWidget() {
+  const { data, isLoading } = useHealthReportQuery(70, 10);
+
+  return (
+    <div className="mt-4">
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold">
+            Sağlıksız Item'lar (skor &lt; 70)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-2/3" />
+            </div>
+          ) : !data || data.count === 0 ? (
+            <p className="text-sm text-muted-foreground">Tüm item'lar sağlıklı görünüyor.</p>
+          ) : (
+            <div className="divide-y">
+              {data.items.map((item) => (
+                <div key={item.item_id} className="flex items-center justify-between py-2 text-sm">
+                  <span className="truncate max-w-[60%]">{item.name || item.item_id}</span>
+                  <span className={`font-mono font-semibold ${sevColors[item.severity] ?? ''}`}>
+                    {item.health_score}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
