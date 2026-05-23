@@ -159,7 +159,7 @@ func (h *SSOHandlers) CreateSSOProvider(w http.ResponseWriter, r *http.Request) 
 	}
 
 	ctx := r.Context()
-	claims, _ := ClaimsFromContext(ctx)
+	claims := ClaimsFromContext(ctx)
 
 	// Insert without secrets first to get the real ID for AAD.
 	var newID string
@@ -239,7 +239,7 @@ func (h *SSOHandlers) UpdateSSOProvider(w http.ResponseWriter, r *http.Request) 
 	}
 
 	ctx := r.Context()
-	claims, _ := ClaimsFromContext(ctx)
+	claims := ClaimsFromContext(ctx)
 
 	tag, err := h.Service.DB.Exec(ctx, `
 		UPDATE sso_providers SET
@@ -302,7 +302,7 @@ func (h *SSOHandlers) UpdateSSOProvider(w http.ResponseWriter, r *http.Request) 
 func (h *SSOHandlers) DeleteSSOProvider(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	ctx := r.Context()
-	claims, _ := ClaimsFromContext(ctx)
+	claims := ClaimsFromContext(ctx)
 
 	var name string
 	if err := h.Service.DB.QueryRow(ctx,

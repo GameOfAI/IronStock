@@ -70,6 +70,7 @@ var validRelTypes = map[string]bool{
 	"builds_to":    true,
 	"scans_with":   true,
 	"deploys_to":   true,
+	"runs_in":      true, // PR-K8S: application item → k8s_namespace item
 }
 
 // Graph implements GET /api/v1/graph.

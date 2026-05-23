@@ -53,6 +53,9 @@ type Deps struct {
 	Pipeline       *PipelineHandlers
 	LogForwarding  *LogForwardingHandlers // PR-LOG1: audit log forwarding to syslog/slack
 	Vault          *VaultHandlers         // PR-VAULT: HashiCorp Vault proxy (ADR-0007)
+	K8sCluster     *K8sClusterHandlers    // PR-K8S: Kubernetes cluster admin CRUD
+	K8s            *K8sHandlers           // PR-K8S: Per-item live K8s data proxy
+	Report         *ReportHandlers        // PR-K8S: HTML inventory report generation
 }
 
 // NewRouter builds a chi router with the standard middleware stack.
@@ -289,6 +292,19 @@ func NewRouter(d Deps) http.Handler {
 				ar.Delete("/sso/providers/{id}", d.SSO.DeleteSSOProvider)
 				ar.Post("/sso/providers/{id}/test", d.SSO.TestLDAPConnection)
 			}
+			// Kubernetes cluster management (PR-K8S).
+			if d.K8sCluster != nil {
+				ar.Get("/k8s/clusters", d.K8sCluster.ListClusters)
+				ar.Post("/k8s/clusters", d.K8sCluster.CreateCluster)
+				ar.Put("/k8s/clusters/{id}", d.K8sCluster.UpdateCluster)
+				ar.Delete("/k8s/clusters/{id}", d.K8sCluster.DeleteCluster)
+				ar.Post("/k8s/clusters/{id}/test", d.K8sCluster.TestCluster)
+			}
+			// HTML report generation (PR-K8S) — long timeout (120s for multi-cluster fetches).
+			if d.Report != nil {
+				ar.With(middleware.Timeout(120*time.Second)).
+					Post("/reports/generate", d.Report.Generate)
+			}
 		})
 	}
 
@@ -447,6 +463,19 @@ func NewRouter(d Deps) http.Handler {
 			Post("/api/v1/items/{id}/vault-fetch", d.Vault.VaultFetch)
 		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
 			Get("/api/v1/vault/paths", d.Vault.VaultListPaths)
+	}
+
+	// PR-K8S: Per-item live K8s proxy routes. Read permission sufficient for data;
+	// write permission required for binding registration.
+	if d.K8s != nil && d.Auth != nil {
+		mw := []func(http.Handler) http.Handler{timeoutMW, RequireAccessToken(d.Auth.Service.JWT)}
+		r.With(mw...).Get("/api/v1/items/{id}/k8s/binding", d.K8s.GetBinding)
+		r.With(mw...).Post("/api/v1/items/{id}/k8s/bind", d.K8s.SetBinding)
+		r.With(mw...).Get("/api/v1/items/{id}/k8s/pods", d.K8s.ListPods)
+		r.With(mw...).Get("/api/v1/items/{id}/k8s/deployments", d.K8s.ListDeployments)
+		r.With(mw...).Get("/api/v1/items/{id}/k8s/services", d.K8s.ListServices)
+		r.With(mw...).Get("/api/v1/items/{id}/k8s/events", d.K8s.ListEvents)
+		r.With(mw...).Get("/api/v1/items/{id}/k8s/metrics", d.K8s.ListMetrics)
 	}
 
 	return r

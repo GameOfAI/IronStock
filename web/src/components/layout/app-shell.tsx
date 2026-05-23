@@ -396,6 +396,8 @@ const NAV_LABELS: Record<string, string> = {
   '/admin/client-certs': 'Sertifikalar',
   '/admin/log-forwarding': 'Log Yönlendirme',
   '/admin/sso': 'SSO / LDAP',
+  '/admin/k8s-clusters': 'K8s Kümeleri',
+  '/admin/reports': 'Raporlar',
   '/profile': 'Profil',
 };
 
@@ -617,6 +619,18 @@ export function AppShell() {
                   to="/admin/sso"
                   icon={ShieldCheck}
                   label="SSO / LDAP"
+                  collapsed={sidebarCollapsed && !mobileOpen}
+                />
+                <NavItem
+                  to="/admin/k8s-clusters"
+                  icon={Layers}
+                  label="K8s Kümeleri"
+                  collapsed={sidebarCollapsed && !mobileOpen}
+                />
+                <NavItem
+                  to="/admin/reports"
+                  icon={FileText}
+                  label="Raporlar"
                   collapsed={sidebarCollapsed && !mobileOpen}
                 />
               </>

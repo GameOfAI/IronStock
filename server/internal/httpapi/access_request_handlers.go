@@ -18,7 +18,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"strings"
 	"time"
 
 	"envanter.app/server/internal/audit"
@@ -81,19 +80,6 @@ type accessRequestListItem struct {
 
 type accessRequestsListResponse struct {
 	Requests []accessRequestListItem `json:"requests"`
-}
-
-// ---- helper: unique violation detection ----
-
-// isUniqueViolation returns true when err is a PostgreSQL 23505 unique constraint
-// violation. pgx wraps PgError transparently, so we can check the error string.
-func isUniqueViolation(err error) bool {
-	if err == nil {
-		return false
-	}
-	return strings.Contains(err.Error(), "23505") ||
-		strings.Contains(err.Error(), "unique constraint") ||
-		strings.Contains(err.Error(), "unique_violation")
 }
 
 // ---- helper: approval gate check ----

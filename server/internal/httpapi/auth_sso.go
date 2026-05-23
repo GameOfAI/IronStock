@@ -34,6 +34,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	ldap "github.com/go-ldap/ldap/v3"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"envanter.app/server/internal/audit"
 	"envanter.app/server/internal/auth"
 	"envanter.app/server/internal/crypto"
@@ -152,7 +154,7 @@ func fetchSSOProvider(ctx context.Context, db auth.DBExec, id string) (ssoProvid
 // a new local user is created with the given email/displayName.
 func findOrProvisionSSOUser(
 	ctx context.Context,
-	db auth.DBExec,
+	db *pgxpool.Pool,
 	p ssoProviderRow,
 	externalID, email, displayName string,
 ) (string, error) {

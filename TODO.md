@@ -1,8 +1,8 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-05-22 — TÜM PLANLI GELİŞTİRMELER TAMAMLANDI ✅
-PR-SEC1/SEC2/SEC3 (mTLS + Tauri .p12) + PR-F3 (Tauri offline cache) + PR-TIME/LOG1/VAULT/GROUP-SHARE/IMPORT/N3/LDAP.
-Kalan tek kullanıcı aksiyonu: server/ dizininde `go mod tidy`.
+Son güncelleme: 2026-05-23 — PR-K8S tamamlandı ✅
+PR-SEC1/SEC2/SEC3 (mTLS + Tauri .p12) + PR-F3 (Tauri offline cache) + PR-TIME/LOG1/VAULT/GROUP-SHARE/IMPORT/N3/LDAP + PR-K8S (K8s cluster entegrasyonu + HTML rapor).
+Kalan tek kullanıcı aksiyonu: server/ dizininde `go mod tidy` (go-ldap/ldap/v3 + gopkg.in/yaml.v3).
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 
@@ -645,6 +645,7 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 ### ⏳ Kalan
 
 - [x] **PR-F3** — Tauri Client Sync: KeyringBootstrap (sessiz yeniden oturum), TLS skip-verify (reqwest), client item-detail parity (expiry/tags), tags + notifications API hooks. ✅ 2026-05-19
+- [x] **PR-K8S** — Kubernetes Cluster Entegrasyonu + HTML Rapor Üretimi: migration 00044/45/46 (`k8s_clusters`, `k8s_namespace` item tipi, `runs_in` rel tipi, `item_k8s_bindings`), `server/internal/k8s/` paketi (pure net/http client, kubeconfig parser), `admin_k8s.go` (CRUD+test+`decryptClusterConfig` helper), `k8s_proxy.go` (5 item-bazlı proxy endpoint), `admin_report.go` + `report.html.tmpl` (self-contained HTML, bounded goroutine pool), router+main wiring, web: admin-k8s.ts + reports.ts + pages/admin/k8s-clusters.tsx + pages/admin/reports.tsx + App.tsx routes + app-shell nav items. ✅ 2026-05-23
 - [ ] **PR-N3** — Onay Workflow / Dual Control: `access_requests` tablosu. Kritik item için erişim isteği → admin onayı → zaman-sınırlı görüntüleme. WS event'lar. **Büyük iş — Faz 6+ ayrı plan gerekir.**
 
 ### 🎯 Önerilen Sonraki Adaylar (Devolutions analizi + öncelik sırası)

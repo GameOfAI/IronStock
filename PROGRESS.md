@@ -1,6 +1,6 @@
 # İlerleyiş
 
-Son güncelleme: 2026-05-22 (durum taraması — gerçek tamamlanma tablosu eklendi)
+Son güncelleme: 2026-05-23 (PR-K8S: Kubernetes cluster entegrasyonu + HTML rapor üretimi tamamlandı)
 
 ## Mevcut Durum
 
@@ -26,14 +26,17 @@ Son güncelleme: 2026-05-22 (durum taraması — gerçek tamamlanma tablosu ekle
 
 | Özellik | Durum | Notlar |
 |---------|-------|--------|
-| **`go mod tidy`** | ⚠️ Kullanıcı aksiyonu | server/ dizininde çalıştırılmalı (go-ldap/ldap/v3 download + go.sum güncelleme) |
+| **`go mod tidy`** | ⚠️ Kullanıcı aksiyonu | server/ dizininde çalıştırılmalı (go-ldap/ldap/v3 + gopkg.in/yaml.v3 download + go.sum güncelleme) |
 
 ### Tamamlanan (bu session — 2026-05-22 devam)
 
 | PR | Açıklama | Durum |
 |----|----------|-------|
 | **PR-SEC3: Tauri mTLS** | .p12 picker (config.tsx), PKCS12 Identity (commands.rs, native-tls), connection store cert alanları, rawFetch cert geçişi | ✅ Tamamlandı |
-| **PR-F3: Tauri Offline Cache** | Rust cache_write/read/clear komutları, offline-cache.ts (serialize/hydrate/subscribe), App.tsx OfflineCacheManager, gcTime 30dk | ✅ Tamamlandı |
+| **PR-F3: Tauri Offline Cache (Read)** | Rust cache_write/read/clear komutları, offline-cache.ts (serialize/hydrate/subscribe), App.tsx OfflineCacheManager, gcTime 30dk | ✅ Tamamlandı |
+| **PR-F3: Offline Write+Sync (Outbox)** | pending-ops.ts (kuyruk disk I/O), store/pending-ops.ts (reaktif badge), offline-sync.ts (retry engine), client.ts network interceptor, connection store offlineModeEnabled, config.tsx toggle, use-offline-sync.ts hook, App.tsx OfflineSyncManager, app-shell badge | ✅ Tamamlandı |
+| **Ekran Yakalama Koruması** | `set_content_protection` Rust komutu (setup'ta default true), tauri.ts wrapper, connection store `contentProtectionEnabled`, config.tsx toggle (varsayılan açık) | ✅ Tamamlandı |
+| **PR-K8S: K8s Cluster Entegrasyonu + HTML Rapor** | migration 00044/45/46, `server/internal/k8s/` paketi (client+resources+kubeconfig), admin_k8s.go (CRUD+test+decryptClusterConfig), k8s_proxy.go (item-bazlı proxy), admin_report.go + report.html.tmpl (bounded goroutine pool, self-contained HTML), router+main wiring, web: admin-k8s.ts + reports.ts + pages/admin/k8s-clusters.tsx + pages/admin/reports.tsx + App.tsx routes + app-shell nav items | ✅ Tamamlandı |
 
 ---
 
