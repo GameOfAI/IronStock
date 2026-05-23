@@ -57,7 +57,9 @@ type Deps struct {
 	K8s            *K8sHandlers           // PR-K8S: Per-item live K8s data proxy
 	Report         *ReportHandlers        // PR-K8S: HTML inventory report generation
 	Template       *TemplateHandlers      // PR-TPL: User-defined item templates
-	AISuggestion   *AISuggestionHandlers  // PR-AI: AI tag/relationship suggestions
+	AISuggestion   *AISuggestionHandlers     // PR-AI: AI tag/relationship suggestions
+	Ansible        *AnsibleInventoryHandlers // PR-ANSIBLE: Ansible dynamic inventory
+	APIToken       *APITokenHandlers         // PR-ANSIBLE: API token management
 }
 
 // NewRouter builds a chi router with the standard middleware stack.
@@ -531,6 +533,19 @@ func NewRouter(d Deps) http.Handler {
 		r.With(mw...).Get("/api/v1/items/{id}/suggestions", d.AISuggestion.ListSuggestions)
 		r.With(mw...).Post("/api/v1/items/{id}/suggestions/{sid}/accept", d.AISuggestion.AcceptSuggestion)
 		r.With(mw...).Post("/api/v1/items/{id}/suggestions/{sid}/reject", d.AISuggestion.RejectSuggestion)
+	}
+
+	// PR-ANSIBLE: Ansible dynamic inventory + API token management.
+	if d.Ansible != nil && d.Auth != nil {
+		mw := []func(http.Handler) http.Handler{timeoutMW, RequireAccessToken(d.Auth.Service.JWT)}
+		// Ansible inventory: also accepts raw API token (checked inside handler).
+		r.With(mw...).Get("/api/v1/ansible/inventory", d.Ansible.GetInventory)
+	}
+	if d.APIToken != nil && d.Auth != nil {
+		mw := []func(http.Handler) http.Handler{timeoutMW, RequireAccessToken(d.Auth.Service.JWT)}
+		r.With(mw...).Get("/api/v1/users/me/api-tokens", d.APIToken.ListAPITokens)
+		r.With(mw...).Post("/api/v1/users/me/api-tokens", d.APIToken.CreateAPIToken)
+		r.With(mw...).Delete("/api/v1/users/me/api-tokens/{id}", d.APIToken.DeleteAPIToken)
 	}
 
 	// PR-K8S: Per-item live K8s proxy routes. Read permission sufficient for data;
