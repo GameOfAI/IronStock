@@ -39,6 +39,41 @@ var (
 		Name: "envanter_item_ops_total",
 		Help: "Item CRUD and sharing operations.",
 	}, []string{"op"})
+
+	// PR-ALERT: credential health metrics — updated by the background expiry scanner.
+
+	// CredentialsExpiringTotal tracks how many credentials expire within a time window.
+	// within labels: "7d", "30d"
+	CredentialsExpiringTotal = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "ironstock_credentials_expiring_total",
+		Help: "Number of credentials expiring within the given time window.",
+	}, []string{"within"})
+
+	// CredentialsExpiredTotal is a gauge of already-expired credentials.
+	CredentialsExpiredTotal = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "ironstock_credentials_expired_total",
+		Help: "Number of credentials that have already expired.",
+	})
+
+	// ItemsUnhealthyTotal tracks items with a health score below thresholds.
+	// severity labels: "high" (score<50), "medium" (score<70)
+	ItemsUnhealthyTotal = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "ironstock_items_unhealthy_total",
+		Help: "Number of items with health score below threshold.",
+	}, []string{"severity"})
+
+	// BreakglassLoginsTotal is incremented whenever a break-glass account logs in.
+	BreakglassLoginsTotal = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "ironstock_breakglass_logins_total",
+		Help: "Total break-glass emergency account login events.",
+	})
+
+	// IronStockAuthFailuresTotal mirrors AuthFailuresTotal with the ironstock_ prefix
+	// expected by the PrometheusRule. Both are incremented by auth handlers.
+	IronStockAuthFailuresTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "ironstock_auth_failures_total",
+		Help: "Authentication failures (ironstock_ prefixed alias for alert rules).",
+	}, []string{"reason"})
 )
 
 // Handler returns the Prometheus scrape handler for GET /metrics.
