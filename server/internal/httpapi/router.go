@@ -500,6 +500,11 @@ func NewRouter(d Deps) http.Handler {
 			Post("/api/v1/items/{id}/vault-fetch", d.Vault.VaultFetch)
 		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
 			Get("/api/v1/vault/paths", d.Vault.VaultListPaths)
+		// PR-VAULT-DYN: ephemeral dynamic credential from Vault secrets engine.
+		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+			Post("/api/v1/items/{id}/dynamic-cred", d.Vault.IssueDynamicCred)
+		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+			Delete("/api/v1/items/{id}/dynamic-cred/{lease_id}", d.Vault.RevokeDynamicCred)
 	}
 
 	// PR-K8S: Per-item live K8s proxy routes. Read permission sufficient for data;

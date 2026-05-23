@@ -58,6 +58,23 @@ type ExternalSourceVault struct {
 	Path      string            `json:"path"`        // KV path relative to mount, e.g. "prod/db/postgres"
 	KVVersion int               `json:"kv_version"`  // 1 or 2 (default 2)
 	KeyMapping map[string]string `json:"key_mapping"` // field_definition.key → vault data key
+
+	// PR-VAULT-DYN: Dynamic secret fields.
+	// When Dynamic=true, the mount is a dynamic secret engine (e.g. database).
+	// Calling IssueDynamicCred(mount) generates a new ephemeral credential.
+	Dynamic bool   `json:"dynamic,omitempty"` // true = dynamic secrets engine
+	TTL     string `json:"ttl,omitempty"`     // requested TTL, e.g. "15m", "1h"
+}
+
+// DynamicCred holds an ephemeral credential returned from a Vault dynamic
+// secrets engine (e.g. database, AWS). Values are plaintext and MUST NOT
+// be stored — they should be returned directly to the caller and discarded.
+type DynamicCred struct {
+	Username      string    `json:"username"`
+	Password      string    `json:"password"`
+	LeaseID       string    `json:"lease_id"`
+	LeaseDuration int       `json:"lease_duration"` // seconds
+	ExpiresAt     time.Time `json:"expires_at"`
 }
 
 // Client is a thread-safe Vault HTTP client with automatic AppRole token
@@ -87,6 +104,78 @@ func New(cfg Config) *Client {
 // IsNil returns true when c is nil (Vault not configured).
 // Exists as a named helper for readability at call sites.
 func IsNil(c *Client) bool { return c == nil }
+
+// IssueDynamicCred generates a new ephemeral credential from a Vault dynamic
+// secrets engine. The mount should point to a role, e.g. "database/creds/readonly".
+// An optional TTL string overrides the role's default (e.g. "15m", "1h").
+//
+// SECURITY: the returned DynamicCred contains plaintext credentials.
+// Callers MUST NOT log or store the Username/Password fields. Return them
+// directly to the requesting client and discard.
+func (c *Client) IssueDynamicCred(ctx context.Context, mount, ttl string) (*DynamicCred, error) {
+	if err := c.ensureToken(ctx); err != nil {
+		return nil, fmt.Errorf("vault auth: %w", err)
+	}
+
+	apiPath := "/v1/" + strings.TrimPrefix(mount, "/")
+
+	// Some dynamic secret backends accept a POST with TTL; others use GET.
+	// Vault database, PKI, AWS, etc. all accept GET. Only use POST if TTL given.
+	var bodyBytes []byte
+	method := http.MethodGet
+	if ttl != "" {
+		var err error
+		bodyBytes, err = json.Marshal(map[string]string{"ttl": ttl})
+		if err != nil {
+			return nil, fmt.Errorf("vault: build ttl payload: %w", err)
+		}
+		method = http.MethodPost
+	}
+
+	body, err := c.doRequest(ctx, method, apiPath, bodyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("vault: issue dynamic cred at %s: %w", mount, err)
+	}
+
+	var resp struct {
+		LeaseID       string `json:"lease_id"`
+		LeaseDuration int    `json:"lease_duration"`
+		Data          struct {
+			Username string `json:"username"`
+			Password string `json:"password"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, fmt.Errorf("vault: parse dynamic cred response: %w", err)
+	}
+	if resp.Data.Username == "" {
+		return nil, fmt.Errorf("vault: dynamic cred response missing username")
+	}
+
+	leaseDur := resp.LeaseDuration
+	if leaseDur == 0 {
+		leaseDur = 900 // 15 min fallback
+	}
+
+	return &DynamicCred{
+		Username:      resp.Data.Username,
+		Password:      resp.Data.Password,
+		LeaseID:       resp.LeaseID,
+		LeaseDuration: leaseDur,
+		ExpiresAt:     time.Now().Add(time.Duration(leaseDur) * time.Second),
+	}, nil
+}
+
+// RevokeLease revokes a Vault lease immediately.
+// This is a best-effort call — callers should not block on its failure.
+func (c *Client) RevokeLease(ctx context.Context, leaseID string) error {
+	if err := c.ensureToken(ctx); err != nil {
+		return fmt.Errorf("vault auth: %w", err)
+	}
+	payload, _ := json.Marshal(map[string]string{"lease_id": leaseID})
+	_, err := c.doRequest(ctx, http.MethodPut, "/v1/sys/leases/revoke", payload)
+	return err
+}
 
 // ReadKV fetches secret data at src.Mount/src.Path and applies
 // src.KeyMapping. Returns a map of field_definition.key → plaintext value.
@@ -261,7 +350,7 @@ func (c *Client) doRequest(ctx context.Context, method, path string, payload []b
 	}
 
 	switch resp.StatusCode {
-	case http.StatusOK:
+	case http.StatusOK, http.StatusNoContent:
 		return body, nil
 	case http.StatusNotFound:
 		return nil, ErrSecretNotFound
