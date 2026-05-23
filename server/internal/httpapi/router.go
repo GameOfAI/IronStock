@@ -289,6 +289,8 @@ func NewRouter(d Deps) http.Handler {
 			// Export (PR-Export) — registered inside this block so auth/role MW applies.
 			if d.Export != nil {
 				ar.Get("/export", d.Export.Export)
+				// PR-EXPORT: Encrypted ZIP export for disaster recovery.
+				ar.Post("/export/encrypted", d.Export.ExportEncrypted)
 			}
 			// Client certificate management (PR-SEC3).
 			if d.ClientCert != nil {
