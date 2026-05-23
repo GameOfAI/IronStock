@@ -487,11 +487,16 @@ func (h *ItemHandlers) List(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, itemListResponse{Items: out})
 }
 
-// Search implements GET /api/v1/items/search?q=term[&type_id=N][&limit=N].
+// Search implements GET /api/v1/items/search?q=term[&type_id=N][&limit=N][&fuzzy=true].
 //
 // Cross-folder substring search across all folders the user can read.
 // Results include folder_id so the client can navigate to the item.
 // Max 50 results to bound query cost.
+//
+// PR-SEARCH-FT: When fuzzy=true, uses pg_trgm similarity matching instead of
+// ILIKE substring matching. Results are ordered by similarity score descending
+// (typo-tolerant search). Requires migration 00052 (GIN indexes + pg_trgm).
+// Field values are E2E encrypted and CANNOT be searched by design (ADR-0004).
 func (h *ItemHandlers) Search(w http.ResponseWriter, r *http.Request) {
 	claims := ClaimsFromContext(r.Context())
 	if claims == nil {
@@ -508,9 +513,30 @@ func (h *ItemHandlers) Search(w http.ResponseWriter, r *http.Request) {
 	}
 	limit := parseIntDefault(r.URL.Query().Get("limit"), 50, 1, 100)
 	typeIDStr := r.URL.Query().Get("type_id")
+	fuzzy := r.URL.Query().Get("fuzzy") == "true"
 
 	ctx := r.Context()
-	term := "%" + strings.ToLower(q) + "%"
+
+	// Build WHERE and ORDER based on fuzzy mode.
+	// Fuzzy: trigram similarity (requires pg_trgm + GIN indexes from migration 00052).
+	// Exact: ILIKE substring match (legacy behaviour).
+	var (
+		whereExpr string
+		orderExpr string
+		term      any
+	)
+	if fuzzy {
+		// Use similarity() for ordering. The % operator uses the configured
+		// pg_trgm.similarity_threshold (default 0.3).
+		// We broaden to OR across name_plain and description.
+		whereExpr = `(i.name_plain % $QTERM OR coalesce(i.description,'') % $QTERM)`
+		orderExpr = `similarity(coalesce(i.name_plain,''), $QTERM) DESC, i.name_plain`
+		term = q // trigram uses raw string, not wildcards
+	} else {
+		whereExpr = `(i.name_plain ILIKE $QTERM OR lower(coalesce(i.description,'')) LIKE lower($QTERM))`
+		orderExpr = `i.name_plain`
+		term = "%" + strings.ToLower(q) + "%"
+	}
 
 	var rows *pgx.Rows
 	var err error
@@ -519,19 +545,21 @@ func (h *ItemHandlers) Search(w http.ResponseWriter, r *http.Request) {
 	if hasRole(claims, RoleAdmin) {
 		var qb strings.Builder
 		args := []any{term, limit}
+		where := strings.ReplaceAll(whereExpr, "$QTERM", "$1")
+		order := strings.ReplaceAll(orderExpr, "$QTERM", "$1")
 		qb.WriteString(`
 			SELECT i.id::text, i.folder_id::text, i.item_type_id,
 			       i.name_enc, i.server_dek_wrapped,
 			       i.created_by::text, i.created_at::text, i.updated_at::text,
 			       i.expires_at::text, i.rotation_interval_days, i.last_rotated_at::text
 			FROM items i
-			WHERE (i.name_plain LIKE $1 OR lower(coalesce(i.description,'')) LIKE $1)
+			WHERE ` + where + `
 		`)
 		if typeIDStr != "" {
 			args = append(args, typeIDStr)
 			qb.WriteString(` AND i.item_type_id = $` + fmt.Sprint(len(args)))
 		}
-		qb.WriteString(` ORDER BY i.name_plain LIMIT $2`)
+		qb.WriteString(` ORDER BY ` + order + ` LIMIT $2`)
 		r2, e := h.Service.DB.Query(ctx, qb.String(), args...)
 		if e != nil {
 			writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal, "Arama hatası.", e)
@@ -542,6 +570,8 @@ func (h *ItemHandlers) Search(w http.ResponseWriter, r *http.Request) {
 	} else {
 		var qb strings.Builder
 		args := []any{claims.Subject, term, limit}
+		where := strings.ReplaceAll(whereExpr, "$QTERM", "$2")
+		order := strings.ReplaceAll(orderExpr, "$QTERM", "$2")
 		qb.WriteString(`
 			WITH accessible AS (
 			    SELECT DISTINCT folder_id FROM folder_permissions
@@ -563,13 +593,13 @@ func (h *ItemHandlers) Search(w http.ResponseWriter, r *http.Request) {
 			       i.expires_at::text, i.rotation_interval_days, i.last_rotated_at::text
 			FROM items i
 			JOIN accessible a ON a.folder_id = i.folder_id
-			WHERE (i.name_plain LIKE $2 OR lower(coalesce(i.description,'')) LIKE $2)
+			WHERE ` + where + `
 		`)
 		if typeIDStr != "" {
 			args = append(args, typeIDStr)
 			qb.WriteString(` AND i.item_type_id = $` + fmt.Sprint(len(args)))
 		}
-		qb.WriteString(` ORDER BY i.name_plain LIMIT $3`)
+		qb.WriteString(` ORDER BY ` + order + ` LIMIT $3`)
 		r2, e := h.Service.DB.Query(ctx, qb.String(), args...)
 		rows = &r2
 		err = e
@@ -619,7 +649,7 @@ func (h *ItemHandlers) Search(w http.ResponseWriter, r *http.Request) {
 		ActorUserID:  claims.Subject,
 		Action:       audit.ActionItemListed,
 		ResourceType: audit.ResourceItem,
-		Details:      map[string]any{"q": q, "result_count": len(out), "global_search": true},
+		Details:      map[string]any{"q": q, "result_count": len(out), "global_search": true, "fuzzy": fuzzy},
 		IPAddress:    parseIP(r.RemoteAddr),
 		UserAgent:    r.UserAgent(),
 	})

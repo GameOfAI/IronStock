@@ -50,6 +50,8 @@ export default function InventoryPage() {
   const [activeItem, setActiveItem] = useState<Item | null>(null);
   // PR-SEARCH: Global cross-folder search toggle
   const [globalSearch, setGlobalSearch] = useState(false);
+  // PR-SEARCH-FT: Fuzzy trigram search toggle
+  const [fuzzySearch, setFuzzySearch] = useState(false);
   // PR-UX4: Tip filtre chip'leri — boş set = hepsi göster
   const [activeTypeIds, setActiveTypeIds] = useState<Set<number>>(new Set());
   const [duplicateFrom, setDuplicateFrom] = useState<{
@@ -65,7 +67,7 @@ export default function InventoryPage() {
   const fieldDefsQuery = useFieldDefinitions();
   const itemTypesQuery = useItemTypes();
   const itemsQuery = useItems(globalSearch ? null : folderId, globalSearch ? undefined : query);
-  const globalSearchQuery = useGlobalItemSearch(globalSearch ? query : '');
+  const globalSearchQuery = useGlobalItemSearch(globalSearch ? query : '', fuzzySearch);
   const folderQuery = useFolder(folderId);
   // Full item (with encrypted fields + DEK) for duplicate decryption.
   const fullItemQuery = useItem(itemId);
@@ -285,6 +287,19 @@ export default function InventoryPage() {
             >
               <Globe size={14} />
             </Button>
+            {/* PR-SEARCH-FT: Fuzzy search toggle — only active when global search is on */}
+            {globalSearch && (
+              <Button
+                size="icon"
+                variant={fuzzySearch ? 'default' : 'ghost'}
+                className="h-8 w-8 shrink-0"
+                aria-label={fuzzySearch ? 'Tam eşleşme moduna geç' : 'Bulanık (fuzzy) aramayı aç'}
+                title={fuzzySearch ? 'Fuzzy: Açık — Tam eşleşmeye geç' : 'Fuzzy: Kapalı — Yazım hatalarını tolere eder'}
+                onClick={() => setFuzzySearch((v) => !v)}
+              >
+                <span className="text-[10px] font-bold leading-none">~</span>
+              </Button>
+            )}
             {folderId && !globalSearch && (
               <Button
                 size="sm"
