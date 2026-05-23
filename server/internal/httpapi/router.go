@@ -60,6 +60,7 @@ type Deps struct {
 	AISuggestion   *AISuggestionHandlers     // PR-AI: AI tag/relationship suggestions
 	Ansible        *AnsibleInventoryHandlers // PR-ANSIBLE: Ansible dynamic inventory
 	APIToken       *APITokenHandlers         // PR-ANSIBLE: API token management
+	SCIM           *SCIMHandlers             // PR-SCIM: SCIM 2.0 user provisioning
 }
 
 // NewRouter builds a chi router with the standard middleware stack.
@@ -559,6 +560,28 @@ func NewRouter(d Deps) http.Handler {
 		r.With(mw...).Get("/api/v1/items/{id}/k8s/services", d.K8s.ListServices)
 		r.With(mw...).Get("/api/v1/items/{id}/k8s/events", d.K8s.ListEvents)
 		r.With(mw...).Get("/api/v1/items/{id}/k8s/metrics", d.K8s.ListMetrics)
+	}
+
+	// PR-SCIM: SCIM 2.0 provisioning endpoints.
+	// Auth: Bearer API token with scope='scim' (checked inside handlers).
+	// Base path: /scim/v2/ — separate from /api/v1/ so IdPs can configure it cleanly.
+	// ServiceProviderConfig is unauthenticated (IdP reads it during setup).
+	if d.SCIM != nil {
+		r.With(timeoutMW).Get("/scim/v2/ServiceProviderConfig", d.SCIM.GetServiceProviderConfig)
+		r.Route("/scim/v2", func(sr chi.Router) {
+			sr.Use(timeoutMW)
+			sr.Get("/Users", d.SCIM.ListUsers)
+			sr.Post("/Users", d.SCIM.CreateUser)
+			sr.Get("/Users/{id}", d.SCIM.GetUser)
+			sr.With(middleware.AllowContentType("application/scim+json", "application/json")).
+				Patch("/Users/{id}", d.SCIM.PatchUser)
+			sr.Delete("/Users/{id}", d.SCIM.DeleteUser)
+			sr.Get("/Groups", d.SCIM.ListGroups)
+			sr.Post("/Groups", d.SCIM.CreateGroup)
+			sr.Get("/Groups/{id}", d.SCIM.GetGroup)
+			sr.With(middleware.AllowContentType("application/scim+json", "application/json")).
+				Patch("/Groups/{id}", d.SCIM.PatchGroup)
+		})
 	}
 
 	return r

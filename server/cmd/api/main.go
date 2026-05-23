@@ -549,6 +549,13 @@ func run() error {
 	ansibleHandlers := &httpapi.AnsibleInventoryHandlers{ItemH: itemHandlers}
 	apiTokenHandlers := &httpapi.APITokenHandlers{ItemH: itemHandlers}
 
+	// --- SCIM 2.0 handler (PR-SCIM) ---
+	scimHandlers := &httpapi.SCIMHandlers{
+		DB:     pool,
+		Audit:  auditWriter,
+		Logger: logger,
+	}
+
 	// --- HTTP layer ---
 	router := httpapi.NewRouter(httpapi.Deps{
 		Logger:         logger,
@@ -579,6 +586,7 @@ func run() error {
 		AISuggestion: aiSuggestionHandlers, // PR-AI
 		Ansible:      ansibleHandlers,       // PR-ANSIBLE
 		APIToken:     apiTokenHandlers,      // PR-ANSIBLE
+		SCIM:         scimHandlers,          // PR-SCIM
 	})
 
 	srv := &http.Server{
