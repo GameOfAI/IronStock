@@ -61,6 +61,7 @@ type Deps struct {
 	Ansible        *AnsibleInventoryHandlers // PR-ANSIBLE: Ansible dynamic inventory
 	APIToken       *APITokenHandlers         // PR-ANSIBLE: API token management
 	SCIM           *SCIMHandlers             // PR-SCIM: SCIM 2.0 user provisioning
+	Scan           *ScanHandlers             // PR-SCAN: Secret fingerprint scanning
 }
 
 // NewRouter builds a chi router with the standard middleware stack.
@@ -560,6 +561,20 @@ func NewRouter(d Deps) http.Handler {
 		r.With(mw...).Get("/api/v1/items/{id}/k8s/services", d.K8s.ListServices)
 		r.With(mw...).Get("/api/v1/items/{id}/k8s/events", d.K8s.ListEvents)
 		r.With(mw...).Get("/api/v1/items/{id}/k8s/metrics", d.K8s.ListMetrics)
+	}
+
+	// PR-SCAN: Secret fingerprint scanning endpoints.
+	// Item-level CRUD: JWT auth (standard).
+	// POST /security/scan: JWT OR API token (scope='scan'/'read'). No JWT MW applied — handled inside handler.
+	if d.Scan != nil && d.Auth != nil {
+		mw := []func(http.Handler) http.Handler{timeoutMW, RequireAccessToken(d.Auth.Service.JWT)}
+		r.With(mw...).Put("/api/v1/items/{id}/scan", d.Scan.UpsertFingerprint)
+		r.With(mw...).Get("/api/v1/items/{id}/scan", d.Scan.GetScanConfig)
+		r.With(mw...).Delete("/api/v1/items/{id}/scan/{fp_id}", d.Scan.DeleteFingerprint)
+		// Scan endpoint: no JWT MW, handler authenticates itself (JWT or API token).
+		r.With(timeoutMW).Post("/api/v1/security/scan", d.Scan.ScanContent)
+		r.With(mw...).Get("/api/v1/security/scan-detections", d.Scan.ListDetections)
+		r.With(mw...).Post("/api/v1/security/scan-detections/{id}/acknowledge", d.Scan.AcknowledgeDetection)
 	}
 
 	// PR-SCIM: SCIM 2.0 provisioning endpoints.

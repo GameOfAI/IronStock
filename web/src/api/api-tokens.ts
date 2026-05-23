@@ -8,7 +8,7 @@ import { apiFetch } from './client';
 export interface APIToken {
   id: string;
   name: string;
-  scope: 'read' | 'ansible' | 'scim';
+  scope: 'read' | 'ansible' | 'scim' | 'scan';
   expires_at?: string;
   last_used_at?: string;
   created_at: string;
@@ -18,7 +18,7 @@ export interface APIToken {
 
 export interface CreateTokenRequest {
   name: string;
-  scope: 'read' | 'ansible' | 'scim';
+  scope: 'read' | 'ansible' | 'scim' | 'scan';
   expires_at?: string;
 }
 

@@ -549,6 +549,14 @@ func run() error {
 	ansibleHandlers := &httpapi.AnsibleInventoryHandlers{ItemH: itemHandlers}
 	apiTokenHandlers := &httpapi.APITokenHandlers{ItemH: itemHandlers}
 
+	// --- Secret scanning handler (PR-SCAN) ---
+	scanHandlers := &httpapi.ScanHandlers{
+		DB:     pool,
+		Audit:  auditWriter,
+		Logger: logger,
+		JWT:    authSvc.JWT,
+	}
+
 	// --- SCIM 2.0 handler (PR-SCIM) ---
 	scimHandlers := &httpapi.SCIMHandlers{
 		DB:     pool,
@@ -587,6 +595,7 @@ func run() error {
 		Ansible:      ansibleHandlers,       // PR-ANSIBLE
 		APIToken:     apiTokenHandlers,      // PR-ANSIBLE
 		SCIM:         scimHandlers,          // PR-SCIM
+		Scan:         scanHandlers,          // PR-SCAN
 	})
 
 	srv := &http.Server{

@@ -23,6 +23,7 @@ import AdminClientCertsPage from '@/pages/admin/client-certs';
 import AdminLogForwardingPage from '@/pages/admin/log-forwarding';
 import AdminSSOPage from '@/pages/admin/sso';
 import AdminSCIMPage from '@/pages/admin/scim';
+import AdminSecretScanningPage from '@/pages/admin/secret-scanning';
 import AdminK8sClustersPage from '@/pages/admin/k8s-clusters';
 import AdminReportsPage from '@/pages/admin/reports';
 import SSOCallbackPage from '@/pages/sso-callback';
@@ -140,6 +141,7 @@ export default function App() {
                       <Route path="/admin/log-forwarding" element={<AdminLogForwardingPage />} />
                       <Route path="/admin/sso" element={<AdminSSOPage />} />
                       <Route path="/admin/scim" element={<AdminSCIMPage />} />
+                      <Route path="/admin/secret-scanning" element={<AdminSecretScanningPage />} />
                       <Route path="/admin/k8s-clusters" element={<AdminK8sClustersPage />} />
                       <Route path="/admin/reports" element={<AdminReportsPage />} />
                     </Route>
