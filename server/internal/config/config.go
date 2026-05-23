@@ -98,6 +98,18 @@ type Config struct {
 	WebAuthnRPID          string   // ENVANTER_WEBAUTHN_RPID
 	WebAuthnRPDisplayName string   // ENVANTER_WEBAUTHN_RP_DISPLAY_NAME (default "IronStock")
 	WebAuthnRPOrigins     []string // ENVANTER_WEBAUTHN_RP_ORIGINS (comma-separated)
+
+	// Redis (PR-SCALE): optional shared store for WebSocket pub/sub, ticket store,
+	// and rate limiter. When RedisURL is empty, all features fall back to in-memory
+	// single-pod mode.
+	RedisURL      string // ENVANTER_REDIS_URL      — e.g. "redis://redis:6379/0"
+	RedisPassword string // ENVANTER_REDIS_PASSWORD — optional auth password
+
+	// RateLimitBackend selects the rate limiter implementation.
+	// "memory" (default) = per-pod in-memory token bucket (existing behaviour).
+	// "redis"            = shared sliding-window counter via Redis (requires RedisURL).
+	// Falls back to "memory" if Redis is unavailable regardless of setting.
+	RateLimitBackend string // ENVANTER_RATE_LIMIT_BACKEND: memory|redis (default "memory")
 }
 
 // Load reads config from environment, applies defaults, and validates.
@@ -140,6 +152,9 @@ func Load() (*Config, error) {
 		WebAuthnRPID:          os.Getenv("ENVANTER_WEBAUTHN_RPID"),
 		WebAuthnRPDisplayName: envOr("ENVANTER_WEBAUTHN_RP_DISPLAY_NAME", "IronStack"),
 		WebAuthnRPOrigins:     envStringSliceOr("ENVANTER_WEBAUTHN_RP_ORIGINS", []string{"http://localhost:5173"}),
+		RedisURL:              os.Getenv("ENVANTER_REDIS_URL"),
+		RedisPassword:         os.Getenv("ENVANTER_REDIS_PASSWORD"),
+		RateLimitBackend:      strings.ToLower(envOr("ENVANTER_RATE_LIMIT_BACKEND", "memory")),
 	}
 	if err := cfg.Validate(); err != nil {
 		return nil, err

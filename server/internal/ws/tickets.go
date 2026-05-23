@@ -1,10 +1,16 @@
 package ws
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"sync"
 	"time"
+
+	"github.com/redis/go-redis/v9"
+
+	"envanter.app/server/internal/cache"
 )
 
 const (
@@ -30,11 +36,13 @@ type ticketEntry struct {
 // (?ticket=...). The ticket is consumed on first use and carries no long-term
 // credential value if it leaks.
 //
-// TicketStore is safe for concurrent use. A background goroutine prunes
-// expired entries lazily when Cleanup is called, but callers that want
-// guaranteed pruning should schedule periodic Cleanup calls. In practice
-// the store stays small (one entry per authenticated session connecting to WS).
+// When a Redis client is provided, tickets are stored in Redis (enabling
+// multi-replica deployments). Falls back to in-memory on Redis failure.
+//
+// TicketStore is safe for concurrent use.
 type TicketStore struct {
+	redis *cache.Client // nil = in-memory only
+
 	mu      sync.Mutex
 	tickets map[string]ticketEntry
 }
@@ -42,6 +50,15 @@ type TicketStore struct {
 // NewTicketStore returns an initialized, ready-to-use TicketStore.
 func NewTicketStore() *TicketStore {
 	return &TicketStore{
+		tickets: make(map[string]ticketEntry),
+	}
+}
+
+// NewTicketStoreWithRedis returns a TicketStore backed by Redis when the client
+// is non-nil. Falls back to in-memory if Redis is unavailable.
+func NewTicketStoreWithRedis(redis *cache.Client) *TicketStore {
+	return &TicketStore{
+		redis:   redis,
 		tickets: make(map[string]ticketEntry),
 	}
 }
@@ -54,6 +71,16 @@ func (ts *TicketStore) Issue(userID string) (string, error) {
 		return "", err
 	}
 	token := hex.EncodeToString(b)
+
+	if ts.redis != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		key := "ws:ticket:" + token
+		if err := ts.redis.SetEX(ctx, key, userID, ticketTTL); err == nil {
+			return token, nil
+		}
+		// Redis failed — fall through to in-memory
+	}
 
 	ts.mu.Lock()
 	ts.tickets[token] = ticketEntry{
@@ -69,6 +96,22 @@ func (ts *TicketStore) Issue(userID string) (string, error) {
 // Returns the userID on success, or an empty string + false if the ticket
 // is unknown, expired, or already consumed.
 func (ts *TicketStore) Consume(token string) (userID string, ok bool) {
+	if ts.redis != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		key := "ws:ticket:" + token
+		val, err := ts.redis.GetDel(ctx, key)
+		if err == nil {
+			return val, true
+		}
+		if !errors.Is(err, redis.Nil) {
+			// Redis error — fall through to in-memory
+		} else {
+			// Ticket not found in Redis (already consumed or expired)
+			return "", false
+		}
+	}
+
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
 
@@ -85,8 +128,8 @@ func (ts *TicketStore) Consume(token string) (userID string, ok bool) {
 	return entry.userID, true
 }
 
-// Cleanup removes all expired tickets. Call periodically (e.g. once per
-// minute) to prevent unbounded map growth under load. Safe for concurrent use.
+// Cleanup removes all expired tickets from the in-memory fallback map.
+// Not needed when Redis is the primary backend (TTL handles expiry).
 func (ts *TicketStore) Cleanup() {
 	now := time.Now()
 	ts.mu.Lock()

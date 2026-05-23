@@ -4,7 +4,7 @@ metadata:
   name: envanter-api
   namespace: envanter
 spec:
-  replicas: 1
+  replicas: 3  # PR-SCALE: multi-replica; requires ENVANTER_REDIS_URL in secret
   selector:
     matchLabels:
       app: envanter-api
@@ -93,7 +93,7 @@ metadata:
   name: envanter-api-pdb
   namespace: envanter
 spec:
-  minAvailable: 0
+  minAvailable: 1  # PR-SCALE: keep at least 1 pod during rolling updates
   selector:
     matchLabels:
       app: envanter-api

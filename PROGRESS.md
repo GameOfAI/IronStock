@@ -1,6 +1,6 @@
 # İlerleyiş
 
-Son güncelleme: 2026-05-23 (PR-NOTIFY: Email/SMTP + Slack/Teams bildirim kanalları + şifre sıfırlama tamamlandı)
+Son güncelleme: 2026-05-23 (PR-SCALE: Redis pub/sub multi-pod WS fan-out + ticket store + circuit-breaker + Redis rate limiter tamamlandı)
 
 ## Mevcut Durum
 
@@ -38,6 +38,9 @@ Son güncelleme: 2026-05-23 (PR-NOTIFY: Email/SMTP + Slack/Teams bildirim kanall
 | **Ekran Yakalama Koruması** | `set_content_protection` Rust komutu (setup'ta default true), tauri.ts wrapper, connection store `contentProtectionEnabled`, config.tsx toggle (varsayılan açık) | ✅ Tamamlandı |
 | **PR-K8S: K8s Cluster Entegrasyonu + HTML Rapor** | migration 00044/45/46, `server/internal/k8s/` paketi (client+resources+kubeconfig), admin_k8s.go (CRUD+test+decryptClusterConfig), k8s_proxy.go (item-bazlı proxy), admin_report.go + report.html.tmpl (bounded goroutine pool, self-contained HTML), router+main wiring, web: admin-k8s.ts + reports.ts + pages/admin/k8s-clusters.tsx + pages/admin/reports.tsx + App.tsx routes + app-shell nav items | ✅ Tamamlandı |
 | **PR-NOTIFY: Email + Bildirim Kanalları** | migration 00047 (password_reset_tokens + email_outbox) + 00048 (user_notification_prefs + user_external_channels), `server/internal/email/` SMTP client + 6 HTML şablon, POST /auth/forgot-password + /auth/reset-password, GET/PUT /users/me/notification-prefs, GET/POST/DELETE /users/me/channels, web: /forgot-password + /reset-password (3-faz, amber E2E uyarı), Profile NotificationPrefsCard + ExternalChannelsCard, Switch UI component | ✅ Tamamlandı |
+| **PR-SEC4: WebAuthn/FIDO2** | migration 00049 (user_credentials), `server/internal/webauthn/` WAService wrapper, 4 endpoint (register begin/finish, login begin/finish), admin SetWebAuthnRequired PATCH, web: SecurityKeysCard (profile), WebAuthn login dialog (login page), admin webauthn_required toggle, `lib/webauthn.ts` browser API wrapper | ✅ Tamamlandı |
+| **PR-SEC5: GeoIP + IP Whitelist** | migration 00050 (allowed_ip_cidrs + allowed_country_codes + deny_tor_exit), `server/internal/geoip/` (ip-api.com 24h cache + Tor exit list daily refresh), check.go IP/CIDR/country/Tor check, auth_login.go IP gate, admin_ip_restrictions.go GET+PATCH handlers, web: IP Kısıtlamaları dialog (user-actions-menu), admin-ip-restrictions.ts | ✅ Tamamlandı |
+| **PR-SCALE: Redis Pub/Sub + Yatay Ölçek** | `server/internal/cache/redis.go` (circuit-breaker wrapper, 5 hata → 30s open), `ws/hub.go` Redis pub/sub fan-out (NewHubWithRedis + subscribeLoop + podID self-echo skip), `ws/tickets.go` Redis-backed ticket store (fallback in-memory), `httpapi/middleware_ratelimit.go` RedisIPRateLimiter (Lua sliding window), config.go ENVANTER_REDIS_URL+PASSWORD+RATE_LIMIT_BACKEND, main.go wiring, deploy/k8s/redis.yaml StatefulSet, api.yaml replicas:3 + PDB minAvailable:1, testler | ✅ Tamamlandı |
 
 ---
 

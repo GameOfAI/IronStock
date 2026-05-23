@@ -24,6 +24,7 @@ import (
 
 	"envanter.app/server/internal/audit"
 	"envanter.app/server/internal/auth"
+	"envanter.app/server/internal/cache"
 	"envanter.app/server/internal/clientcert"
 	"envanter.app/server/internal/config"
 	"envanter.app/server/internal/db"
@@ -123,12 +124,45 @@ func run() error {
 		logger.Info("built-in client CA ready")
 	}
 
+	// --- Redis client (PR-SCALE, optional) ---
+	// When ENVANTER_REDIS_URL is set, a shared Redis client is created for:
+	//   • WebSocket pub/sub (cross-pod event fan-out)
+	//   • Ticket store (one-time WS upgrade tokens)
+	//   • Rate limiter (optional, selected by ENVANTER_RATE_LIMIT_BACKEND=redis)
+	// Falls back gracefully to in-memory when Redis is unavailable (circuit breaker).
+	var redisClient *cache.Client
+	if cfg.RedisURL != "" {
+		rc, err := cache.New(cfg.RedisURL, cfg.RedisPassword, logger)
+		if err != nil {
+			// Misconfigured URL — non-fatal; single-pod mode continues.
+			logger.Warn("redis: init failed — falling back to single-pod mode",
+				slog.String("error", err.Error()))
+		} else if rc != nil {
+			redisClient = rc
+			defer func() { _ = redisClient.Close() }()
+			logger.Info("redis: client ready", slog.String("url", cfg.RedisURL))
+		}
+	} else {
+		logger.Info("redis not configured — single-pod WebSocket mode")
+	}
+
 	// --- WebSocket hub + ticket store ---
-	hub := ws.NewHub(logger)
+	// When Redis is configured, use multi-pod mode (pub/sub fan-out + Redis ticket store).
+	// Pod ID is used to suppress self-echo of pub/sub messages.
+	podID := fmt.Sprintf("%s-%d", mustHostname(), os.Getpid())
+	var hub *ws.Hub
+	var tickets *ws.TicketStore
+	if redisClient != nil {
+		hub = ws.NewHubWithRedis(logger, redisClient, podID)
+		tickets = ws.NewTicketStoreWithRedis(redisClient)
+		logger.Info("ws: using Redis pub/sub hub", slog.String("pod_id", podID))
+	} else {
+		hub = ws.NewHub(logger)
+		tickets = ws.NewTicketStore()
+		logger.Info("ws: using single-pod in-memory hub")
+	}
 	defer hub.Close()
-	// TicketStore enables secure WS auth without putting access tokens in URLs.
-	// Periodic cleanup runs inside the goroutine below.
-	tickets := ws.NewTicketStore()
+	// TicketStore in-memory cleanup (no-op when Redis is primary, but safe to run).
 	go func() {
 		ticker := time.NewTicker(time.Minute)
 		defer ticker.Stop()
@@ -551,6 +585,16 @@ func run() error {
 	logFwdManager.StopAll()
 	logger.Info("shutdown complete")
 	return nil
+}
+
+// mustHostname returns the OS hostname or "unknown" on failure.
+// Used to build a unique pod ID for Redis pub/sub self-echo suppression.
+func mustHostname() string {
+	h, err := os.Hostname()
+	if err != nil {
+		return "unknown"
+	}
+	return h
 }
 
 // ensureDefaultAdmin creates a default admin user on the very first startup
