@@ -77,6 +77,19 @@ type Config struct {
 	VaultRoleID    string // ENVANTER_VAULT_ROLE_ID    — AppRole role_id
 	VaultSecretID  string // ENVANTER_VAULT_SECRET_ID  — AppRole secret_id
 	VaultNamespace string // ENVANTER_VAULT_NAMESPACE  — Vault Enterprise namespace (optional)
+
+	// SMTP e-posta gönderimi (PR-NOTIFY).
+	// Tümü boş bırakılırsa e-posta gönderimi devre dışı kalır (sadece in-app bildirim).
+	SMTPHost     string // ENVANTER_SMTP_HOST — SMTP sunucu adresi
+	SMTPPort     int    // ENVANTER_SMTP_PORT — varsayılan 587
+	SMTPUser     string // ENVANTER_SMTP_USER
+	SMTPPassword string // ENVANTER_SMTP_PASSWORD
+	SMTPFrom     string // ENVANTER_SMTP_FROM — e.g. "IronStock <noreply@example.com>"
+	SMTPTLSMode  string // ENVANTER_SMTP_TLS — none|starttls|tls (varsayılan "starttls")
+	AppURL       string // ENVANTER_APP_URL — frontend public URL (reset linkleri için)
+
+	// Password reset token TTL (PR-NOTIFY).
+	PasswordResetTTL int // ENVANTER_PASSWORD_RESET_TTL_MINUTES — varsayılan 60
 }
 
 // Load reads config from environment, applies defaults, and validates.
@@ -108,6 +121,14 @@ func Load() (*Config, error) {
 		VaultRoleID:           os.Getenv("ENVANTER_VAULT_ROLE_ID"),
 		VaultSecretID:         os.Getenv("ENVANTER_VAULT_SECRET_ID"),
 		VaultNamespace:        os.Getenv("ENVANTER_VAULT_NAMESPACE"),
+		SMTPHost:              os.Getenv("ENVANTER_SMTP_HOST"),
+		SMTPPort:              envIntOr("ENVANTER_SMTP_PORT", 587),
+		SMTPUser:              os.Getenv("ENVANTER_SMTP_USER"),
+		SMTPPassword:          os.Getenv("ENVANTER_SMTP_PASSWORD"),
+		SMTPFrom:              envOr("ENVANTER_SMTP_FROM", "IronStock <noreply@localhost>"),
+		SMTPTLSMode:           strings.ToLower(envOr("ENVANTER_SMTP_TLS", "starttls")),
+		AppURL:                envOr("ENVANTER_APP_URL", "http://localhost:5173"),
+		PasswordResetTTL:      envIntOr("ENVANTER_PASSWORD_RESET_TTL_MINUTES", 60),
 	}
 	if err := cfg.Validate(); err != nil {
 		return nil, err
@@ -193,6 +214,16 @@ func envInt32Or(key string, def int32) int32 {
 	if v := os.Getenv(key); v != "" {
 		if n, err := strconv.ParseInt(v, 10, 32); err == nil {
 			return int32(n)
+		}
+	}
+	return def
+}
+
+// envIntOr parses an int from env.
+func envIntOr(key string, def int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
 		}
 	}
 	return def

@@ -483,9 +483,13 @@ export default function LoginPage() {
               <span>Tüm oturumlar uçtan uca şifrelenir. İzinsiz giriş loglanır.</span>
             </div>
 
-            <div className="text-center text-[12px]">
+            <div className="flex items-center justify-center gap-3 text-center text-[12px]">
               <Link to="/recover" className="text-slate-500 hover:text-slate-300">
                 Hesabınızı mı unuttunuz?
+              </Link>
+              <span className="text-slate-700">·</span>
+              <Link to="/forgot-password" className="text-slate-500 hover:text-slate-300">
+                Şifremi unuttum
               </Link>
             </div>
           </form>

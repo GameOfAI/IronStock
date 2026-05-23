@@ -32,6 +32,15 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import {
   totpStatusQueryKey,
@@ -42,8 +51,33 @@ import {
   useRevokeTrustedDeviceMutation,
   useRevokeAllTrustedDevicesMutation,
 } from '@/api/auth';
+import {
+  useNotificationPrefsQuery,
+  useUpdateNotificationPrefsMutation,
+  useExternalChannelsQuery,
+  useAddExternalChannelMutation,
+  useDeleteExternalChannelMutation,
+  useTestExternalChannelMutation,
+  type NotificationType,
+  type NotificationChannel,
+  type NotificationPref,
+} from '@/api/notifications';
 import { useAuthStore } from '@/store/auth';
-import { ShieldCheck, ShieldOff, RefreshCw, Copy, CheckCheck, Laptop, Trash2 } from 'lucide-react';
+import {
+  ShieldCheck,
+  ShieldOff,
+  RefreshCw,
+  Copy,
+  CheckCheck,
+  Laptop,
+  Trash2,
+  Bell,
+  Plus,
+  ExternalLink,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+} from 'lucide-react';
 
 // --- Recovery Codes Display ---
 
@@ -459,6 +493,342 @@ function TrustedDevicesCard() {
   );
 }
 
+// --- Notification Prefs Card (PR-NOTIFY) ---
+
+const NOTIFICATION_TYPES: { key: NotificationType; label: string }[] = [
+  { key: 'access_request', label: 'Erişim Talepleri' },
+  { key: 'share_added', label: 'Paylaşım Bildirimleri' },
+  { key: 'credential_expiring', label: 'Credential Bitiş Uyarısı' },
+  { key: 'security_alert', label: 'Güvenlik Uyarıları' },
+  { key: 'mention', label: 'Bahsetmeler' },
+  { key: 'system_announcement', label: 'Sistem Duyuruları' },
+  { key: 'break_glass_alert', label: 'Break-Glass Alarmları' },
+];
+
+const CHANNEL_LABELS: Record<NotificationChannel, string> = {
+  inapp: 'Uygulama İçi',
+  email: 'E-posta',
+  slack: 'Slack',
+  teams: 'Teams',
+};
+
+const ALL_CHANNELS: NotificationChannel[] = ['inapp', 'email', 'slack', 'teams'];
+
+function NotificationPrefsCard() {
+  const { toast } = useToast();
+  const { data, isLoading } = useNotificationPrefsQuery();
+  const updateMut = useUpdateNotificationPrefsMutation();
+
+  // Local copy — track unsaved changes
+  const [localPrefs, setLocalPrefs] = React.useState<NotificationPref[]>([]);
+  const [dirty, setDirty] = React.useState(false);
+
+  React.useEffect(() => {
+    if (data?.prefs) {
+      setLocalPrefs(data.prefs);
+      setDirty(false);
+    }
+  }, [data]);
+
+  function isEnabled(type: NotificationType, channel: NotificationChannel) {
+    const pref = localPrefs.find((p) => p.notification_type === type);
+    return pref?.channels.includes(channel) ?? (channel === 'inapp');
+  }
+
+  function toggle(type: NotificationType, channel: NotificationChannel) {
+    setLocalPrefs((prev) => {
+      const existing = prev.find((p) => p.notification_type === type);
+      if (!existing) {
+        return [...prev, { notification_type: type, channels: [channel] }];
+      }
+      const channels = existing.channels.includes(channel)
+        ? existing.channels.filter((c) => c !== channel)
+        : [...existing.channels, channel];
+      return prev.map((p) =>
+        p.notification_type === type ? { ...p, channels } : p,
+      );
+    });
+    setDirty(true);
+  }
+
+  function handleSave() {
+    updateMut.mutate(localPrefs, {
+      onSuccess: () => {
+        setDirty(false);
+        toast({ title: 'Tercihler kaydedildi.' });
+      },
+      onError: (err) => {
+        toast({
+          title: 'Kaydedilemedi',
+          description: err instanceof Error ? err.message : 'Bilinmeyen hata.',
+          variant: 'destructive',
+        });
+      },
+    });
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Bell className="h-5 w-5 text-muted-foreground" />
+          <CardTitle>Bildirim Tercihleri</CardTitle>
+        </div>
+        <CardDescription>Hangi bildirimleri hangi kanaldan almak istediğinizi seçin.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Tercihler yükleniyor...
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Matrix table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="pb-2 text-left font-medium text-muted-foreground">Bildirim Tipi</th>
+                    {ALL_CHANNELS.map((ch) => (
+                      <th key={ch} className="pb-2 text-center font-medium text-muted-foreground">
+                        {CHANNEL_LABELS[ch]}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {NOTIFICATION_TYPES.map(({ key, label }) => (
+                    <tr key={key} className="border-b last:border-0">
+                      <td className="py-2 pr-4 text-sm">{label}</td>
+                      {ALL_CHANNELS.map((ch) => (
+                        <td key={ch} className="py-2 text-center">
+                          <input
+                            type="checkbox"
+                            checked={isEnabled(key, ch)}
+                            onChange={() => toggle(key, ch)}
+                            className="h-4 w-4 cursor-pointer accent-indigo-600"
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {dirty && (
+              <Button
+                size="sm"
+                onClick={handleSave}
+                disabled={updateMut.isPending}
+                className="bg-indigo-600 hover:bg-indigo-500"
+              >
+                {updateMut.isPending && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
+                Kaydet
+              </Button>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// --- External Channels Card (PR-NOTIFY) ---
+
+function ExternalChannelsCard() {
+  const { toast } = useToast();
+  const { data } = useExternalChannelsQuery();
+  const addMut = useAddExternalChannelMutation();
+  const deleteMut = useDeleteExternalChannelMutation();
+  const testMut = useTestExternalChannelMutation();
+
+  const [open, setOpen] = React.useState(false);
+  const [channelType, setChannelType] = React.useState<'slack' | 'teams'>('slack');
+  const [webhookURL, setWebhookURL] = React.useState('');
+  const [channelName, setChannelName] = React.useState('');
+
+  function handleAdd(e: React.FormEvent) {
+    e.preventDefault();
+    addMut.mutate(
+      { channel_type: channelType, webhook_url: webhookURL, channel_name: channelName },
+      {
+        onSuccess: () => {
+          setOpen(false);
+          setWebhookURL('');
+          setChannelName('');
+          toast({ title: 'Kanal eklendi ve test mesajı gönderildi.' });
+        },
+        onError: (err) => {
+          toast({
+            title: 'Kanal eklenemedi',
+            description: err instanceof Error ? err.message : 'Webhook test başarısız.',
+            variant: 'destructive',
+          });
+        },
+      },
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Harici Bildirim Kanalları</CardTitle>
+            <CardDescription className="mt-1">
+              Slack veya Teams webhook'ları ile bildirimleri harici kanallara yönlendirin.
+            </CardDescription>
+          </div>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" variant="outline">
+                <Plus className="mr-1 h-4 w-4" />
+                Kanal Ekle
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Webhook Kanalı Ekle</DialogTitle>
+                <DialogDescription>
+                  Slack veya Teams gelen webhook URL'si girin. Kaydedilmeden önce test mesajı gönderilir.
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleAdd} className="space-y-4 pt-2">
+                <div className="space-y-2">
+                  <Label>Kanal Tipi</Label>
+                  <div className="flex gap-3">
+                    {(['slack', 'teams'] as const).map((t) => (
+                      <label key={t} className="flex cursor-pointer items-center gap-2">
+                        <input
+                          type="radio"
+                          name="channel_type"
+                          value={t}
+                          checked={channelType === t}
+                          onChange={() => setChannelType(t)}
+                          className="accent-indigo-600"
+                        />
+                        <span className="text-sm capitalize">{t}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="channel-name">Kanal Adı</Label>
+                  <Input
+                    id="channel-name"
+                    value={channelName}
+                    onChange={(e) => setChannelName(e.target.value)}
+                    placeholder="#genel-uyarilar"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="webhook-url">Webhook URL</Label>
+                  <Input
+                    id="webhook-url"
+                    type="url"
+                    value={webhookURL}
+                    onChange={(e) => setWebhookURL(e.target.value)}
+                    placeholder="https://hooks.slack.com/..."
+                    required
+                  />
+                </div>
+                <DialogFooter>
+                  <Button
+                    type="submit"
+                    className="bg-indigo-600 hover:bg-indigo-500"
+                    disabled={addMut.isPending}
+                  >
+                    {addMut.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Test edilip kaydediliyor...
+                      </>
+                    ) : (
+                      'Test Et ve Kaydet'
+                    )}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {!data?.channels.length ? (
+          <p className="text-sm text-muted-foreground">Henüz kanal eklenmemiş.</p>
+        ) : (
+          <div className="space-y-2">
+            {data.channels.map((ch) => (
+              <div
+                key={ch.id}
+                className="flex items-center justify-between rounded-lg border p-3"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
+                    <ExternalLink className="h-4 w-4 text-zinc-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">{ch.channel_name}</p>
+                    <p className="text-xs text-muted-foreground capitalize">{ch.channel_type}</p>
+                    {ch.last_error && (
+                      <p className="flex items-center gap-1 text-xs text-red-500">
+                        <XCircle className="h-3 w-3" />
+                        {ch.last_error}
+                      </p>
+                    )}
+                    {!ch.last_error && ch.last_used_at && (
+                      <p className="flex items-center gap-1 text-xs text-emerald-600">
+                        <CheckCircle2 className="h-3 w-3" />
+                        Son kullanım: {new Date(ch.last_used_at).toLocaleDateString('tr-TR')}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={testMut.isPending}
+                    onClick={() =>
+                      testMut.mutate(ch.id, {
+                        onSuccess: () =>
+                          toast({ title: 'Test mesajı gönderildi.' }),
+                        onError: (err) =>
+                          toast({
+                            title: 'Test başarısız',
+                            description: err instanceof Error ? err.message : '',
+                            variant: 'destructive',
+                          }),
+                      })
+                    }
+                  >
+                    Test
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-red-500 hover:text-red-600"
+                    onClick={() =>
+                      deleteMut.mutate(ch.id, {
+                        onSuccess: () => toast({ title: 'Kanal silindi.' }),
+                      })
+                    }
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // --- Profile Page ---
 
 export default function ProfilePage() {
@@ -478,6 +848,8 @@ export default function ProfilePage() {
 
       <TOTPManagementCard />
       <TrustedDevicesCard />
+      <NotificationPrefsCard />
+      <ExternalChannelsCard />
     </div>
   );
 }

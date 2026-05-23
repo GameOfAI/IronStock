@@ -26,8 +26,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuthStore } from '@/store/auth';
 import { useCSVPreviewMutation, useBatchImportMutation } from '@/api/import';
-import { useItemTypes, useFieldDefinitions } from '@/api/catalog';
-import { useFolders } from '@/api/folders';
+import { useItemTypes, useFieldDefinitions, useUserPublicKey } from '@/api/catalog';
+import { useRootFolders } from '@/api/folders';
 import { generateDEK, sealDEK, encryptField, toBase64, fromBase64 } from '@/lib/crypto';
 import { parseKdbx } from '@/lib/kdbx-parser';
 import type { BatchImportItem } from '@/api/types';
@@ -82,13 +82,14 @@ export default function ImportPage() {
   const kdbxInputRef = useRef<HTMLInputElement>(null);
 
   const privateKey = useAuthStore((s) => s.privateKey);
-  const publicKey = useAuthStore((s) => s.publicKey);
+  const userId = useAuthStore((s) => s.user?.id ?? null);
 
   const csvPreviewMut = useCSVPreviewMutation();
   const batchImportMut = useBatchImportMutation();
   const itemTypesQuery = useItemTypes();
   const fieldDefsQuery = useFieldDefinitions();
-  const foldersQuery = useFolders(null); // all root folders
+  const foldersQuery = useRootFolders();
+  const userPubKeyQuery = useUserPublicKey(userId);
 
   // --- CSV handlers ---
   async function handleCSVUpload() {
@@ -100,7 +101,6 @@ export default function ImportPage() {
       setCsvRows(result.rows.map((r) => r.raw_data));
       setCsvTotal(result.total);
       // Auto-detect common column names
-      const lcHeaders = result.headers.map((h) => h.toLowerCase());
       const detect = (candidates: string[]) =>
         result.headers.find((h) => candidates.includes(h.toLowerCase())) ?? '';
       setMapping({
@@ -140,7 +140,7 @@ export default function ImportPage() {
 
   // --- E2E encrypt + batch submit ---
   async function handleImport() {
-    if (!privateKey || !publicKey) {
+    if (!privateKey || !userPubKeyQuery.data?.public_key) {
       setError('Şifreleme anahtarı bulunamadı. Yeniden giriş yapın.');
       return;
     }
@@ -155,7 +155,7 @@ export default function ImportPage() {
     const fieldDefs = fieldDefsQuery.data?.field_definitions ?? [];
     const findFieldDef = (key: string) => fieldDefs.find((f) => f.key === key);
 
-    const pubKeyBytes = fromBase64(publicKey);
+    const pubKeyBytes = fromBase64(userPubKeyQuery.data!.public_key);
 
     try {
       let items: BatchImportItem[];
@@ -316,7 +316,7 @@ export default function ImportPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {itemTypes.map((t) => (
-                    <SelectItem key={t.id} value={String(t.id)}>{t.display_name}</SelectItem>
+                    <SelectItem key={t.id} value={String(t.id)}>{t.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

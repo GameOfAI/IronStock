@@ -27,7 +27,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/cn';
 import {
   useAdminK8sClustersQuery,
@@ -287,7 +287,7 @@ function ClusterFormDialog({
               <Switch
                 id="skip-tls"
                 checked={form.skip_tls_verify}
-                onCheckedChange={(v) => set('skip_tls_verify', v)}
+                onCheckedChange={(v: boolean) => set('skip_tls_verify', v)}
               />
               <Label htmlFor="skip-tls" className="font-normal text-sm">TLS doğrulamasını atla</Label>
             </div>
@@ -295,7 +295,7 @@ function ClusterFormDialog({
               <Switch
                 id="enabled"
                 checked={form.enabled}
-                onCheckedChange={(v) => set('enabled', v)}
+                onCheckedChange={(v: boolean) => set('enabled', v)}
               />
               <Label htmlFor="enabled" className="font-normal text-sm">Aktif</Label>
             </div>

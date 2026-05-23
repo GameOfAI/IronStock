@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"envanter.app/server/internal/audit"
 	"envanter.app/server/internal/auth"
 )
 
@@ -20,6 +21,8 @@ import (
 type NotificationHandlers struct {
 	Service *auth.Service
 	Logger  *slog.Logger
+	// PR-NOTIFY: ek alanlar bildirim kanal yönetimi için
+	Audit *audit.Writer // nil ise audit log atlanır
 }
 
 type notificationResponse struct {

@@ -1,0 +1,20 @@
+{{define "subject"}}IronStock — Güvenlik Uyarısı: {{.AlertType}}{{end}}
+{{define "content"}}
+<h1>Güvenlik Uyarısı</h1>
+<p>Merhaba <strong>{{.Username}}</strong>,</p>
+
+<div class="alert-red">
+  <strong>🔴 {{.AlertType}}</strong><br>
+  {{.Description}}
+</div>
+
+<hr class="divider">
+
+<div class="meta-row"><span class="meta-label">Tarih:</span> {{.OccurredAt}}</div>
+<div class="meta-row"><span class="meta-label">IP:</span> {{.IPAddress}}</div>
+<div class="meta-row"><span class="meta-label">Tarayıcı:</span> {{.UserAgent}}</div>
+
+<p>Eğer bu işlemi siz yapmadıysanız lütfen hemen şifrenizi değiştirin ve güvenlik ekibinizle iletişime geçin.</p>
+
+<a href="{{.AppURL}}/profile/security" class="btn btn-danger">Güvenlik Ayarlarım</a>
+{{end}}

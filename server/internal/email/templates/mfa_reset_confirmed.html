@@ -1,0 +1,19 @@
+{{define "subject"}}IronStock — MFA Sıfırlandı{{end}}
+{{define "content"}}
+<h1>MFA Sıfırlama Tamamlandı</h1>
+<p>Merhaba <strong>{{.Username}}</strong>,</p>
+<p>Hesabınızın çok faktörlü kimlik doğrulaması (MFA/TOTP) başarıyla sıfırlandı.</p>
+
+<div class="alert-amber">
+  <strong>⚠️ Önemli:</strong> MFA sıfırlama sonrasında yeni bir kimlik doğrulayıcı uygulaması bağlamak için bir sonraki girişte TOTP kurulum adımını tamamlamanız gerekmektedir.
+</div>
+
+<hr class="divider">
+
+<div class="meta-row"><span class="meta-label">Tarih:</span> {{.OccurredAt}}</div>
+<div class="meta-row"><span class="meta-label">IP:</span> {{.IPAddress}}</div>
+
+<p>Bu işlemi siz yapmadıysanız lütfen hemen hesap güvenliğinizi kontrol edin.</p>
+
+<a href="{{.AppURL}}/login" class="btn">Giriş Yap</a>
+{{end}}

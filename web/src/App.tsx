@@ -15,6 +15,8 @@ import LoginPage from '@/pages/login';
 import RegisterPage from '@/pages/register';
 import TOTPSetupPage from '@/pages/totp-setup';
 import RecoverPage from '@/pages/recover';
+import ForgotPasswordPage from '@/pages/forgot-password';
+import ResetPasswordPage from '@/pages/reset-password';
 import InventoryPage from '@/pages/inventory';
 import AdminUsersPage, { AdminAuditLogPage, AdminDashboardPage } from '@/pages/admin';
 import AdminClientCertsPage from '@/pages/admin/client-certs';
@@ -88,6 +90,9 @@ export default function App() {
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/totp/setup" element={<TOTPSetupPage />} />
             <Route path="/recover" element={<RecoverPage />} />
+            {/* PR-NOTIFY: Şifremi unuttum + sıfırlama */}
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
             {/* Bootstrap admin panel — TOTP-free, ADR-0010 */}
             <Route path="/admin-setup" element={<AdminSetupPage />} />
             <Route path="/admin-login" element={<AdminLoginPage />} />

@@ -5,6 +5,7 @@ import (
 
 	"envanter.app/server/internal/audit"
 	"envanter.app/server/internal/auth"
+	"envanter.app/server/internal/email"
 	"envanter.app/server/internal/notify"
 	"envanter.app/server/internal/ws"
 )
@@ -21,4 +22,11 @@ type AuthHandlers struct {
 	// Break-glass alerting (PR-N4): optional — nil disables WS/notification fanout.
 	Hub    *ws.Hub
 	Notify *notify.Writer
+
+	// PR-NOTIFY: E-posta gönderimi için SMTP client (nil ise e-posta gönderilemez).
+	EmailClient *email.Client
+	// AppURL, frontend public URL'si — reset link oluşturmak için.
+	AppURL string
+	// PasswordResetTTL, token geçerlilik süresi (dakika). 0 ise 60 kullanılır.
+	PasswordResetTTL int
 }

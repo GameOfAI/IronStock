@@ -1,0 +1,24 @@
+{{define "subject"}}IronStock — Bildirim Özeti{{end}}
+{{define "content"}}
+<h1>Bildirim Özeti</h1>
+<p>Merhaba <strong>{{.Username}}</strong>,</p>
+<p>Aşağıda son dönemdeki bildirimlerinizin özeti yer almaktadır.</p>
+
+<hr class="divider">
+
+{{range .Notifications}}
+<div style="border-left:3px solid #6366f1;padding:8px 16px;margin-bottom:12px;">
+  <strong>{{.Title}}</strong><br>
+  <span style="font-size:13px;color:#71717a;">{{.Body}}</span><br>
+  <span style="font-size:12px;color:#a1a1aa;">{{.CreatedAt}}</span>
+</div>
+{{else}}
+<p style="color:#a1a1aa;">Gösterilecek bildirim bulunmuyor.</p>
+{{end}}
+
+<hr class="divider">
+
+<a href="{{.AppURL}}/notifications" class="btn">Tüm Bildirimleri Gör</a>
+
+<p style="font-size:13px;color:#a1a1aa;">Bu özet e-postalarını almak istemiyorsanız profil ayarlarınızdan kapatabilirsiniz.</p>
+{{end}}

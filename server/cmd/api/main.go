@@ -27,6 +27,7 @@ import (
 	"envanter.app/server/internal/clientcert"
 	"envanter.app/server/internal/config"
 	"envanter.app/server/internal/db"
+	"envanter.app/server/internal/email"
 	"envanter.app/server/internal/httpapi"
 	"envanter.app/server/internal/logfwd"
 	"envanter.app/server/internal/logging"
@@ -144,6 +145,34 @@ func run() error {
 	// background goroutines (expiry scanner).
 	notifyWriter := notify.New(pool, hub, logger)
 
+	// --- Email client (PR-NOTIFY, optional — nil if SMTP not configured) ---
+	var emailClient *email.Client
+	if cfg.SMTPHost != "" {
+		emailCfg := email.Config{
+			Host:    cfg.SMTPHost,
+			Port:    cfg.SMTPPort,
+			Username: cfg.SMTPUser,
+			Password: cfg.SMTPPassword,
+			From:    cfg.SMTPFrom,
+			TLSMode: email.TLSMode(cfg.SMTPTLSMode),
+			AppURL:  cfg.AppURL,
+		}
+		var emailErr error
+		emailClient, emailErr = email.New(emailCfg, pool, logger)
+		if emailErr != nil {
+			// Template parse hatası kritik değil; log edip devam et
+			logger.Warn("email client init failed — email notifications disabled",
+				slog.String("error", emailErr.Error()))
+		} else {
+			logger.Info("smtp email client ready",
+				slog.String("host", cfg.SMTPHost),
+				slog.Int("port", cfg.SMTPPort),
+			)
+		}
+	} else {
+		logger.Info("smtp not configured — email notifications disabled")
+	}
+
 	// --- Auth handlers ---
 	// Constructed after hub + notifyWriter so break-glass alerts (PR-N4) work.
 	authHandlers := &httpapi.AuthHandlers{
@@ -153,6 +182,9 @@ func run() error {
 		BootstrapEnabled: cfg.BootstrapEnabled,
 		Hub:              hub,
 		Notify:           notifyWriter,
+		EmailClient:      emailClient,
+		AppURL:           cfg.AppURL,
+		PasswordResetTTL: cfg.PasswordResetTTL,
 	}
 
 	// --- Credential expiry scanner (PR-N1 + PR-N8) ---
@@ -267,6 +299,7 @@ func run() error {
 	notificationHandlers := &httpapi.NotificationHandlers{
 		Service: authSvc,
 		Logger:  logger,
+		Audit:   auditWriter,
 	}
 	graphHandlers := &httpapi.GraphHandlers{
 		Service: authSvc,

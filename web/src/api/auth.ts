@@ -209,3 +209,55 @@ export function useRevokeAllTrustedDevicesMutation() {
     },
   });
 }
+
+// --- PR-NOTIFY: Password Reset (Forgot Password) ---
+
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface ResetPasswordRequest {
+  token: string;
+  new_password: string;
+  public_key: Uint8Array;
+  private_key_enc: Uint8Array;
+  kek_salt: Uint8Array;
+  kek_params: Record<string, unknown>;
+}
+
+/**
+ * POST /api/v1/auth/forgot-password
+ * Always returns 200 OK (email enumeration protection).
+ */
+export function useForgotPasswordMutation() {
+  return useMutation({
+    mutationFn: async (input: ForgotPasswordRequest) =>
+      apiFetch<{ message: string }>('/api/v1/auth/forgot-password', {
+        method: 'POST',
+        body: input,
+        unauthenticated: true,
+      }),
+  });
+}
+
+/**
+ * POST /api/v1/auth/reset-password
+ * Token from URL + new password + fresh E2E keypair.
+ */
+export function useResetPasswordMutation() {
+  return useMutation({
+    mutationFn: async (input: ResetPasswordRequest) =>
+      apiFetch<{ message: string }>('/api/v1/auth/reset-password', {
+        method: 'POST',
+        body: {
+          token: input.token,
+          new_password: input.new_password,
+          public_key: Array.from(input.public_key),
+          private_key_enc: Array.from(input.private_key_enc),
+          kek_salt: Array.from(input.kek_salt),
+          kek_params: input.kek_params,
+        },
+        unauthenticated: true,
+      }),
+  });
+}
