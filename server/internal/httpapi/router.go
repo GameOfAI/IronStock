@@ -227,8 +227,9 @@ func NewRouter(d Deps) http.Handler {
 			ir.Use(timeoutMW)
 			ir.Use(RequireAccessToken(d.Auth.Service.JWT))
 			ir.Get("/", d.Item.List)
-			ir.Get("/search", d.Item.Search)         // PR-SEARCH: cross-folder substring search
-			ir.Get("/duplicates", d.Item.CheckDuplicates) // PR-DUP: duplicate name detection
+			ir.Get("/search", d.Item.Search)              // PR-SEARCH: cross-folder substring search
+			ir.Get("/duplicates", d.Item.CheckDuplicates)  // PR-DUP: duplicate name detection
+			ir.Get("/health-report", d.Item.GetHealthReport) // PR-HEALTH: admin health report
 			ir.Post("/", d.Item.Create)
 			ir.Get("/{id}", d.Item.Get)
 			ir.Put("/{id}", d.Item.Update)
@@ -243,6 +244,7 @@ func NewRouter(d Deps) http.Handler {
 			ir.Get("/{id}/links", d.Item.ListLinks)                                  // PR-LINK
 			ir.Post("/{id}/links", d.Item.CreateLink)                                // PR-LINK
 			ir.Delete("/{id}/links/{link_id}", d.Item.DeleteLink)                   // PR-LINK
+			ir.Get("/{id}/health", d.Item.GetHealth)                                 // PR-HEALTH
 
 			// PR-N7 tag + favorite routes under /items/{id}
 			if d.Tag != nil {
