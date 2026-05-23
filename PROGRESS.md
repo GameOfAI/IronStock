@@ -1,6 +1,6 @@
 # İlerleyiş
 
-Son güncelleme: 2026-05-23 (PR-VAULT-DYN: Dinamik Vault secret'ları — IssueDynamicCred + RevokeLease + countdown UI + 7 birim test)
+Son güncelleme: 2026-05-23 (PR-EXPORT: Şifreli bulk export — encrypted ZIP (items+shares+keypairs ciphertext), 5 birim test, admin dashboard UI)
 
 ## Mevcut Durum
 
@@ -43,6 +43,7 @@ Son güncelleme: 2026-05-23 (PR-VAULT-DYN: Dinamik Vault secret'ları — IssueD
 | **PR-SCALE: Redis Pub/Sub + Yatay Ölçek** | `server/internal/cache/redis.go` (circuit-breaker wrapper, 5 hata → 30s open), `ws/hub.go` Redis pub/sub fan-out (NewHubWithRedis + subscribeLoop + podID self-echo skip), `ws/tickets.go` Redis-backed ticket store (fallback in-memory), `httpapi/middleware_ratelimit.go` RedisIPRateLimiter (Lua sliding window), config.go ENVANTER_REDIS_URL+PASSWORD+RATE_LIMIT_BACKEND, main.go wiring, deploy/k8s/redis.yaml StatefulSet, api.yaml replicas:3 + PDB minAvailable:1, testler | ✅ Tamamlandı |
 | **PR-LINK: Linked Entries** | migration 00051 (item_links: source_item+field → target_item+field, link_type mirror/reference, UNIQUE constraint), `httpapi/item_links.go` (CreateLink POST, ListLinks GET, DeleteLink DELETE + queryMirrorLinkIDs helper), item Update handler artık `mirror_link_ids` döndürüyor (client-side E2E propagation), router wiring, web: `api/item-links.ts` (useItemLinksQuery + create + delete mutations), `linked-items-tab.tsx` (mirror/reference badge, create dialog, E2E uyarı banner), item-detail.tsx Bağlantılar tab'ı | ✅ Tamamlandı |
 | **PR-VAULT-DYN: Dinamik Vault Secret'ları** | `vault/client.go` ExternalSourceVault'a dynamic+ttl alanları, DynamicCred struct, IssueDynamicCred() (GET/POST /v1/{mount}, TTL desteği), RevokeLease() (PUT /v1/sys/leases/revoke), doRequest 204 desteği; `httpapi/vault_dynamic.go` IssueDynamicCred handler (POST /api/v1/items/{id}/dynamic-cred, izin+dynamic=true kontrolü, audit item.dynamic_cred_issued), RevokeDynamicCred handler (DELETE ..., best-effort revocation, audit); router wiring; web: DynamicCred interface + useIssueDynamicCredMutation + useRevokeDynamicCredMutation (api/vault.ts); item-detail.tsx dinamik credential paneli (Al/Yenile butonu, gizle/göster, countdown timer, İptal Et, 30s auto-clear); 7 birim test (httptest.Server mock Vault) | ✅ Tamamlandı |
+| **PR-EXPORT: Şifreli Bulk Export** | `httpapi/admin_export_encrypted.go` POST /api/v1/admin/export/encrypted (admin-only, ZIP stream); ZIP içeriği: manifest.json (version+scope+counts), items.json (name_enc+name_nonce+server_dek_wrapped+field value_enc/nonce base64), shares.json (e2e_dek_wrapped+wrap_nonce aktif paylaşımlar), keypairs.json (public_key+private_key_enc+kek_salt+kek_params); scope: all/folder:{uuid}/user:{uuid}; audit admin.export_encrypted_started + _completed; router wiring; web: downloadEncryptedExport() + EncryptedExportRequest (admin.ts); admin dashboard Şifreli ZIP Export paneli (kapsam seçimi, custom scope input, indir butonu); 5 birim test | ✅ Tamamlandı |
 
 ---
 

@@ -215,3 +215,45 @@ export async function downloadAdminExport(format: ExportFormat = 'json'): Promis
   a.remove();
   URL.revokeObjectURL(url);
 }
+
+// PR-EXPORT: Encrypted ZIP export request body.
+export interface EncryptedExportRequest {
+  scope: string;            // "all" | "folder:{uuid}" | "user:{uuid}"
+  include_attachments: boolean;
+}
+
+/**
+ * PR-EXPORT: Triggers an encrypted ZIP export download.
+ *
+ * The ZIP contains raw ciphertext blobs (name_enc, field value_enc, DEK wraps,
+ * keypairs) that can be used for disaster recovery. Plaintext values are NEVER
+ * included — each user can decrypt only items shared with them using their KEK.
+ *
+ * The browser auto-downloads the file as ironstock-encrypted-export-{date}.zip.
+ */
+export async function downloadEncryptedExport(req: EncryptedExportRequest): Promise<void> {
+  const token = getAccessToken();
+  const res = await fetch('/api/v1/admin/export/encrypted', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error((body as { message?: string }).message ?? `Şifreli export başarısız (${res.status})`);
+  }
+  const blob = await res.blob();
+  const date = new Date().toISOString().slice(0, 10);
+  const filename = `ironstock-encrypted-export-${date}.zip`;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}

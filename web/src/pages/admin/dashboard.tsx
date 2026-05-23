@@ -33,7 +33,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useUsers, useAuditLog, downloadAdminExport, type ExportFormat } from '@/api/admin';
+import { useUsers, useAuditLog, downloadAdminExport, downloadEncryptedExport, type ExportFormat } from '@/api/admin';
 import { useNotificationsQuery } from '@/api/notifications';
 import { RelativeTime } from '@/components/common/relative-time';
 import { cn } from '@/lib/cn';
@@ -170,6 +170,22 @@ export default function AdminDashboardPage() {
       await downloadAdminExport(fmt);
     } finally {
       setExporting(null);
+    }
+  }
+
+  // PR-EXPORT: Encrypted ZIP export state.
+  const [encExporting, setEncExporting] = useState(false);
+  const [encExportScope, setEncExportScope] = useState<'all' | 'custom'>('all');
+  const [encExportCustomScope, setEncExportCustomScope] = useState('');
+  async function handleEncryptedExport() {
+    if (encExporting) return;
+    const scope = encExportScope === 'all' ? 'all' : encExportCustomScope.trim();
+    if (!scope) return;
+    setEncExporting(true);
+    try {
+      await downloadEncryptedExport({ scope, include_attachments: false });
+    } finally {
+      setEncExporting(false);
     }
   }
 
@@ -477,6 +493,52 @@ export default function AdminDashboardPage() {
                 </div>
                 <p className="mt-1 text-[10px] text-muted-foreground">
                   Şifreli alanlar dahil edilmez.
+                </p>
+              </div>
+
+              {/* PR-EXPORT: Encrypted ZIP Export */}
+              <div className="border-t pt-2">
+                <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Şifreli ZIP Export
+                </p>
+                <div className="space-y-1.5">
+                  <div className="flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setEncExportScope('all')}
+                      className={`flex-1 rounded border px-2 py-1 text-[10px] transition ${encExportScope === 'all' ? 'border-violet-500 bg-violet-500/20 text-violet-300' : 'border-slate-700 bg-slate-900/60 text-slate-400 hover:border-slate-500'}`}
+                    >
+                      Tüm Vault
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEncExportScope('custom')}
+                      className={`flex-1 rounded border px-2 py-1 text-[10px] transition ${encExportScope === 'custom' ? 'border-violet-500 bg-violet-500/20 text-violet-300' : 'border-slate-700 bg-slate-900/60 text-slate-400 hover:border-slate-500'}`}
+                    >
+                      Kapsam Belirt
+                    </button>
+                  </div>
+                  {encExportScope === 'custom' && (
+                    <input
+                      type="text"
+                      placeholder="folder:{uuid} veya user:{uuid}"
+                      value={encExportCustomScope}
+                      onChange={(e) => setEncExportCustomScope(e.target.value)}
+                      className="w-full rounded border border-slate-700 bg-slate-900/80 px-2 py-1 font-mono text-[10px] text-slate-300 placeholder-slate-600 focus:border-violet-500 focus:outline-none"
+                    />
+                  )}
+                  <button
+                    type="button"
+                    disabled={encExporting || (encExportScope === 'custom' && !encExportCustomScope.trim())}
+                    onClick={handleEncryptedExport}
+                    className="flex w-full items-center justify-center gap-1.5 rounded-md border border-violet-700 bg-violet-900/30 px-2 py-1.5 text-[11px] text-violet-300 transition hover:bg-violet-800/40 disabled:opacity-50"
+                  >
+                    {encExporting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+                    Şifreli ZIP İndir
+                  </button>
+                </div>
+                <p className="mt-1 text-[10px] text-muted-foreground">
+                  Tüm şifreli blob'ları içerir (disaster recovery). Güvenli yerde saklayın.
                 </p>
               </div>
             </CardContent>
