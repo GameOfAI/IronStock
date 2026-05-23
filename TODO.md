@@ -1,8 +1,8 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-05-23 — PR-K8S tamamlandı ✅
-PR-SEC1/SEC2/SEC3 (mTLS + Tauri .p12) + PR-F3 (Tauri offline cache) + PR-TIME/LOG1/VAULT/GROUP-SHARE/IMPORT/N3/LDAP + PR-K8S (K8s cluster entegrasyonu + HTML rapor).
-Kalan tek kullanıcı aksiyonu: server/ dizininde `go mod tidy` (go-ldap/ldap/v3 + gopkg.in/yaml.v3).
+Son güncelleme: 2026-05-23 — PR-NOTIFY tamamlandı ✅
+PR-SEC1/SEC2/SEC3 + PR-F3 + PR-TIME/LOG1/VAULT/GROUP-SHARE/IMPORT/N3/LDAP + PR-K8S + PR-NOTIFY.
+Sonraki: PR-SEC4 (WebAuthn/FIDO2), PR-SEC5 (GeoIP+IP Whitelist), PR-SCALE (Redis Pub/Sub).
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 
