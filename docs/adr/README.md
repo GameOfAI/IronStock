@@ -49,5 +49,8 @@ Küçük refactoring'ler veya kod içi kararlar için ADR yazılmaz — commit m
 | [0004](0004-encryption-details.md) | Şifreleme detayları: AES-256-GCM + Argon2id + X25519 + HMAC search | 2026-04-24 | Accepted |
 | [0005](0005-migration-tool.md) | Migration tool: goose (SQL-first, embed) | 2026-04-24 | Accepted |
 | [0006](0006-data-model-extensions.md) | Veri modeli: item_types, field_definitions, folder_permissions, item_relationships + admin role | 2026-04-24 | Accepted |
-| [0007](0007-external-secret-backends.md) | Vault proxy modeli (manuel linking, Faz 5 impl) | 2026-04-24 | Accepted |
+| [0007](0007-external-secret-backends.md) | Vault proxy modeli (manuel linking) | 2026-04-24 | Implemented ✅ 2026-05-22 |
 | [0008](0008-deployment-stack.md) | Containerization + raw k8s + GHCR + ArgoCD GitOps (Helm yerine) | 2026-04-25 | Accepted |
+| [0009](0009-web-state-management.md) | Web client state management: Zustand + TanStack Query + Tailwind 4 + shadcn/ui | 2026-04-27 | Accepted |
+| [0010](0010-bootstrap-admin-panel.md) | Bootstrap admin panel: acil yönetici erişimi (break-glass) | 2026-05-15 | Proposed |
+| [0011](0011-item-search-model.md) | Item arama: name_plain + ILIKE substring search (ADR-0004 HMAC search'ü geçersiz kılar) | 2026-05-22 | Implemented ✅ 2026-05-22 |

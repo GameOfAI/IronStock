@@ -97,6 +97,12 @@ type itemResponse struct {
 	ExpiresAt            *string `json:"expires_at,omitempty"`
 	RotationIntervalDays *int    `json:"rotation_interval_days,omitempty"`
 	LastRotatedAt        *string `json:"last_rotated_at,omitempty"`
+
+	// Onay/Checkout Workflow (PR-N3).
+	// When true, non-owners must have an active approved access request to
+	// receive fields. Fields are omitted and my_access_request is populated.
+	RequiresApproval *bool              `json:"requires_approval,omitempty"`
+	MyAccessRequest  *AccessRequestInfo `json:"my_access_request,omitempty"`
 }
 
 type itemFieldOutput struct {
@@ -341,6 +347,29 @@ func (h *ItemHandlers) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	item.Permission = perm
+
+	// Onay/Checkout Workflow gate (PR-N3):
+	// Non-owners on approval-gated items must have an active approved request.
+	// Admins and the item owner (has a share row with write) bypass the gate.
+	isOwner := item.OwnerDEKWrapped != nil // owner always has a DEK share row
+	if item.RequiresApproval != nil && *item.RequiresApproval &&
+		!hasRole(claims, RoleAdmin) && !isOwner {
+		ok, err := hasActiveApproval(ctx, h.Service.DB, id, claims.Subject)
+		if err != nil {
+			writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
+				"Onay kontrolü başarısız.", err)
+			return
+		}
+		if !ok {
+			// Return metadata without fields; populate my_access_request.
+			item.Fields = nil
+			item.OwnerDEKWrapped = nil
+			item.OwnerWrapNonce = nil
+			item.MyAccessRequest = fetchMyAccessRequest(ctx, h.Service.DB, id, claims.Subject)
+			writeJSON(w, http.StatusOK, item)
+			return
+		}
+	}
 
 	// Async audit — item.viewed tracks every full-detail read (fields included).
 	// Written off the hot path to avoid adding a DB round-trip to every GET.
@@ -906,6 +935,9 @@ type itemRow struct {
 	ExpiresAt            *string
 	RotationIntervalDays *int
 	LastRotatedAt        *string
+
+	// Onay/Checkout Workflow (PR-N3).
+	RequiresApproval bool
 }
 
 func fetchItemForUpdate(ctx context.Context, db auth.DBExec, id string) (itemRow, error) {
@@ -914,7 +946,8 @@ func fetchItemForUpdate(ctx context.Context, db auth.DBExec, id string) (itemRow
 		       name_enc, server_dek_wrapped,
 		       description,
 		       created_by::text, created_at::text, updated_at::text,
-		       expires_at::text, rotation_interval_days, last_rotated_at::text
+		       expires_at::text, rotation_interval_days, last_rotated_at::text,
+		       requires_approval
 		FROM items WHERE id = $1::uuid LIMIT 1
 	`
 	var row itemRow
@@ -924,6 +957,7 @@ func fetchItemForUpdate(ctx context.Context, db auth.DBExec, id string) (itemRow
 		&row.Description,
 		&row.CreatedBy, &row.CreatedAt, &row.UpdatedAt,
 		&row.ExpiresAt, &row.RotationIntervalDays, &row.LastRotatedAt,
+		&row.RequiresApproval,
 	)
 	return row, err
 }
@@ -948,6 +982,7 @@ func fetchItemFull(ctx context.Context, db auth.DBExec, svc *auth.Service, id, u
 	if err != nil {
 		return itemResponse{}, err
 	}
+	ra := row.RequiresApproval
 	return itemResponse{
 		ID:                   row.ID,
 		FolderID:             row.FolderID,
@@ -963,6 +998,7 @@ func fetchItemFull(ctx context.Context, db auth.DBExec, svc *auth.Service, id, u
 		ExpiresAt:            row.ExpiresAt,
 		RotationIntervalDays: row.RotationIntervalDays,
 		LastRotatedAt:        row.LastRotatedAt,
+		RequiresApproval:     &ra,
 	}, nil
 }
 

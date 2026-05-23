@@ -29,6 +29,8 @@ import {
   X,
   Lock,
   History,
+  ShieldAlert,
+  SendHorizonal,
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -44,6 +46,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import type { ExternalSourceVault, FieldDefinition, ItemType, RelationshipType, VaultFieldValue } from '@/api/types';
 import { useVaultFetchMutation } from '@/api/vault';
+import { useCreateAccessRequestMutation, useCancelAccessRequestMutation } from '@/api/access-requests';
 import { useItem, useRecordRotationMutation, useFieldVersionsQuery } from '@/api/items';
 import {
   useAddFavoriteMutation,
@@ -466,6 +469,12 @@ export function ItemDetail({ itemId, fieldDefinitions, itemTypes: _itemTypes }: 
                   </section>
                 );
               })()}
+
+              {/* PR-N3: Approval gate panel — shown when item requires approval and
+                  caller has no active approved access */}
+              {item.requires_approval && (item.fields == null || item.fields.length === 0) && (
+                <ApprovalPanel itemId={itemId} item={item} />
+              )}
 
               {/* Metadata */}
               <section>
@@ -937,5 +946,144 @@ function FieldHistorySection({
         </div>
       )}
     </div>
+  );
+}
+
+// ---- PR-N3: Approval gate panel ----
+
+function ApprovalPanel({ itemId, item }: { itemId: string; item: { my_access_request?: { id: string; status: string; deny_reason?: string | null; expires_at?: string | null } | null } }) {
+  const [reason, setReason] = useState('');
+  const [duration, setDuration] = useState(60);
+  const [showForm, setShowForm] = useState(false);
+  const { toast } = useToast();
+
+  const createMut = useCreateAccessRequestMutation(itemId);
+  const cancelMut = useCancelAccessRequestMutation(itemId);
+
+  const existing = item.my_access_request;
+
+  async function handleRequest() {
+    try {
+      await createMut.mutateAsync({ reason, access_duration_minutes: duration });
+      setShowForm(false);
+      toast({ title: 'Erişim isteği gönderildi', description: 'Admin onayladığında bildirim alacaksınız.' });
+    } catch {
+      toast({ title: 'İstek gönderilemedi', variant: 'destructive' });
+    }
+  }
+
+  async function handleCancel() {
+    if (!existing) return;
+    try {
+      await cancelMut.mutateAsync(existing.id);
+      toast({ title: 'İstek iptal edildi' });
+    } catch {
+      toast({ title: 'İptal başarısız', variant: 'destructive' });
+    }
+  }
+
+  return (
+    <section>
+      <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        Erişim Onayı
+      </h3>
+      <div className="rounded-md border bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800 p-3 space-y-3">
+        <div className="flex items-start gap-2">
+          <ShieldAlert className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+          <div className="text-xs text-amber-700 dark:text-amber-400">
+            <p className="font-medium">Bu item onay gerektiriyor.</p>
+            <p className="mt-0.5 text-amber-600 dark:text-amber-500">
+              Şifreli alanları görüntülemek için admin onayı almanız gerekiyor.
+            </p>
+          </div>
+        </div>
+
+        {/* Existing request status */}
+        {existing && existing.status === 'pending' && (
+          <div className="flex items-center justify-between rounded bg-white/50 dark:bg-black/20 px-3 py-2">
+            <div className="flex items-center gap-2 text-xs">
+              <Clock className="h-3.5 w-3.5 text-amber-600" />
+              <span>İsteğiniz admin onayı bekliyor.</span>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 text-xs text-muted-foreground"
+              disabled={cancelMut.isPending}
+              onClick={handleCancel}
+            >
+              İptal et
+            </Button>
+          </div>
+        )}
+
+        {existing && existing.status === 'denied' && (
+          <div className="rounded bg-red-50 dark:bg-red-950/20 border border-red-200 px-3 py-2 text-xs text-red-600">
+            İsteğiniz reddedildi.{existing.deny_reason && ` Neden: ${existing.deny_reason}`}
+          </div>
+        )}
+
+        {/* Request form */}
+        {(!existing || existing.status === 'denied' || existing.status === 'cancelled' || existing.status === 'expired') && (
+          showForm ? (
+            <div className="space-y-2.5">
+              <div className="space-y-1">
+                <label className="text-xs font-medium">Neden erişime ihtiyacınız var? (opsiyonel)</label>
+                <textarea
+                  className="w-full rounded border bg-white/70 dark:bg-black/20 px-2 py-1.5 text-xs resize-none focus:outline-none focus:ring-1 focus:ring-amber-400"
+                  rows={2}
+                  placeholder="Erişim gerekçenizi belirtin…"
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-medium shrink-0">Süre (dk):</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={1440}
+                  value={duration}
+                  onChange={(e) => setDuration(Number(e.target.value))}
+                  className="w-20 rounded border bg-white/70 dark:bg-black/20 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-amber-400"
+                />
+                <span className="text-[10px] text-muted-foreground">(max 1440 = 24 saat)</span>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  className="h-7 text-xs gap-1.5 bg-amber-600 hover:bg-amber-700 text-white"
+                  disabled={createMut.isPending}
+                  onClick={handleRequest}
+                >
+                  {createMut.isPending
+                    ? <Loader2 className="h-3 w-3 animate-spin" />
+                    : <SendHorizonal className="h-3 w-3" />}
+                  Gönder
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => setShowForm(false)}
+                >
+                  İptal
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs gap-1.5 border-amber-300 text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/30"
+              onClick={() => setShowForm(true)}
+            >
+              <SendHorizonal className="h-3 w-3" />
+              Erişim İste
+            </Button>
+          )
+        )}
+      </div>
+    </section>
   );
 }

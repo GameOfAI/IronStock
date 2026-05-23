@@ -16,7 +16,7 @@ import {
   setAccessToken,
   setRefreshToken,
 } from './token-storage';
-import { ApiError, ErrCode, isAccessTokenExpired } from './errors';
+import { ApiError, ErrCode, OfflineQueuedError, isAccessTokenExpired } from './errors';
 import type { ApiErrorResponse, RefreshResponse } from './types';
 
 export interface RequestOptions {
@@ -35,6 +35,15 @@ let inflightRefresh: Promise<string> | null = null;
 let _baseUrl = '';
 /** TLS skip-verify flag — geliştirme ortamında self-signed sertifikalar için. */
 let _tlsSkipVerify = false;
+/** mTLS client sertifikası — base64 PKCS12 içeriği. Boş string = cert yok. */
+let _clientCertP12Base64 = '';
+/** mTLS client sertifikası parolası. */
+let _clientCertPassword = '';
+/**
+ * Offline mod aktifse, network hatası alan mutation'lar (POST/PUT/PATCH/DELETE)
+ * kuyruğa alınır ve bağlantı geri gelince otomatik tekrar denenir.
+ */
+let _offlineModeEnabled = false;
 
 export function setBaseUrl(url: string): void {
   _baseUrl = url.replace(/\/$/, '');
@@ -48,14 +57,39 @@ export function setTlsSkipVerify(value: boolean): void {
   _tlsSkipVerify = value;
 }
 
+/** mTLS client sertifikasını (PKCS12 base64) ve parolasını ayarlar. */
+export function setClientCert(p12Base64: string, password: string): void {
+  _clientCertP12Base64 = p12Base64;
+  _clientCertPassword = password;
+}
+
+export function hasClientCert(): boolean {
+  return _clientCertP12Base64.length > 0;
+}
+
+/** Offline mod flag'ini ayarlar. */
+export function setOfflineModeEnabled(value: boolean): void {
+  _offlineModeEnabled = value;
+}
+
+export function getOfflineModeEnabled(): boolean {
+  return _offlineModeEnabled;
+}
+
 /**
- * TLS bypass desteği olan fetch wrapper.
+ * TLS bypass + mTLS client sertifikası destekli fetch wrapper.
  *
- * Tauri ortamında `_tlsSkipVerify` aktifse self-signed sertifikalı sunuculara
- * Rust reqwest üzerinden bağlanır. Aksi hâlde standart browser `fetch()` kullanılır.
+ * Tauri ortamında aşağıdaki iki koşuldan biri sağlandığında Rust reqwest kullanılır:
+ *   1. `_tlsSkipVerify = true` — self-signed sertifikalı geliştirme ortamı
+ *   2. `_clientCertP12Base64` dolu — mTLS client certificate gönderilecek
+ *
+ * Aksi hâlde standart browser `fetch()` kullanılır (production, sertifikasız).
  */
 export async function rawFetch(url: string, init: RequestInit = {}): Promise<Response> {
-  if (_tlsSkipVerify && typeof window !== 'undefined' && '__TAURI__' in window) {
+  const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
+  const needsRust = isTauri && (_tlsSkipVerify || _clientCertP12Base64.length > 0);
+
+  if (needsRust) {
     const { invoke } = await import('@tauri-apps/api/core');
     const headers: Record<string, string> = {};
     if (init.headers) {
@@ -63,13 +97,14 @@ export async function rawFetch(url: string, init: RequestInit = {}): Promise<Res
         headers[k] = v;
       }
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = (await invoke('tls_fetch', {
       url,
       method: init.method ?? 'GET',
       headers,
       body: (init.body as string | null | undefined) ?? null,
-      tlsSkipVerify: true,
+      tlsSkipVerify: _tlsSkipVerify,
+      clientCertP12Base64: _clientCertP12Base64 || null,
+      clientCertPassword: _clientCertPassword || null,
     })) as { status: number; body: string };
     return new Response(result.body || null, { status: result.status });
   }
@@ -163,11 +198,25 @@ export async function apiFetch<T = unknown>(
   try {
     res = await rawFetch(url, init);
   } catch (err) {
-    throw new ApiError(0, {
+    const networkErr = new ApiError(0, {
       code: 'network_error',
       message: 'Sunucuya ulaşılamadı.',
       details: { reason: (err as Error).message },
     });
+
+    // Offline mod: mutation'ları (GET dışı, unauthenticated olmayan) kuyruğa al.
+    const isMutation =
+      method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE';
+    if (_offlineModeEnabled && isMutation && !unauthenticated) {
+      // Dinamik import — bu kod path'e yalnızca Tauri+offline modda girilir.
+      const { pushPendingOp } = await import('@/lib/pending-ops');
+      const { usePendingOpsStore } = await import('@/store/pending-ops');
+      const newOp = await pushPendingOp({ method, path, body });
+      usePendingOpsStore.getState().addOp(newOp);
+      throw new OfflineQueuedError(newOp.id);
+    }
+
+    throw networkErr;
   }
 
   if (res.ok) {

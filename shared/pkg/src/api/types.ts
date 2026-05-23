@@ -232,6 +232,10 @@ export interface Item {
   last_rotated_at?: string | null;
   /** PR-VAULT: external secret backend source config. Present for Vault-backed items. */
   external_source?: Record<string, unknown> | null;
+  /** PR-N3: When true, non-owners must request access to view secret fields. */
+  requires_approval?: boolean;
+  /** PR-N3: Present when requires_approval=true and caller has no active approved request. */
+  my_access_request?: AccessRequestInfo | null;
 }
 
 export interface ItemListResponse {
@@ -258,6 +262,53 @@ export interface ShareItemRequest {
   /** PR-TIME: optional time window. ISO 8601. NULL = no bound. */
   valid_from?: string | null;
   valid_until?: string | null;
+}
+
+// --- Group shares (PR-GROUP-SHARE) ---
+
+/** One group member's wrapped DEK inside a ShareGroupRequest. */
+export interface GroupShareMemberDEK {
+  user_id: string;
+  dek_wrapped: string; // base64
+  wrap_nonce: string;  // base64, 12B
+}
+
+export interface ShareGroupRequest {
+  group_id: string;
+  permission: 'read' | 'write';
+  /** Per-member DEK wraps. Client fetches all group members + public keys first. */
+  members: GroupShareMemberDEK[];
+  valid_from?: string | null;
+  valid_until?: string | null;
+}
+
+export interface ItemShareEntry {
+  id: string;
+  user_id: string;
+  username: string;
+  permission: 'read' | 'write';
+  granted_by: string;
+  granted_at: string;
+  revoked_at?: string | null;
+  valid_from?: string | null;
+  valid_until?: string | null;
+}
+
+export interface ItemGroupShareEntry {
+  id: string;
+  group_id: string;
+  group_name: string;
+  permission: 'read' | 'write';
+  granted_by: string;
+  granted_at: string;
+  revoked_at?: string | null;
+  valid_from?: string | null;
+  valid_until?: string | null;
+}
+
+export interface ItemSharesListResponse {
+  users: ItemShareEntry[];
+  groups: ItemGroupShareEntry[];
 }
 
 // --- Admin ---
@@ -866,3 +917,178 @@ export interface VaultFetchResponse {
 export interface VaultPathsResponse {
   paths: string[];
 }
+
+// --- Bulk Import (PR-IMPORT) ---
+
+/** One parsed row returned by POST /api/v1/import/csv/preview. */
+export interface CSVPreviewRow {
+  index: number;
+  raw_data: Record<string, string>;
+}
+
+/** Response body of POST /api/v1/import/csv/preview. */
+export interface CSVPreviewResponse {
+  headers: string[];
+  rows: CSVPreviewRow[];
+  total: number;
+}
+
+/** One item in a batch import request. Fields are already client-encrypted. */
+export interface BatchImportItem {
+  id: string;              // client-generated UUID v7
+  folder_id: string;
+  item_type_id: number;
+  name: string;
+  description?: string;
+  fields: ItemFieldInput[];
+  owner_dek_wrapped: string; // base64
+  owner_wrap_nonce: string;  // base64, 12B
+  expires_at?: string | null;
+  rotation_interval_days?: number | null;
+}
+
+export interface BatchImportRequest {
+  items: BatchImportItem[];
+}
+
+export interface BatchImportResponse {
+  created: number;
+  errors: string[];
+}
+
+// ---- Onay/Checkout Workflow (PR-N3) ----------------------------------------
+
+export type AccessRequestStatus = 'pending' | 'approved' | 'denied' | 'expired' | 'cancelled';
+
+/** Embedded in Item when requires_approval=true and caller has no active access. */
+export interface AccessRequestInfo {
+  id: string;
+  status: AccessRequestStatus;
+  access_duration_minutes: number;
+  requested_at: string;
+  responded_at?: string | null;
+  expires_at?: string | null;
+  deny_reason?: string | null;
+}
+
+export interface AccessRequest {
+  id: string;
+  item_id: string;
+  item_name?: string;
+  requester_id: string;
+  requester_name?: string;
+  status: AccessRequestStatus;
+  reason?: string | null;
+  deny_reason?: string | null;
+  access_duration_minutes: number;
+  requested_at: string;
+  responded_at?: string | null;
+  approved_by?: string | null;
+  expires_at?: string | null;
+}
+
+export interface AccessRequestsListResponse {
+  requests: AccessRequest[];
+}
+
+export interface CreateAccessRequestRequest {
+  reason?: string;
+  access_duration_minutes: number;
+}
+
+export interface ApproveAccessRequestRequest {
+  access_duration_minutes?: number;
+}
+
+export interface DenyAccessRequestRequest {
+  reason: string;
+}
+
+export interface ToggleApprovalRequiredRequest {
+  required: boolean;
+}
+
+// --- SSO/LDAP (PR-LDAP) ---
+
+export type SSOProviderType = 'oidc' | 'ldap';
+
+/** Public metadata for an SSO provider (no secrets). */
+export interface SSOProviderInfo {
+  id: string;
+  name: string;
+  provider_type: SSOProviderType;
+}
+
+/** Full admin view of an SSO provider (no secrets — booleans indicate presence). */
+export interface SSOProvider {
+  id: string;
+  name: string;
+  provider_type: SSOProviderType;
+  enabled: boolean;
+  // OIDC
+  discovery_url?: string | null;
+  client_id?: string | null;
+  has_client_secret: boolean;
+  scopes?: string[];
+  // LDAP
+  ldap_url?: string | null;
+  ldap_bind_dn?: string | null;
+  has_ldap_bind_password: boolean;
+  ldap_user_search_base?: string | null;
+  ldap_user_filter?: string;
+  ldap_attr_username?: string;
+  ldap_attr_email?: string;
+  ldap_attr_display_name?: string;
+  ldap_use_starttls: boolean;
+  ldap_skip_tls_verify: boolean;
+  // Provisioning
+  auto_provision: boolean;
+  default_role: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SSOProvidersListResponse {
+  providers: SSOProviderInfo[];
+}
+
+export interface AdminSSOProvidersListResponse {
+  providers: SSOProvider[];
+}
+
+export interface CreateSSOProviderRequest {
+  name: string;
+  provider_type: SSOProviderType;
+  enabled: boolean;
+  auto_provision: boolean;
+  default_role: string;
+  // OIDC
+  discovery_url?: string;
+  client_id?: string;
+  client_secret?: string;
+  scopes?: string[];
+  // LDAP
+  ldap_url?: string;
+  ldap_bind_dn?: string;
+  ldap_bind_password?: string;
+  ldap_user_search_base?: string;
+  ldap_user_filter?: string;
+  ldap_attr_username?: string;
+  ldap_attr_email?: string;
+  ldap_attr_display_name?: string;
+  ldap_use_starttls?: boolean;
+  ldap_skip_tls_verify?: boolean;
+}
+
+export interface LDAPLoginRequest {
+  provider_id: string;
+  username: string;
+  password: string;
+}
+
+export interface LDAPTestResult {
+  ok: boolean;
+  message?: string;
+  error?: string;
+}
+

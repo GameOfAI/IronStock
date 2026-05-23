@@ -16,6 +16,12 @@ pub fn run() {
         .setup(move |app| {
             tray::setup(app)?;
 
+            // Ekran yakalama korumasını varsayılan olarak etkinleştir.
+            // JS katmanı hydration sonrası kullanıcı tercihini uygulayarak override edebilir.
+            if let Some(win) = app.get_webview_window("main") {
+                let _ = win.set_content_protection(true);
+            }
+
             let handle = app.handle().clone();
             let last = Arc::clone(&inactivity_for_thread.last_activity);
             let timeout = Arc::clone(&inactivity_for_thread.timeout_secs);
@@ -30,6 +36,10 @@ pub fn run() {
             commands::activity_ping,
             commands::set_inactivity_timeout,
             commands::tls_fetch,
+            commands::cache_write,
+            commands::cache_read,
+            commands::cache_clear,
+            commands::set_content_protection,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,6 +1,8 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-05-19 (**Post-v1.0.0 Kapsamlı Geliştirmeler** — tüm PR-UX1..UX9 + WS origin fix + PR-Export + PR-F3 + PR-SEC1 tamamlandı. Kalan: PR-SEC2 (first-login TOTP gate), PR-SEC3 (mTLS), prod hardening.)
+Son güncelleme: 2026-05-23 — PR-K8S tamamlandı ✅
+PR-SEC1/SEC2/SEC3 (mTLS + Tauri .p12) + PR-F3 (Tauri offline cache) + PR-TIME/LOG1/VAULT/GROUP-SHARE/IMPORT/N3/LDAP + PR-K8S (K8s cluster entegrasyonu + HTML rapor).
+Kalan tek kullanıcı aksiyonu: server/ dizininde `go mod tidy` (go-ldap/ldap/v3 + gopkg.in/yaml.v3).
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 
@@ -505,7 +507,7 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 | PR-K5 | `feat/k8s-minio` | MinIO k8s StatefulSet + docker-compose servisi + secret + StorageBackend interface | Orta | ✅ merged |
 | PR-A1 | `feat/item-description` | `items.description` migration + server endpoint + web/client UI (textarea) | Orta | ✅ merged |
 | PR-A2 | `feat/item-attachments` | `item_attachments` migration + presigned URL API + upload/download UI | Orta | ✅ merged |
-| PR-K6 | `feat/server-vault` | `server/internal/vault` package + item endpoint passthrough + audit | Düşük | ⏸ parking lot |
+| PR-K6 / PR-VAULT | `main` | `server/internal/vault` package + item endpoint passthrough + audit | Düşük | ✅ 2026-05-22 |
 | PR-P1 | `feat/client-packaging-2` | Tauri auto-updater config + macOS Universal DMG CI | Orta | ✅ merged |
 | PR-V1 | `feat/release-v1` | Production readiness checklist + version bump + v1.0.0 tag | Son | ✅ merged |
 
@@ -643,6 +645,7 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 ### ⏳ Kalan
 
 - [x] **PR-F3** — Tauri Client Sync: KeyringBootstrap (sessiz yeniden oturum), TLS skip-verify (reqwest), client item-detail parity (expiry/tags), tags + notifications API hooks. ✅ 2026-05-19
+- [x] **PR-K8S** — Kubernetes Cluster Entegrasyonu + HTML Rapor Üretimi: migration 00044/45/46 (`k8s_clusters`, `k8s_namespace` item tipi, `runs_in` rel tipi, `item_k8s_bindings`), `server/internal/k8s/` paketi (pure net/http client, kubeconfig parser), `admin_k8s.go` (CRUD+test+`decryptClusterConfig` helper), `k8s_proxy.go` (5 item-bazlı proxy endpoint), `admin_report.go` + `report.html.tmpl` (self-contained HTML, bounded goroutine pool), router+main wiring, web: admin-k8s.ts + reports.ts + pages/admin/k8s-clusters.tsx + pages/admin/reports.tsx + App.tsx routes + app-shell nav items. ✅ 2026-05-23
 - [ ] **PR-N3** — Onay Workflow / Dual Control: `access_requests` tablosu. Kritik item için erişim isteği → admin onayı → zaman-sınırlı görüntüleme. WS event'lar. **Büyük iş — Faz 6+ ayrı plan gerekir.**
 
 ### 🎯 Önerilen Sonraki Adaylar (Devolutions analizi + öncelik sırası)
@@ -660,22 +663,22 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 **Kolay kazanımlar — Devolutions'dan ilham (günler):**
 - [x] **Log forwarding** — Audit log event'larından Syslog (UDP/TCP) + Slack webhook entegrasyonu. SOC/SIEM için kritik. ✅ 2026-05-22 (server/internal/logfwd/ + admin_log_forwarding.go + migration 00038 + web UI)
 - [x] **Scheduled export** — `GET /api/v1/admin/export?format=json|csv` endpoint. Admin Dashboard'da JSON/CSV butonları. ✅ 2026-05-19
-- [ ] **Zaman bazlı erişim** — `item_shares` + `folder_permissions`'a `valid_from TIMESTAMPTZ`, `valid_until TIMESTAMPTZ` alanları. `ResolveItemPermission` CTE'ye `AND (valid_until IS NULL OR valid_until > NOW())` eklenir. Migration + UI.
-- [ ] **Item arama iyileştirmesi** — HMAC blind index sadece tam eşleşme. Prefix için bigram HMAC array veya Postgres `ILIKE` (plaintext metadata).
+- [x] **Zaman bazlı erişim** — `item_shares` + `folder_permissions`'a `valid_from TIMESTAMPTZ`, `valid_until TIMESTAMPTZ` alanları. `ResolveItemPermission` CTE'ye `AND (valid_until IS NULL OR valid_until > NOW())` eklenir. Migration + UI. ✅ 2026-05-22 (PR-TIME, migration 00040)
+- [x] **Item arama iyileştirmesi** — `name_plain TEXT` kolonu + `ILIKE '%query%'` substring + global cross-folder search. ADR-0011. ✅ 2026-05-22 (PR-SEARCH, migration 00039)
 
 **Orta vadeli — kritik gaplar (hafta):**
 - [ ] **SSO / OIDC entegrasyonu** — Azure AD (Entra ID) ve Okta. Kurumsal ortamlarda AD zorunlu; bu olmadan enterprise satışı güç. SAML 2.0 + OIDC. Backend: `POST /auth/sso/callback` + `users.external_id` kolonu. Önce Entra ID, sonra Okta.
 - [ ] **PR-N3 (Onay/Checkout Workflow)** — Kritik credential erişimi → onay isteği → admin onayı → zaman-sınırlı görüntüleme. `access_requests` tablosu. WS event'lar. Büyük iş, ayrı plan session.
 - [ ] **Bağlı kayıtlar (Linked Entries)** — `item_links` tablosu: `source_item_id → target_item_id, field_def_id`. Kaynak alan güncellenince bağlı item'lar da güncellenir (re-encrypt). Örn: tek SSH key birden fazla sunucuda kullanılıyor.
-- [ ] **Bulk import/export** — CSV + KeePassXC .kdbx import parser (Go `keepassxc-go` library). Takım geçişleri için şart.
-- [ ] **Share modal grup desteği** — `item_shares`'e `group_id` sütunu + `ResolveItemPermission` CTE'ye group path. Frontend: kullanıcı picker'a "Gruplar" tab'ı.
+- [x] **Bulk import/export** — CSV + KeePass .kdbx import sihirbazı (kdbxweb istemci-taraflı; server stdlib csv). Toplu şifreli item oluşturma, E2E guarantee. ✅ 2026-05-22 (PR-IMPORT)
+- [x] **Share modal grup desteği** — `item_group_shares` tablosu + `ResolveItemPermission` 4-sinyal (owner > user share > group share > folder ACL). Frontend: paylaşım modalına "Grup" sekmesi. ✅ 2026-05-22 (PR-GROUP-SHARE)
 
 **Uzun vadeli — büyük özellikler (ay):**
 - [ ] **Otomatik parola rotasyonu** — Rotation scheduler + agent/runner ile SSH/API üzerinden credential push. Backend'de rotation policy engine. Devolutions'da PAM add-on; IronStock'ta built-in olabilir.
 - [ ] **WebAuthn / YubiKey MFA** — TOTP ötesi donanım anahtarı. `webauthn-go` library. `user_credentials` tablosu. TOTP'a alternatif/ek.
 - [ ] **Tauri offline cache** — SQLite local cache + sync-on-connect. Ağ kesildiğinde client çalışmaya devam eder.
 - [ ] **CLI client** — `ironstock` komutu: credential fetch, copy-to-clipboard, script-friendly. DevOps pipeline entegrasyonu.
-- [ ] **Vault backend (PR-K6)** — HashiCorp Vault proxy (parking lot'tan çıkarılabilir). Büyük enterprise için.
+- [x] **Vault backend (PR-VAULT)** — HashiCorp Vault proxy tamamlandı. ✅ 2026-05-22
 - [ ] **OIDC SSO** — Azure AD / Okta / Keycloak (yukarıdaki kısa vadeli sonrası genişletme).
 - [ ] **Mobile client** — Tauri 2 mobile (iOS/Android).
 - [ ] **Terraform provider** — IaC ile envanter yönetimi.
@@ -700,12 +703,14 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 - [ ] Backup/restore prosedürü + cron
 - [ ] KMS entegrasyonu (master_keys rotation batch job)
 
-### External Secret Backends (ADR-0007)
-- [ ] `server/internal/vault` — HTTP client + k8s AppRole auth (PR-K6, parking lot)
-- [ ] Item detail endpoint genişletme: `external_source` doluysa Vault passthrough
-- [ ] Audit log integration — her Vault fetch `item.external_fetch` olarak log'lanır
-- [ ] Web + client UI: "Vault-backed item oluştur" formu + key_mapping editor
-- [ ] Bonus: Dynamic secrets flow (`POST /items/:id/dynamic-cred` → Vault'tan 15dk'lık cred)
+### External Secret Backends (ADR-0007) ✅ 2026-05-22 (PR-VAULT)
+- [x] `server/internal/vault` — HTTP client + k8s AppRole auth (PR-VAULT)
+- [x] Item detail endpoint genişletme: `external_source` doluysa Vault passthrough
+- [x] Audit log integration — `item.vault_fetch` / `item.vault_fetch_error` (metadata only, no plaintext)
+- [x] Web + client UI: "Vault-backed item oluştur" formu + key_mapping editor + 30sn auto-clear
+- [ ] **Parking lot:** Dynamic secrets flow (`POST /items/:id/dynamic-cred` → Vault'tan 15dk'lık cred)
+- [ ] **Parking lot:** AWS Secrets Manager / Azure Key Vault (`external_source.type = "aws_sm"`)
+- [ ] **Parking lot:** OIDC SSO (Vault + IronStock ortak kimlik)
 
 ### Release
 - [x] Production readiness checklist — PR-V1

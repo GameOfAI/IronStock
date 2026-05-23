@@ -18,6 +18,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Folder,
   Shield,
+  ShieldCheck,
   FileText,
   LogOut,
   Sun,
@@ -38,6 +39,8 @@ import {
   X,
   Fingerprint,
   Radio,
+  Upload,
+  ClipboardCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -383,6 +386,8 @@ const NAV_LABELS: Record<string, string> = {
   '/graph': 'İlişki Haritası',
   '/pipeline': 'Pipeline Diyagramları',
   '/pipeline/lifecycle': 'Lifecycle Lanes',
+  '/import': 'Toplu İçe Aktarma',
+  '/access-requests': 'Onay İstekleri',
   '/admin': 'Admin Paneli',
   '/admin/users': 'Kullanıcı Yönetimi',
   '/admin/groups': 'Gruplar',
@@ -390,6 +395,9 @@ const NAV_LABELS: Record<string, string> = {
   '/admin/audit-log': 'Audit Log',
   '/admin/client-certs': 'Sertifikalar',
   '/admin/log-forwarding': 'Log Yönlendirme',
+  '/admin/sso': 'SSO / LDAP',
+  '/admin/k8s-clusters': 'K8s Kümeleri',
+  '/admin/reports': 'Raporlar',
   '/profile': 'Profil',
 };
 
@@ -569,6 +577,18 @@ export function AppShell() {
               label="Lifecycle Lanes"
               collapsed={sidebarCollapsed && !mobileOpen}
             />
+            <NavItem
+              to="/import"
+              icon={Upload}
+              label="Toplu Aktarma"
+              collapsed={sidebarCollapsed && !mobileOpen}
+            />
+            <NavItem
+              to="/access-requests"
+              icon={ClipboardCheck}
+              label="Onay İstekleri"
+              collapsed={sidebarCollapsed && !mobileOpen}
+            />
             {isAdmin && (
               <>
                 <NavItem
@@ -593,6 +613,24 @@ export function AppShell() {
                   to="/admin/log-forwarding"
                   icon={Radio}
                   label="Log Yönlendirme"
+                  collapsed={sidebarCollapsed && !mobileOpen}
+                />
+                <NavItem
+                  to="/admin/sso"
+                  icon={ShieldCheck}
+                  label="SSO / LDAP"
+                  collapsed={sidebarCollapsed && !mobileOpen}
+                />
+                <NavItem
+                  to="/admin/k8s-clusters"
+                  icon={Layers}
+                  label="K8s Kümeleri"
+                  collapsed={sidebarCollapsed && !mobileOpen}
+                />
+                <NavItem
+                  to="/admin/reports"
+                  icon={FileText}
+                  label="Raporlar"
                   collapsed={sidebarCollapsed && !mobileOpen}
                 />
               </>

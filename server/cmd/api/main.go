@@ -372,6 +372,12 @@ func run() error {
 		return fmt.Errorf("ensure default admin: %w", err)
 	}
 
+	ssoHandlers := &httpapi.SSOHandlers{
+		Service: authSvc,
+		Audit:   auditWriter,
+		Logger:  logger,
+	}
+
 	shareLinkHandlers := &httpapi.ShareLinkHandlers{
 		DB:      pool,
 		Service: authSvc,
@@ -400,6 +406,23 @@ func run() error {
 		Logger:  logger,
 	}
 
+	// --- K8s handlers (PR-K8S) ---
+	k8sClusterHandlers := &httpapi.K8sClusterHandlers{
+		Service: authSvc,
+		Audit:   auditWriter,
+		Logger:  logger,
+	}
+	k8sHandlers := &httpapi.K8sHandlers{
+		Service: authSvc,
+		Audit:   auditWriter,
+		Logger:  logger,
+	}
+	reportHandlers := &httpapi.ReportHandlers{
+		Service: authSvc,
+		Audit:   auditWriter,
+		Logger:  logger,
+	}
+
 	// --- HTTP layer ---
 	router := httpapi.NewRouter(httpapi.Deps{
 		Logger:         logger,
@@ -410,6 +433,7 @@ func run() error {
 		Attachment:     attachmentHandlers,
 		Admin:          adminHandlers,
 		ClientCert:     clientCertHandlers, // PR-SEC3
+		SSO:            ssoHandlers,         // PR-LDAP
 		Group:          groupHandlers,
 		Tag:            tagHandlers,
 		Notification:   notificationHandlers,
@@ -421,7 +445,10 @@ func run() error {
 		Lifecycle:    lifecycleHandlers,
 		Pipeline:     pipelineHandlers,
 		Export:       exportHandlers,
-		Vault:        vaultHandlers, // PR-VAULT
+		Vault:        vaultHandlers,        // PR-VAULT
+		K8sCluster:   k8sClusterHandlers,   // PR-K8S
+		K8s:          k8sHandlers,          // PR-K8S
+		Report:       reportHandlers,       // PR-K8S
 	})
 
 	srv := &http.Server{

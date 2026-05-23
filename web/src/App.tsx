@@ -19,6 +19,10 @@ import InventoryPage from '@/pages/inventory';
 import AdminUsersPage, { AdminAuditLogPage, AdminDashboardPage } from '@/pages/admin';
 import AdminClientCertsPage from '@/pages/admin/client-certs';
 import AdminLogForwardingPage from '@/pages/admin/log-forwarding';
+import AdminSSOPage from '@/pages/admin/sso';
+import AdminK8sClustersPage from '@/pages/admin/k8s-clusters';
+import AdminReportsPage from '@/pages/admin/reports';
+import SSOCallbackPage from '@/pages/sso-callback';
 import TagsPage from '@/pages/tags';
 import { GraphPage } from '@/pages/graph';
 import PipelineListPage from '@/pages/pipeline/index';
@@ -29,6 +33,8 @@ import AdminLoginPage from '@/pages/admin-login';
 import ChangePasswordPage from '@/pages/change-password';
 import ProfilePage from '@/pages/profile';
 import SharePage from '@/pages/share';
+import ImportPage from '@/pages/import';
+import AccessRequestsPage from '@/pages/access-requests';
 import NotFoundPage from '@/pages/not-found';
 
 /**
@@ -87,6 +93,8 @@ export default function App() {
             <Route path="/admin-login" element={<AdminLoginPage />} />
             {/* PR-N5: Public one-time share link — no auth required */}
             <Route path="/share/:token" element={<SharePage />} />
+            {/* PR-LDAP: OIDC callback landing — sets auth store from hash fragment */}
+            <Route path="/sso-callback" element={<SSOCallbackPage />} />
 
             {/* Authenticated — WsProvider starts WebSocket after login */}
             <Route element={<AuthGate />}>
@@ -112,6 +120,8 @@ export default function App() {
                     <Route path="/pipeline/lifecycle" element={<LifecyclePage />} />
                     <Route path="/pipeline/:id" element={<DiagramPage />} />
                     <Route path="/profile" element={<ProfilePage />} />
+                    <Route path="/import" element={<ImportPage />} />
+                    <Route path="/access-requests" element={<AccessRequestsPage />} />
 
                     {/* Admin */}
                     <Route element={<RoleGate role="admin" />}>
@@ -122,6 +132,9 @@ export default function App() {
                       <Route path="/admin/audit-log" element={<AdminAuditLogPage />} />
                       <Route path="/admin/client-certs" element={<AdminClientCertsPage />} />
                       <Route path="/admin/log-forwarding" element={<AdminLogForwardingPage />} />
+                      <Route path="/admin/sso" element={<AdminSSOPage />} />
+                      <Route path="/admin/k8s-clusters" element={<AdminK8sClustersPage />} />
+                      <Route path="/admin/reports" element={<AdminReportsPage />} />
                     </Route>
                   </Route>
                   </Route>

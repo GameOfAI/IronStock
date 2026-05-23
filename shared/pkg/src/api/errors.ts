@@ -38,7 +38,24 @@ export const ErrCode = {
   Internal: 'internal_error',
   Forbidden: 'forbidden',
   ReuseDetected: 'reuse_detected', // hypothetical — not yet emitted
+  /** Client-side only — mutation offline moda alındı, queue'ya eklendi. */
+  OfflineQueued: 'offline_queued',
 } as const;
+
+/**
+ * Client-side only hata — mutation offline kuyruğuna alındığında fırlatılır.
+ * Sunucuya hiç gönderilmedi; bağlantı geri gelince otomatik tekrar denenir.
+ */
+export class OfflineQueuedError extends Error {
+  public readonly code = ErrCode.OfflineQueued;
+  public readonly opId: string;
+
+  constructor(opId: string) {
+    super('İstek çevrimdışı kuyruğuna alındı. Bağlantı geldiğinde otomatik gönderilecek.');
+    this.name = 'OfflineQueuedError';
+    this.opId = opId;
+  }
+}
 
 /** True for codes that mean "user must re-login from scratch". */
 export function isUnrecoverableAuth(err: unknown): boolean {

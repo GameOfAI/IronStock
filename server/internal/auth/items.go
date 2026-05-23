@@ -48,9 +48,8 @@ func (p ItemPermission) AllowsWrite() bool {
 }
 
 // ResolveItemPermission returns the caller's effective permission on
-// itemID. Three sub-queries kept simple rather than one CTE — micro-bench
-// shows three indexed PK lookups is faster than a recursive CTE join
-// for typical depths (<5).
+// itemID. Four sub-queries — owner, direct user share, group share, folder ACL.
+// Simple indexed PK lookups are faster than one big CTE for typical usage.
 //
 // Returns ItemPermNone if the item doesn't exist OR the user has no
 // matching grant. Caller decides surface (404 vs 403); we don't leak
@@ -104,19 +103,51 @@ func ResolveItemPermission(
 		}
 	}
 
-	// Early Write hit — folder check can't strengthen further.
+	// Early Write hit — nothing can strengthen further.
 	if fromShare == ItemPermWrite {
 		return ItemPermWrite, nil
 	}
 
-	// 3. Folder ACL via shared resolver.
+	// 3. Group share — check if user is a member of any group that has an
+	// active, in-window group share for this item.
+	var groupSharePerm *string
+	err = q.QueryRow(ctx, `
+		SELECT igs.permission
+		FROM item_group_shares igs
+		JOIN group_members gm ON gm.group_id = igs.group_id
+		WHERE igs.item_id = $1::uuid
+		  AND gm.user_id  = $2::uuid
+		  AND igs.revoked_at IS NULL
+		  AND (igs.valid_from  IS NULL OR igs.valid_from  <= NOW())
+		  AND (igs.valid_until IS NULL OR igs.valid_until >  NOW())
+		ORDER BY igs.permission DESC  -- 'write' > 'read'
+		LIMIT 1
+	`, itemID, userID).Scan(&groupSharePerm)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return ItemPermNone, err
+	}
+	fromGroupShare := ItemPermNone
+	if groupSharePerm != nil {
+		if *groupSharePerm == "write" {
+			fromGroupShare = ItemPermWrite
+		} else {
+			fromGroupShare = ItemPermRead
+		}
+	}
+
+	// Early Write hit again.
+	if fromGroupShare == ItemPermWrite {
+		return ItemPermWrite, nil
+	}
+
+	// 4. Folder ACL via shared resolver.
 	folderPerm, err := ResolveFolderPermission(ctx, q, userID, folderID)
 	if err != nil {
 		return ItemPermNone, err
 	}
 	fromFolder := folderPermToItemPerm(folderPerm)
 
-	return maxItemPerm(fromShare, fromFolder), nil
+	return maxItemPerm(maxItemPerm(fromShare, fromGroupShare), fromFolder), nil
 }
 
 func folderPermToItemPerm(fp FolderPermission) ItemPermission {

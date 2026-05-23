@@ -3,6 +3,13 @@ import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-route
 import { QueryClientProvider } from '@tanstack/react-query';
 
 import { queryClient } from '@/api/query';
+import {
+  loadCacheFromDisk,
+  subscribeQueryCacheForPersist,
+  clearDiskCache,
+} from '@/lib/offline-cache';
+import { clearPendingOps } from '@/lib/pending-ops';
+import { useOfflineSync } from '@/hooks/use-offline-sync';
 import { useAuthStore } from '@/store/auth';
 import { useConnectionStore } from '@/store/connection';
 import { ThemeProvider } from '@/components/layout/theme-provider';
@@ -140,6 +147,51 @@ function InactivityGuard() {
   return null;
 }
 
+/**
+ * Offline cache bootstrap (PR-F3).
+ *
+ * Mount'ta disk cache'ini yükleyerek queryClient'ı hydrate eder.
+ * Aynı zamanda cache değişikliklerini dinleyip periyodik olarak diske kaydeder.
+ *
+ * Auth store clear() çağrıldığında disk cache'ini temizler
+ * (farklı kullanıcı girişlerinde kirli veri kalmasın).
+ */
+function OfflineCacheManager() {
+  const user = useAuthStore((s) => s.user);
+
+  // Cache'i diske yaz event listener'ı — uygulama boyunca aktif.
+  React.useEffect(() => {
+    const unsubscribe = subscribeQueryCacheForPersist(queryClient);
+    // Uygulama açılışında disk cache'ini yükle.
+    void loadCacheFromDisk(queryClient);
+    return unsubscribe;
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Oturum kapatıldığında disk cache'ini ve pending op kuyruğunu temizle.
+  const prevUser = React.useRef(user);
+  React.useEffect(() => {
+    if (prevUser.current !== null && user === null) {
+      void clearDiskCache();
+      void clearPendingOps();
+    }
+    prevUser.current = user;
+  }, [user]);
+
+  return null;
+}
+
+/**
+ * Offline sync manager (PR-F3 outbox).
+ *
+ * - Mount'ta kuyruğu yükler.
+ * - Online event'inde kuyruktaki op'ları tekrar dener.
+ * - Kalıcı hata durumunda kullanıcıya toast gösterir.
+ */
+function OfflineSyncManager() {
+  useOfflineSync();
+  return null;
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -148,6 +200,8 @@ export default function App() {
           <AuthEventBridge />
           <KeyringBootstrap />
           <InactivityGuard />
+          <OfflineCacheManager />
+          <OfflineSyncManager />
           <Routes>
             {/* Sunucu yapılandırma ekranı — ConnectionGate'den önce, her zaman erişilebilir */}
             <Route path="/config" element={<ConfigPage />} />

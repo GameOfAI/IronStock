@@ -49,8 +49,10 @@ const (
 	ActionItemUpdated      = "item.updated"
 	ActionItemDeleted      = "item.deleted"
 	ActionItemFieldUpdated = "item.field_updated"
-	ActionItemShared       = "item.shared"
-	ActionItemUnshared     = "item.unshared"
+	ActionItemShared        = "item.shared"
+	ActionItemUnshared      = "item.unshared"
+	ActionItemGroupShared   = "item.group_shared"   // PR-GROUP-SHARE
+	ActionItemGroupUnshared = "item.group_unshared" // PR-GROUP-SHARE
 
 	// Read-event audit (PR-N6). Written async so hot-path latency is unaffected.
 	// Vault/CyberArk model: every read is traceable in the audit log.
@@ -151,6 +153,40 @@ const (
 	// Vault plaintext is NEVER included in details — only metadata (path, success).
 	ActionItemVaultFetch      = "item.vault_fetch"
 	ActionItemVaultFetchError = "item.vault_fetch_error"
+
+	// Onay/Checkout Workflow (PR-N3).
+	// ActionAccessRequestCreated: user requests access to an approval-gated item.
+	ActionAccessRequestCreated   = "access_request.created"
+	ActionAccessRequestApproved  = "access_request.approved"
+	ActionAccessRequestDenied    = "access_request.denied"
+	ActionAccessRequestCancelled = "access_request.cancelled"
+	ActionAccessRequestExpired   = "access_request.expired"
+	// ActionItemApprovalToggled: admin enables/disables requires_approval on an item.
+	ActionItemApprovalToggled = "item.approval_toggled"
+
+	// SSO/LDAP integration (PR-LDAP).
+	// ActionAdminSSOProviderCreated: admin creates an SSO/LDAP provider config.
+	ActionAdminSSOProviderCreated = "admin.sso_provider_created"
+	// ActionAdminSSOProviderUpdated: admin updates an SSO/LDAP provider config.
+	ActionAdminSSOProviderUpdated = "admin.sso_provider_updated"
+	// ActionAdminSSOProviderDeleted: admin deletes an SSO/LDAP provider.
+	ActionAdminSSOProviderDeleted = "admin.sso_provider_deleted"
+
+	// Kubernetes cluster integration (PR-K8S).
+	// ActionAdminK8sClusterCreated: admin adds a K8s cluster config.
+	ActionAdminK8sClusterCreated = "admin.k8s_cluster_created"
+	// ActionAdminK8sClusterUpdated: admin updates a K8s cluster config.
+	ActionAdminK8sClusterUpdated = "admin.k8s_cluster_updated"
+	// ActionAdminK8sClusterDeleted: admin removes a K8s cluster config.
+	ActionAdminK8sClusterDeleted = "admin.k8s_cluster_deleted"
+	// ActionAdminK8sClusterTested: admin tests connectivity to a K8s cluster.
+	ActionAdminK8sClusterTested = "admin.k8s_cluster_tested"
+	// ActionItemK8sFetch: user fetched live K8s resource data for an item.
+	// Payload is NEVER logged — only cluster_id, namespace, resource type, and count.
+	ActionItemK8sFetch = "item.k8s_fetch"
+	// ActionAdminReportGenerated: admin generated an HTML inventory report.
+	// Options and item count are logged; no secret field values are included.
+	ActionAdminReportGenerated = "admin.report_generated"
 )
 
 // ResourceGroup is the audit resource type for group rows.

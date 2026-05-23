@@ -12,6 +12,8 @@ import type {
   ItemListResponse,
   FieldVersionsResponse,
   ShareItemRequest,
+  ShareGroupRequest,
+  ItemSharesListResponse,
 } from './types';
 
 /**
@@ -77,16 +79,50 @@ export function useDeleteItemMutation(_folderId: string) {
 }
 
 export function useShareItemMutation(itemId: string) {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: (req: ShareItemRequest) =>
       apiFetch<void>(`/api/v1/items/${itemId}/shares`, { method: 'POST', body: req }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['item-shares', itemId] }),
   });
 }
 
 export function useUnshareItemMutation(itemId: string) {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: (userId: string) =>
       apiFetch<void>(`/api/v1/items/${itemId}/shares/${userId}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['item-shares', itemId] }),
+  });
+}
+
+/** PR-GROUP-SHARE: List all user and group shares for an item. */
+export function useItemSharesQuery(itemId: string | null) {
+  return useQuery({
+    queryKey: ['item-shares', itemId],
+    queryFn: () => apiFetch<ItemSharesListResponse>(`/api/v1/items/${itemId}/shares`),
+    enabled: Boolean(itemId),
+    staleTime: 15_000,
+  });
+}
+
+/** PR-GROUP-SHARE: Share an item with a group (creates item_group_shares + batch member item_shares). */
+export function useShareGroupMutation(itemId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (req: ShareGroupRequest) =>
+      apiFetch<void>(`/api/v1/items/${itemId}/group-shares`, { method: 'POST', body: req }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['item-shares', itemId] }),
+  });
+}
+
+/** PR-GROUP-SHARE: Revoke a group share (soft-revoke item_group_shares row). */
+export function useUnshareGroupMutation(itemId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (groupId: string) =>
+      apiFetch<void>(`/api/v1/items/${itemId}/group-shares/${groupId}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['item-shares', itemId] }),
   });
 }
 

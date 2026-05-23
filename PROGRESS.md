@@ -1,13 +1,42 @@
 # İlerleyiş
 
-Son güncelleme: 2026-05-22 (PR-LOG1 — Audit Log Forwarding tamamlandı)
+Son güncelleme: 2026-05-23 (PR-K8S: Kubernetes cluster entegrasyonu + HTML rapor üretimi tamamlandı)
 
 ## Mevcut Durum
 
 - **Aktif Faz:** Post-v1.0.0 Kapsamlı Geliştirmeler (Faz 6+)
 - **Tamamlanan Faz:** Faz 0 + 1 + 2 + 3 + 4 + 5 ✅
-- **Son tamamlanan:** PR-SEC3 (mTLS) ✅ 2026-05-20 + PR-UX7 (client item-detail tabs) ✅ 2026-05-22 + PR-LOG1 (Log Forwarding) ✅ 2026-05-22
-- **Proje durumu:** MVP + tüm UX PR'ları + PR-F3 + PR-SEC1/SEC2/SEC3 + PR-LOG1 tamamlandı. Syslog/Slack audit fan-out eklendi. Sıradaki: "Zaman bazlı erişim" veya PR-N3 (Onay/checkout workflow).
+
+### Tamamlanan PR'lar (kod taramasıyla doğrulandı — 2026-05-22)
+
+| PR | Açıklama | Backend | Frontend | Notlar |
+|----|----------|---------|----------|--------|
+| PR-SEC1 | TOTP per-user enforcement + QR | ✅ migration 00034, auth_login 3-dal akışı, admin_users toggle | ✅ totp-qr component, MustSetupTOTPGate, admin kullanıcı modal | |
+| PR-SEC2 | First-login forced TOTP wizard | ✅ must_setup_totp login response | ✅ MustSetupTOTPGate + auth-gate.tsx | |
+| PR-SEC3 | mTLS client certificate katmanı | ✅ migration 00035/36/37, clientcert/ pkg, admin_client_certs.go, auth_login cert validation | ✅ admin/client-certs.tsx | Tauri .p12 picker eksik (bkz. eksikler) |
+| PR-TIME | Zaman bazlı erişim penceresi | ✅ migration 00040 (item_shares + folder_permissions valid_from/until) | ✅ | |
+| PR-LOG1 | Log yönlendirme (Syslog/Splunk) | ✅ migration 00038, admin_log_forwarding.go | ✅ admin/log-forwarding.tsx | |
+| PR-VAULT | HashiCorp Vault proxy | ✅ vault_handlers.go | ✅ | |
+| PR-GROUP-SHARE | Item-level grup paylaşımı | ✅ migration 00041, item_shares güncelleme | ✅ | |
+| PR-IMPORT | CSV + KeePass import sihirbazı | ✅ import_handlers.go | ✅ pages/import.tsx | |
+| PR-N3 | Onay/Checkout workflow | ✅ migration 00042, access_request_handlers.go | ✅ pages/access-requests.tsx | |
+| PR-LDAP | SSO/LDAP/OIDC entegrasyonu | ✅ migration 00043, auth_sso.go, admin_sso.go | ✅ admin/sso.tsx, sso-callback.tsx, login SSO butonları | go mod tidy gerekli |
+
+### Eksik / Tamamlanmamış
+
+| Özellik | Durum | Notlar |
+|---------|-------|--------|
+| **`go mod tidy`** | ⚠️ Kullanıcı aksiyonu | server/ dizininde çalıştırılmalı (go-ldap/ldap/v3 + gopkg.in/yaml.v3 download + go.sum güncelleme) |
+
+### Tamamlanan (bu session — 2026-05-22 devam)
+
+| PR | Açıklama | Durum |
+|----|----------|-------|
+| **PR-SEC3: Tauri mTLS** | .p12 picker (config.tsx), PKCS12 Identity (commands.rs, native-tls), connection store cert alanları, rawFetch cert geçişi | ✅ Tamamlandı |
+| **PR-F3: Tauri Offline Cache (Read)** | Rust cache_write/read/clear komutları, offline-cache.ts (serialize/hydrate/subscribe), App.tsx OfflineCacheManager, gcTime 30dk | ✅ Tamamlandı |
+| **PR-F3: Offline Write+Sync (Outbox)** | pending-ops.ts (kuyruk disk I/O), store/pending-ops.ts (reaktif badge), offline-sync.ts (retry engine), client.ts network interceptor, connection store offlineModeEnabled, config.tsx toggle, use-offline-sync.ts hook, App.tsx OfflineSyncManager, app-shell badge | ✅ Tamamlandı |
+| **Ekran Yakalama Koruması** | `set_content_protection` Rust komutu (setup'ta default true), tauri.ts wrapper, connection store `contentProtectionEnabled`, config.tsx toggle (varsayılan açık) | ✅ Tamamlandı |
+| **PR-K8S: K8s Cluster Entegrasyonu + HTML Rapor** | migration 00044/45/46, `server/internal/k8s/` paketi (client+resources+kubeconfig), admin_k8s.go (CRUD+test+decryptClusterConfig), k8s_proxy.go (item-bazlı proxy), admin_report.go + report.html.tmpl (bounded goroutine pool, self-contained HTML), router+main wiring, web: admin-k8s.ts + reports.ts + pages/admin/k8s-clusters.tsx + pages/admin/reports.tsx + App.tsx routes + app-shell nav items | ✅ Tamamlandı |
 
 ---
 
@@ -140,10 +169,12 @@ IronStock şu an **"güvenli credential vault + DevOps görselleştirme"** kesi�
 | PR-UX8 | Admin Dashboard (6 widget: güvenlik skoru, expiry, user stats, audit) | ✅ DONE |
 | PR-UX9 | Item form şablon galerisi (11 quickstart şablonu) | ✅ DONE |
 | PR-F3 | Tauri Client Sync | ✅ DONE |
-| PR-N3 | Onay Workflow / Dual Control | ⏳ Faz 6+ (büyük iş) |
+| PR-N3 | Onay Workflow / Dual Control | ✅ DONE |
 | PR-SEC1 | TOTP per-user enforcement + Login UX + QR | ✅ DONE |
 | PR-SEC2 | First-login forced TOTP setup wizard | ✅ DONE |
 | PR-SEC3 | Client Certificate (mTLS) | 📋 TODO |
+| PR-GROUP-SHARE | Item-level grup paylaşımı (ACL + E2E DEK wrap) | ✅ DONE |
+| PR-IMPORT | Toplu CSV + KeePass import sihirbazı | ✅ DONE |
 
 ## Faz Durumu
 
@@ -186,6 +217,86 @@ Durumlar: `DONE` tamamlandı · `ACTIVE` devam ediyor · `PARTIAL` parçalı tam
 - [ ] **User aksiyonu:** Lokal tool'ları kur (`make tools-install` — sqlc, oapi-codegen, goose, golangci-lint), `make gen` + `make migrate-up` çalıştır, schema'yı Adminer'da doğrula.
 
 ## Günlük
+
+### 2026-05-22 (Win) — PR-IMPORT: Toplu CSV + KeePass Import Sihirbazı ✅
+
+**Mimari:** İki kaynak destekleniyor — CSV (sunucu önizleme) ve KeePass .kdbx (istemci-taraflı şifre çözme). E2E garantisi: şifreler tarayıcıda şifrelenir, sunucu plaintext görmez.
+
+**Tamamlanan:**
+- `server/internal/httpapi/import_handlers.go` — `CSVPreview` (POST /api/v1/import/csv/preview, stdlib encoding/csv, 500 satır önizleme, 10 MB limit, BOM temizleme) + `BatchImport` (POST /api/v1/import/batch, 1000 item limit, klasör ACL kontrolü, server-side envelope şifreleme, owner share row, audit event)
+- `server/internal/httpapi/router.go` — iki yeni import route'u
+- `web/src/lib/kdbx-parser.ts` — kdbxweb ile .kdbx şifre çözme, recursive grup yürüyüşü, `ProtectedValue.getText()` ile secret alanlar
+- `web/src/pages/import.tsx` — 4 adımlı sihirbaz (seç → önizle → içe aktarıyor → tamamlandı); CSV kolon otomatik algılama; KeePass master parola girişi; E2E: `generateDEK` + `encryptField` + `sealDEK` submit öncesi; per-item hata raporu
+- `web/src/api/import.ts` — `useCSVPreviewMutation`, `useBatchImportMutation`
+- `web/src/api/client.ts` — `rawBody?: BodyInit` desteği (multipart FormData yüklemeleri için)
+- `shared/pkg/src/api/types.ts` + `client/src/api/types.ts` — `CSVPreviewResponse`, `BatchImportItem`, `BatchImportRequest`, `BatchImportResponse` tipleri
+- `web/package.json` — `uuid@11` eklendi (istemci taraflı UUIDv7 item ID üretimi için)
+- `web/src/App.tsx` + `web/src/components/layout/app-shell.tsx` — "Toplu Aktarma" nav item + `/import` route
+
+---
+
+### 2026-05-22 (Win) — PR-GROUP-SHARE: Item-Level Grup Paylaşımı ✅
+
+**Mimari:** `item_group_shares` tablosu ACL takibi için; her grup üyesi için `item_shares` satırları E2E DEK wrap'ları için. `ResolveItemPermission` 3-sinyalden 4-sinyale geçti (owner > user share > group share > folder ACL). Yeni üyeler için re-share gerekiyor (folder_group_permissions ile aynı tasarım).
+
+**Tamamlanan:**
+- `server/migrations/00041_item_group_shares.sql` — `item_group_shares` tablosu, unique (item_id, group_id), zaman penceresi kısıtı, aktif indeksler
+- `server/internal/auth/items.go` — `ResolveItemPermission` güncellendi: grup üyelik JOIN + `valid_from/until` koşulları
+- `server/internal/audit/audit.go` — `ActionItemGroupShared`, `ActionItemGroupUnshared` sabitleri
+- `server/internal/httpapi/item_shares.go` — `ListShares`, `ShareGroup`, `UnshareGroup` handler'ları; `GET /api/v1/items/{id}/shares` birleşik (kullanıcı + grup)
+- `server/internal/httpapi/router.go` — grup paylaşım route'ları
+- `shared/pkg/src/api/types.ts` — `GroupShareMemberDEK`, `ShareGroupRequest`, `ItemShareEntry`, `ItemGroupShareEntry`, `ItemSharesListResponse`
+- `web/src/api/catalog.ts` — `useUserPublicKeys(userIds)` paralel public key fetch için
+- `web/src/api/items.ts` — `useItemSharesQuery`, `useShareGroupMutation`, `useUnshareGroupMutation`
+- `web/src/components/inventory/item-share-modal.tsx` — Tabs ile "Kullanıcı" ve "Grup" sekmeleri; grup seçici, üye sayısı görünümü, E2E not
+
+---
+
+### 2026-05-22 (Win) — PR-VAULT: HashiCorp Vault Proxy Entegrasyonu ✅
+
+**Mimari (ADR-0007 implementasyonu):** Envanter sunucu Vault secret'larını DB'ye **yazmaz**. `items.external_source jsonb`'deki path referansını kullanarak her kullanıcı isteğinde Vault'tan canlı çeker (proxy), RAM'de passthrough yapar. E2E/envelope modeli bozulmaz.
+
+**Tamamlanan:**
+- `server/internal/vault/client.go` — AppRole auth + token cache (75% TTL) + KV v1/v2 destekli `ReadKV()` + `ListPaths()` + `mutex` güvenli token yenileme
+- `server/internal/config/config.go` — `ENVANTER_VAULT_{ADDR,ROLE_ID,SECRET_ID,NAMESPACE}` env vars
+- `server/internal/httpapi/vault_handlers.go` — `POST /api/v1/items/{id}/vault-fetch` (item read izni) + `GET /api/v1/vault/paths` (admin-only autocomplete)
+- `server/internal/audit/audit.go` — `ActionItemVaultFetch` + `ActionItemVaultFetchError` constants
+- `server/cmd/api/main.go` — `vault.New()` wire + nil guard (Vault konfigüre edilmemişse 503)
+- `shared/pkg/src/api/types.ts` — `ExternalSourceVault`, `VaultFieldValue`, `VaultFetchResponse`, `VaultPathsResponse` tipleri
+- `web/src/api/vault.ts` + `client/src/api/vault.ts` — `useVaultFetchMutation` (non-cacheable) + `useVaultPathsQuery`
+- `web/src/components/inventory/item-detail.tsx` — Vault panel: "Vault'tan Çek" butonu + 30sn auto-clear timer + gizle/göster toggle
+- `web/src/components/inventory/item-form-modal.tsx` — "Vault Kaynağı" collapsible bölümü: mount/path/kv_version/key_mapping editor + datalist autocomplete
+- `docs/adr/0007-external-secret-backends.md` — Durum "Implemented ✅ 2026-05-22" olarak güncellendi
+
+**Güvenlik notları:** Vault plaintext asla DB'ye yazılmaz, audit log'a yazılmaz (sadece metadata: path + field key + success/fail). 30 saniye sonra UI'dan otomatik temizlenir. Vault down iken native item'lar etkilenmez, sadece Vault-backed item'lar 503 döner.
+
+**Parking lot (gelecek):** Dynamic secrets (`POST /items/{id}/dynamic-cred`), AWS Secrets Manager / Azure Key Vault, OIDC SSO.
+
+---
+
+### 2026-05-22 (Win) — PR-TIME: Zaman Bazlı Erişim Pencereleri ✅
+
+**Mimari:** `item_shares` ve `folder_permissions` tablolarına `valid_from TIMESTAMPTZ` + `valid_until TIMESTAMPTZ` eklendi. `ResolveItemPermission` CTE'ye `AND (valid_until IS NULL OR valid_until > NOW())` koşulu eklendi.
+
+**Tamamlanan:**
+- `server/migrations/00040_time_based_access.sql` — iki tabloya nullable timestamp alanları
+- `server/internal/httpapi/` — share + folder permission endpoint'lerinde valid_from/until desteği
+- Frontend: share modal ve klasör izin ekranlarında tarih-saat picker'lar
+- `shared/pkg/src/api/types.ts` — `ShareItemRequest` ve permission tiplerinde yeni alanlar
+
+---
+
+### 2026-05-22 (Win) — PR-SEARCH: Item Substring Arama + Global Cross-Folder ✅
+
+**Mimari (ADR-0011):** ADR-0004'teki HMAC blind index (tam eşleşme only) yerini `name_plain TEXT` + `ILIKE '%query%'` aldı. Item name metadata kategorisinde — server zaten görüyor, E2E bozulmuyor.
+
+**Tamamlanan:**
+- `server/migrations/00039_name_plain.sql` — `items.name_plain TEXT` kolonu + `CREATE INDEX idx_items_name_plain` + mevcut row backfill
+- `server/internal/httpapi/item_handlers.go` — `GET /api/v1/items?search=` substring + `POST /api/v1/items/search` cross-folder endpoint (ACL-aware CTE)
+- `web/src/components/inventory/search-bar.tsx` + `client/src/components/inventory/search-bar.tsx` — global toggle switch eklendi
+- `docs/adr/0011-item-search-model.md` — YENİ (ADR-0004 §Searchable Encryption bölümünü geçersiz kılar)
+
+---
 
 ### 2026-05-22 (Win) — PR-LOG1: Audit Log Forwarding (Syslog + Slack) ✅
 
@@ -2243,8 +2354,11 @@ Kullanıcı review sırasında ürün için 4 ek boyut tanımladı; hepsi için 
 | 0004 | Şifreleme detayları: AES-256-GCM + Argon2id + X25519 + HMAC search | Kabul (2026-04-24) |
 | 0005 | Migration tool: goose | Kabul (2026-04-24) |
 | 0006 | Veri modeli: item_types, field_definitions, folder_permissions, item_relationships + admin rolü | Kabul (2026-04-24) |
-| 0007 | External secret backends: Vault proxy (manuel linking, Faz 5 impl) | Kabul (2026-04-24) |
+| 0007 | External secret backends: Vault proxy (manuel linking) | Implemented ✅ (2026-05-22) |
 | 0008 | Containerization + raw k8s + GHCR + ArgoCD (Helm yerine, ADR-0001 deploy satırını değiştirir) | Kabul (2026-04-25) |
+| 0009 | Web client state management: Zustand + TanStack Query + Tailwind 4 + shadcn/ui | Kabul (2026-04-27) |
+| 0010 | Bootstrap admin panel: acil yönetici erişimi (break-glass) | Proposed (2026-05-15) |
+| 0011 | Item arama: name_plain + ILIKE (ADR-0004 HMAC search bölümünü geçersiz kılar) | Implemented ✅ (2026-05-22) |
 
 ## Bloker / Risk / Not
 

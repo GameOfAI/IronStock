@@ -40,6 +40,7 @@ type Deps struct {
 	Attachment   *AttachmentHandlers
 	Admin        *AdminHandlers
 	ClientCert   *ClientCertHandlers // PR-SEC3: mTLS client certificate management
+	SSO          *SSOHandlers        // PR-LDAP: SSO/LDAP provider admin CRUD
 	Group        *GroupHandlers
 	Catalog      *CatalogHandlers
 	WS           *WSHandlers
@@ -52,6 +53,9 @@ type Deps struct {
 	Pipeline       *PipelineHandlers
 	LogForwarding  *LogForwardingHandlers // PR-LOG1: audit log forwarding to syslog/slack
 	Vault          *VaultHandlers         // PR-VAULT: HashiCorp Vault proxy (ADR-0007)
+	K8sCluster     *K8sClusterHandlers    // PR-K8S: Kubernetes cluster admin CRUD
+	K8s            *K8sHandlers           // PR-K8S: Per-item live K8s data proxy
+	Report         *ReportHandlers        // PR-K8S: HTML inventory report generation
 }
 
 // NewRouter builds a chi router with the standard middleware stack.
@@ -171,6 +175,20 @@ func NewRouter(d Deps) http.Handler {
 		})
 	}
 
+	// PR-LDAP: SSO/LDAP login routes (public, rate-limited).
+	// GET  /api/v1/auth/sso/providers         — list enabled providers (login page)
+	// POST /api/v1/auth/ldap/login            — LDAP credential exchange
+	// GET  /api/v1/auth/sso/{id}/authorize    — OIDC authorize redirect
+	// GET  /api/v1/auth/sso/{id}/callback     — OIDC token callback (browser redirect)
+	if d.Auth != nil {
+		authBruteRLSSO := NewIPRateLimiter(rate.Every(12*time.Second), 5)
+		r.With(timeoutMW).Get("/api/v1/auth/sso/providers", d.Auth.ListSSOProviders)
+		r.With(timeoutMW, authBruteRLSSO.Middleware).Post("/api/v1/auth/ldap/login", d.Auth.LDAPLogin)
+		r.With(timeoutMW).Get("/api/v1/auth/sso/{provider_id}/authorize", d.Auth.OIDCAuthorize)
+		// Callback has NO timeout — it does a network round-trip to the OIDC token endpoint.
+		r.Get("/api/v1/auth/sso/{provider_id}/callback", d.Auth.OIDCCallback)
+	}
+
 	// Inventory routes — folder + item. Bearer access required.
 	if d.Folder != nil && d.Auth != nil {
 		r.Route("/api/v1/folders", func(fr chi.Router) {
@@ -196,8 +214,11 @@ func NewRouter(d Deps) http.Handler {
 			ir.Get("/{id}", d.Item.Get)
 			ir.Put("/{id}", d.Item.Update)
 			ir.Delete("/{id}", d.Item.Delete)
+			ir.Get("/{id}/shares", d.Item.ListShares)                                // PR-GROUP-SHARE
 			ir.Post("/{id}/shares", d.Item.Share)
 			ir.Delete("/{id}/shares/{user_id}", d.Item.Unshare)
+			ir.Post("/{id}/group-shares", d.Item.ShareGroup)                         // PR-GROUP-SHARE
+			ir.Delete("/{id}/group-shares/{group_id}", d.Item.UnshareGroup)          // PR-GROUP-SHARE
 			ir.Post("/{id}/rotate", d.Item.RecordRotation)                           // PR-N1
 			ir.Get("/{id}/fields/{field_def_id}/versions", d.Item.ListFieldVersions) // PR-N2
 
@@ -262,6 +283,27 @@ func NewRouter(d Deps) http.Handler {
 				ar.Put("/log-forwarding/{id}", d.LogForwarding.UpdateConfig)
 				ar.Delete("/log-forwarding/{id}", d.LogForwarding.DeleteConfig)
 				ar.Post("/log-forwarding/{id}/test", d.LogForwarding.TestConfig)
+			}
+			// SSO/LDAP provider management (PR-LDAP).
+			if d.SSO != nil {
+				ar.Get("/sso/providers", d.SSO.ListSSOProviders)
+				ar.Post("/sso/providers", d.SSO.CreateSSOProvider)
+				ar.Put("/sso/providers/{id}", d.SSO.UpdateSSOProvider)
+				ar.Delete("/sso/providers/{id}", d.SSO.DeleteSSOProvider)
+				ar.Post("/sso/providers/{id}/test", d.SSO.TestLDAPConnection)
+			}
+			// Kubernetes cluster management (PR-K8S).
+			if d.K8sCluster != nil {
+				ar.Get("/k8s/clusters", d.K8sCluster.ListClusters)
+				ar.Post("/k8s/clusters", d.K8sCluster.CreateCluster)
+				ar.Put("/k8s/clusters/{id}", d.K8sCluster.UpdateCluster)
+				ar.Delete("/k8s/clusters/{id}", d.K8sCluster.DeleteCluster)
+				ar.Post("/k8s/clusters/{id}/test", d.K8sCluster.TestCluster)
+			}
+			// HTML report generation (PR-K8S) — long timeout (120s for multi-cluster fetches).
+			if d.Report != nil {
+				ar.With(middleware.Timeout(120*time.Second)).
+					Post("/reports/generate", d.Report.Generate)
 			}
 		})
 	}
@@ -344,6 +386,32 @@ func NewRouter(d Deps) http.Handler {
 		})
 	}
 
+	// Import routes (PR-IMPORT).
+	if d.Item != nil && d.Auth != nil {
+		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+			Post("/api/v1/import/csv/preview", d.Item.CSVPreview)
+		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+			Post("/api/v1/import/batch", d.Item.BatchImport)
+	}
+
+	// Onay/Checkout Workflow routes (PR-N3).
+	if d.Item != nil && d.Auth != nil {
+		// Per-item: create request + approval toggle (admin).
+		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+			Post("/api/v1/items/{id}/access-requests", d.Item.CreateAccessRequest)
+		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+			Patch("/api/v1/items/{id}/approval-required", d.Item.ToggleApprovalRequired)
+		// Global: list + approve/deny/cancel.
+		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+			Get("/api/v1/access-requests", d.Item.ListAccessRequests)
+		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+			Post("/api/v1/access-requests/{req_id}/approve", d.Item.ApproveAccessRequest)
+		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+			Post("/api/v1/access-requests/{req_id}/deny", d.Item.DenyAccessRequest)
+		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+			Delete("/api/v1/access-requests/{req_id}", d.Item.CancelAccessRequest)
+	}
+
 	// Notification routes (PR-N8).
 	if d.Notification != nil && d.Auth != nil {
 		r.Route("/api/v1/notifications", func(nr chi.Router) {
@@ -395,6 +463,19 @@ func NewRouter(d Deps) http.Handler {
 			Post("/api/v1/items/{id}/vault-fetch", d.Vault.VaultFetch)
 		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
 			Get("/api/v1/vault/paths", d.Vault.VaultListPaths)
+	}
+
+	// PR-K8S: Per-item live K8s proxy routes. Read permission sufficient for data;
+	// write permission required for binding registration.
+	if d.K8s != nil && d.Auth != nil {
+		mw := []func(http.Handler) http.Handler{timeoutMW, RequireAccessToken(d.Auth.Service.JWT)}
+		r.With(mw...).Get("/api/v1/items/{id}/k8s/binding", d.K8s.GetBinding)
+		r.With(mw...).Post("/api/v1/items/{id}/k8s/bind", d.K8s.SetBinding)
+		r.With(mw...).Get("/api/v1/items/{id}/k8s/pods", d.K8s.ListPods)
+		r.With(mw...).Get("/api/v1/items/{id}/k8s/deployments", d.K8s.ListDeployments)
+		r.With(mw...).Get("/api/v1/items/{id}/k8s/services", d.K8s.ListServices)
+		r.With(mw...).Get("/api/v1/items/{id}/k8s/events", d.K8s.ListEvents)
+		r.With(mw...).Get("/api/v1/items/{id}/k8s/metrics", d.K8s.ListMetrics)
 	}
 
 	return r
