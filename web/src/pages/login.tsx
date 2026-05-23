@@ -20,7 +20,7 @@
 
 import * as React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Key, Loader2, ShieldCheck, LogIn } from 'lucide-react';
+import { Eye, EyeOff, Key, Loader2, ShieldCheck, LogIn, Fingerprint } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -32,6 +32,11 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useLoginMutation } from '@/api/auth';
 import { fetchMyKeypair } from '@/api/me';
+import {
+  useWebAuthnLoginBeginMutation,
+  useWebAuthnLoginFinishMutation,
+} from '@/api/webauthn';
+import { authenticateWithKey, isWebAuthnSupported } from '@/lib/webauthn';
 import { useAuthStore } from '@/store/auth';
 import type { SessionUser } from '@/store/auth';
 import { decryptPrivateKey, deriveKEK, fromBase64 } from '@/lib/crypto';
@@ -230,6 +235,13 @@ export default function LoginPage() {
   // LDAP dialog state
   const [activeLDAPProvider, setActiveLDAPProvider] = React.useState<SSOProviderInfo | null>(null);
 
+  // WebAuthn login state
+  const waLoginBegin = useWebAuthnLoginBeginMutation();
+  const waLoginFinish = useWebAuthnLoginFinishMutation();
+  const [waUsername, setWaUsername] = React.useState('');
+  const [waDialogOpen, setWaDialogOpen] = React.useState(false);
+  const [waBusy, setWaBusy] = React.useState(false);
+
   const [username, setUsername] = React.useState('');
   const [password, setPassword] = React.useState('');
 
@@ -295,6 +307,41 @@ export default function LoginPage() {
     }
 
     navigate(fromPath ?? '/inventory', { replace: true });
+  }
+
+  // WebAuthn login flow
+  async function onWebAuthnLogin(e: React.FormEvent) {
+    e.preventDefault();
+    if (waBusy || !waUsername.trim()) return;
+    setWaBusy(true);
+    try {
+      const beginRes = await waLoginBegin.mutateAsync(waUsername.trim().toLowerCase());
+      const credentialJSON = await authenticateWithKey(
+        beginRes.options as Parameters<typeof authenticateWithKey>[0],
+      );
+      const finishRes = await waLoginFinish.mutateAsync({
+        user_id: beginRes.user_id,
+        session_key: beginRes.session_key,
+        credential: JSON.parse(credentialJSON),
+      });
+      // WebAuthn login returns tokens — but no KEK; bootstrap session (no E2E decrypt)
+      setBootstrapSession({
+        user: { id: finishRes.user_id, username: waUsername.trim(), roles: finishRes.roles ?? [] },
+        accessToken: finishRes.access_token,
+        refreshToken: finishRes.refresh_token,
+      });
+      navigate(fromPath ?? '/inventory', { replace: true });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Bilinmeyen hata.';
+      if (!msg.includes('NotAllowed') && !msg.includes('abort') && !msg.includes('cancelled')) {
+        toast({
+          title: 'Güvenlik anahtarı ile giriş başarısız',
+          description: msg,
+          variant: 'destructive',
+        });
+      }
+      setWaBusy(false);
+    }
   }
 
   // Phase 1: username + password form submit
@@ -529,12 +576,96 @@ export default function LoginPage() {
               </div>
             </div>
           )}
+
+          {/* WebAuthn / Security Key section (PR-SEC4) */}
+          {isWebAuthnSupported() && (
+            <div className="mt-5">
+              <div className="flex items-center gap-3">
+                <span className="h-px flex-1 bg-slate-800" />
+                <span className="text-[11px] text-slate-500">veya güvenlik anahtarı ile</span>
+                <span className="h-px flex-1 bg-slate-800" />
+              </div>
+              <div className="mt-3">
+                <button
+                  type="button"
+                  onClick={() => setWaDialogOpen(true)}
+                  disabled={busy}
+                  className="flex w-full items-center justify-center gap-2 rounded-md border border-slate-700 bg-slate-900 py-2.5 text-[13px] text-slate-300 transition hover:border-indigo-600/60 hover:bg-slate-800 hover:text-slate-100 disabled:opacity-50"
+                >
+                  <Fingerprint className="h-3.5 w-3.5 text-indigo-400" />
+                  Güvenlik Anahtarı ile Giriş Yap
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         <p className="mt-4 text-center font-mono text-[10px] text-slate-600">
           IronStock © 2026 · Tüm hakları saklıdır
         </p>
       </div>
+
+      {/* WebAuthn login dialog (PR-SEC4) */}
+      <Dialog open={waDialogOpen} onOpenChange={(o) => { if (!o && !waBusy) { setWaDialogOpen(false); setWaUsername(''); } }}>
+        <DialogContent
+          className="border-slate-800 bg-slate-900 sm:max-w-sm"
+          onInteractOutside={(e) => { if (waBusy) e.preventDefault(); }}
+        >
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-slate-100">
+              <Fingerprint className="h-5 w-5 text-indigo-400" />
+              Güvenlik Anahtarı ile Giriş
+            </DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Kullanıcı adınızı girin, ardından güvenlik anahtarınıza dokunun.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={onWebAuthnLogin} className="flex flex-col gap-4 pt-2">
+            <div className="flex flex-col gap-1.5">
+              <label className="font-mono text-[10px] uppercase tracking-wider text-slate-400">
+                Kullanıcı Adı
+              </label>
+              <input
+                value={waUsername}
+                onChange={(e) => setWaUsername(e.target.value)}
+                placeholder="admin"
+                autoComplete="username webauthn"
+                required
+                disabled={waBusy}
+                autoFocus
+                className="w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2.5 text-sm text-slate-200 placeholder:text-slate-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/40 disabled:opacity-60"
+              />
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <button
+                type="button"
+                onClick={() => { setWaDialogOpen(false); setWaUsername(''); }}
+                disabled={waBusy}
+                className="rounded-md border border-slate-700 bg-transparent px-4 py-2 text-[13px] text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+              >
+                İptal
+              </button>
+              <button
+                type="submit"
+                disabled={waBusy || !waUsername.trim()}
+                className="flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-[13px] font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
+              >
+                {waBusy ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Anahtara dokunun…
+                  </>
+                ) : (
+                  <>
+                    <Fingerprint className="h-3.5 w-3.5" />
+                    Devam Et
+                  </>
+                )}
+              </button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* TOTP dialog — appears after successful password auth when MFA is required */}
       <Dialog

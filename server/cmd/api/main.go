@@ -34,6 +34,7 @@ import (
 	"envanter.app/server/internal/notify"
 	"envanter.app/server/internal/storage"
 	"envanter.app/server/internal/vault"
+	webauthnpkg "envanter.app/server/internal/webauthn"
 	"envanter.app/server/internal/ws"
 )
 
@@ -173,6 +174,28 @@ func run() error {
 		logger.Info("smtp not configured — email notifications disabled")
 	}
 
+	// --- WebAuthn service (PR-SEC4, optional — nil if RPID not set) ---
+	var waService *webauthnpkg.WAService
+	if cfg.WebAuthnRPID != "" {
+		waSvc, waErr := webauthnpkg.New(webauthnpkg.Config{
+			RPID:          cfg.WebAuthnRPID,
+			RPDisplayName: cfg.WebAuthnRPDisplayName,
+			RPOrigins:     cfg.WebAuthnRPOrigins,
+		}, pool)
+		if waErr != nil {
+			logger.Warn("webauthn service init failed — WebAuthn disabled",
+				slog.String("error", waErr.Error()))
+		} else {
+			waService = waSvc
+			logger.Info("webauthn service ready",
+				slog.String("rpid", cfg.WebAuthnRPID),
+				slog.Any("origins", cfg.WebAuthnRPOrigins),
+			)
+		}
+	} else {
+		logger.Info("webauthn not configured (ENVANTER_WEBAUTHN_RPID not set) — endpoints return 501")
+	}
+
 	// --- Auth handlers ---
 	// Constructed after hub + notifyWriter so break-glass alerts (PR-N4) work.
 	authHandlers := &httpapi.AuthHandlers{
@@ -185,6 +208,7 @@ func run() error {
 		EmailClient:      emailClient,
 		AppURL:           cfg.AppURL,
 		PasswordResetTTL: cfg.PasswordResetTTL,
+		WebAuthn:         waService,
 	}
 
 	// --- Credential expiry scanner (PR-N1 + PR-N8) ---

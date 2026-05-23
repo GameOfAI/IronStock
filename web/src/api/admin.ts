@@ -141,6 +141,20 @@ export function useUpdateTOTPRequirementMutation(userId: string) {
   });
 }
 
+// ---------- WebAuthn Requirement Toggle (PR-SEC4) ----------
+
+export function useUpdateWebAuthnRequirementMutation(userId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (required: boolean) =>
+      apiFetch<void>(`/api/v1/admin/users/${userId}/webauthn-required`, {
+        method: 'PATCH',
+        body: { required },
+      }),
+    onSuccess: () => invalidateAllUserPages(queryClient),
+  });
+}
+
 // ---------- Audit log ----------
 
 /**

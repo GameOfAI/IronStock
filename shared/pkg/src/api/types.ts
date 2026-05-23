@@ -322,8 +322,9 @@ export interface AdminUser {
   last_login_at?: string | null;
   created_at: string;
   is_break_glass: boolean; // PR-N4
-  totp_required: boolean;  // PR-SEC1 — per-user TOTP enforcement
+  totp_required: boolean;       // PR-SEC1 — per-user TOTP enforcement
   requires_client_cert: boolean; // PR-SEC3 — per-user mTLS enforcement
+  webauthn_required: boolean;   // PR-SEC4 — WebAuthn/FIDO2 enforcement
 }
 
 export interface AdminUsersResponse {

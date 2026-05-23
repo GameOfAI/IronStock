@@ -174,6 +174,17 @@ func NewRouter(d Deps) http.Handler {
 			ar.With(authBruteRL.Middleware).Post("/forgot-password", d.Auth.ForgotPassword)
 			ar.With(authBruteRL.Middleware).Post("/reset-password", d.Auth.ResetPassword)
 
+			// PR-SEC4: WebAuthn / FIDO2 credential management + login flow.
+			// Registration requires an access token (authenticated user adding a key).
+			// Login flow is unauthenticated (begin/finish replace the password step).
+			ar.With(RequireAccessToken(d.Auth.Service.JWT)).Post("/webauthn/register/begin", d.Auth.WebAuthnRegisterBegin)
+			ar.With(RequireAccessToken(d.Auth.Service.JWT)).Post("/webauthn/register/finish", d.Auth.WebAuthnRegisterFinish)
+			ar.With(authBruteRL.Middleware).Post("/webauthn/login/begin", d.Auth.WebAuthnLoginBegin)
+			ar.With(authBruteRL.Middleware).Post("/webauthn/login/finish", d.Auth.WebAuthnLoginFinish)
+			ar.With(RequireAccessToken(d.Auth.Service.JWT)).Get("/webauthn/credentials", d.Auth.WebAuthnListCredentials)
+			ar.With(RequireAccessToken(d.Auth.Service.JWT)).Put("/webauthn/credentials/{id}", d.Auth.WebAuthnUpdateCredential)
+			ar.With(RequireAccessToken(d.Auth.Service.JWT)).Delete("/webauthn/credentials/{id}", d.Auth.WebAuthnDeleteCredential)
+
 			// Trusted device management (PR-F2b) — access-token protected.
 			ar.With(RequireAccessToken(d.Auth.Service.JWT)).Get("/trusted-devices", d.Auth.ListTrustedDevices)
 			ar.With(RequireAccessToken(d.Auth.Service.JWT)).Delete("/trusted-devices", d.Auth.RevokeAllTrustedDevices)
@@ -265,6 +276,8 @@ func NewRouter(d Deps) http.Handler {
 			ar.Post("/users/{id}/totp/reset", d.Admin.AdminResetTOTP)
 			// Admin TOTP zorunluluğu toggle (PR-SEC1).
 			ar.Patch("/users/{id}/totp-required", d.Admin.SetTOTPRequired)
+			// Admin WebAuthn zorunluluğu toggle (PR-SEC4).
+			ar.Patch("/users/{id}/webauthn-required", d.Admin.SetWebAuthnRequired)
 			// Break-glass toggle (PR-N4).
 			ar.Post("/users/{id}/break-glass", d.Admin.SetBreakGlass)
 			// Export (PR-Export) — registered inside this block so auth/role MW applies.

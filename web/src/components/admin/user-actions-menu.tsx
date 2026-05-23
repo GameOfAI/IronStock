@@ -35,6 +35,7 @@ import {
   useResetTOTPMutation,
   useRevokeRoleMutation,
   useUpdateTOTPRequirementMutation,
+  useUpdateWebAuthnRequirementMutation,
 } from '@/api/admin';
 import { useUpdateClientCertRequirementMutation } from '@/api/admin-client-certs';
 import { useAuthStore } from '@/store/auth';
@@ -78,6 +79,7 @@ export function UserActionsMenu({ user }: UserActionsMenuProps) {
   const resetTotp = useResetTOTPMutation(user.id);
   const updateTotpReq = useUpdateTOTPRequirementMutation(user.id);
   const updateCertReq = useUpdateClientCertRequirementMutation(user.id);
+  const updateWebAuthnReq = useUpdateWebAuthnRequirementMutation(user.id);
 
   const isSelf = me?.id === user.id;
   const userRoles = new Set(user.roles);
@@ -275,6 +277,33 @@ export function UserActionsMenu({ user }: UserActionsMenuProps) {
           >
             <Fingerprint className="mr-2 h-4 w-4" />
             <span>Sertifika zorunlu</span>
+          </DropdownMenuCheckboxItem>
+          {/* PR-SEC4: WebAuthn / FIDO2 zorunluluğu toggle */}
+          <DropdownMenuCheckboxItem
+            checked={user.webauthn_required}
+            disabled={updateWebAuthnReq.isPending}
+            onSelect={(e) => {
+              e.preventDefault();
+              const next = !user.webauthn_required;
+              updateWebAuthnReq.mutate(next, {
+                onSuccess: () =>
+                  toast({
+                    title: next ? 'WebAuthn zorunlu kılındı' : 'WebAuthn zorunluluğu kaldırıldı',
+                    description: next
+                      ? `${user.username} artık güvenlik anahtarıyla giriş yapmak zorunda.`
+                      : `${user.username} artık güvenlik anahtarı olmadan giriş yapabilir.`,
+                  }),
+                onError: (err) =>
+                  toast({
+                    title: 'WebAuthn zorunluluğu güncellenemedi',
+                    description: describeError(err),
+                    variant: 'destructive',
+                  }),
+              });
+            }}
+          >
+            <ShieldCheck className="mr-2 h-4 w-4 text-indigo-500" />
+            <span>WebAuthn zorunlu</span>
           </DropdownMenuCheckboxItem>
           <DropdownMenuSeparator />
           {isDisabled ? (

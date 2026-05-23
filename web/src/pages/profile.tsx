@@ -52,6 +52,14 @@ import {
   useRevokeAllTrustedDevicesMutation,
 } from '@/api/auth';
 import {
+  useWebAuthnCredentials,
+  useWebAuthnRegisterBeginMutation,
+  useWebAuthnRegisterFinishMutation,
+  useWebAuthnUpdateCredentialMutation,
+  useWebAuthnDeleteCredentialMutation,
+} from '@/api/webauthn';
+import { registerSecurityKey, isWebAuthnSupported } from '@/lib/webauthn';
+import {
   useNotificationPrefsQuery,
   useUpdateNotificationPrefsMutation,
   useExternalChannelsQuery,
@@ -77,6 +85,8 @@ import {
   Loader2,
   CheckCircle2,
   XCircle,
+  Key,
+  Pencil,
 } from 'lucide-react';
 
 // --- Recovery Codes Display ---
@@ -829,6 +839,255 @@ function ExternalChannelsCard() {
   );
 }
 
+// --- Security Keys Card (PR-SEC4) ---
+
+function SecurityKeysCard() {
+  const { toast } = useToast();
+  const { data, isLoading } = useWebAuthnCredentials();
+  const registerBegin = useWebAuthnRegisterBeginMutation();
+  const registerFinish = useWebAuthnRegisterFinishMutation();
+  const updateCred = useWebAuthnUpdateCredentialMutation();
+  const deleteCred = useWebAuthnDeleteCredentialMutation();
+
+  const [addOpen, setAddOpen] = React.useState(false);
+  const [label, setLabel] = React.useState('');
+  const [registering, setRegistering] = React.useState(false);
+  const [editId, setEditId] = React.useState<string | null>(null);
+  const [editLabel, setEditLabel] = React.useState('');
+
+  const credentials = data ?? [];
+  const supported = isWebAuthnSupported();
+
+  async function handleAddKey(e: React.FormEvent) {
+    e.preventDefault();
+    if (!label.trim() || registering) return;
+    setRegistering(true);
+    try {
+      // Step 1: get challenge from server
+      const beginRes = await registerBegin.mutateAsync();
+      // Step 2: interact with authenticator
+      const credentialJSON = await registerSecurityKey(
+        beginRes.options as Parameters<typeof registerSecurityKey>[0],
+      );
+      // Step 3: send response to server
+      await registerFinish.mutateAsync({
+        session_key: beginRes.session_key,
+        label: label.trim(),
+        credential: JSON.parse(credentialJSON),
+      });
+      toast({ title: 'Güvenlik anahtarı eklendi', description: label.trim() });
+      setAddOpen(false);
+      setLabel('');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Bilinmeyen hata.';
+      // User cancelled the authenticator prompt — don't show error
+      if (msg.includes('cancelled') || msg.includes('NotAllowed') || msg.includes('abort')) {
+        toast({ title: 'İptal edildi', description: 'Güvenlik anahtarı eklenmedi.' });
+      } else {
+        toast({ title: 'Anahtar eklenemedi', description: msg, variant: 'destructive' });
+      }
+    } finally {
+      setRegistering(false);
+    }
+  }
+
+  function startEdit(id: string, currentLabel: string) {
+    setEditId(id);
+    setEditLabel(currentLabel);
+  }
+
+  function handleRename(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editId || !editLabel.trim()) return;
+    updateCred.mutate(
+      { id: editId, label: editLabel.trim() },
+      {
+        onSuccess: () => {
+          toast({ title: 'Etiket güncellendi.' });
+          setEditId(null);
+        },
+        onError: (err) =>
+          toast({
+            title: 'Güncellenemedi',
+            description: err instanceof Error ? err.message : 'Bilinmeyen hata.',
+            variant: 'destructive',
+          }),
+      },
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Key className="h-5 w-5" />
+            <div>
+              <CardTitle>Güvenlik Anahtarları</CardTitle>
+              <CardDescription className="mt-0.5">
+                YubiKey, Touch ID veya diğer FIDO2/WebAuthn kimlik doğrulayıcıları.
+              </CardDescription>
+            </div>
+          </div>
+          {supported && (
+            <Dialog open={addOpen} onOpenChange={setAddOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" variant="outline">
+                  <Plus className="mr-1 h-4 w-4" />
+                  Anahtar Ekle
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Yeni Güvenlik Anahtarı Ekle</DialogTitle>
+                  <DialogDescription>
+                    Bir etiket girdikten sonra güvenlik anahtarınıza dokunun veya PIN'inizi girin.
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleAddKey} className="space-y-4 pt-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="key-label">Etiket</Label>
+                    <Input
+                      id="key-label"
+                      value={label}
+                      onChange={(e) => setLabel(e.target.value)}
+                      placeholder="YubiKey 5 NFC"
+                      required
+                      autoFocus
+                      disabled={registering}
+                    />
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      type="submit"
+                      className="bg-indigo-600 hover:bg-indigo-500"
+                      disabled={!label.trim() || registering}
+                    >
+                      {registering ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Anahtara dokunun…
+                        </>
+                      ) : (
+                        'Kaydet'
+                      )}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        {!supported && (
+          <p className="text-sm text-amber-600 dark:text-amber-400">
+            Tarayıcınız WebAuthn'ı desteklemiyor. Güvenlik anahtarı eklemek için modern bir
+            tarayıcı kullanın.
+          </p>
+        )}
+
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">Yükleniyor…</p>
+        ) : credentials.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Kayıtlı güvenlik anahtarı yok.</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {credentials.map((cred) => (
+              <div
+                key={cred.id}
+                className="flex items-start justify-between rounded-md border px-3 py-2 text-sm"
+              >
+                <div className="flex flex-col gap-0.5">
+                  {editId === cred.id ? (
+                    <form onSubmit={handleRename} className="flex items-center gap-2">
+                      <Input
+                        value={editLabel}
+                        onChange={(e) => setEditLabel(e.target.value)}
+                        className="h-7 text-sm"
+                        autoFocus
+                        onKeyDown={(e) => { if (e.key === 'Escape') setEditId(null); }}
+                      />
+                      <Button type="submit" size="sm" variant="outline" className="h-7 text-xs">
+                        Kaydet
+                      </Button>
+                    </form>
+                  ) : (
+                    <span className="font-medium">{cred.label}</span>
+                  )}
+                  <span className="text-xs text-muted-foreground">
+                    Eklenme: {new Date(cred.created_at).toLocaleDateString('tr-TR')}
+                    {cred.last_used_at && (
+                      <> · Son kullanım: {new Date(cred.last_used_at).toLocaleDateString('tr-TR')}</>
+                    )}
+                  </span>
+                  {cred.transports.length > 0 && (
+                    <span className="text-xs text-muted-foreground">
+                      Taşıma: {cred.transports.join(', ')}
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                    onClick={() => startEdit(cred.id, cred.label)}
+                    aria-label="Etiketi düzenle"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                        aria-label="Anahtarı sil"
+                        disabled={deleteCred.isPending}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Güvenlik anahtarını sil</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          <strong>{cred.label}</strong> anahtarı kalıcı olarak kaldırılacak. Bu
+                          anahtarla artık giriş yapamayacaksınız.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>İptal</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() =>
+                            deleteCred.mutate(cred.id, {
+                              onSuccess: () => toast({ title: 'Güvenlik anahtarı silindi.' }),
+                              onError: (err) =>
+                                toast({
+                                  title: 'Silinemedi',
+                                  description: err instanceof Error ? err.message : '',
+                                  variant: 'destructive',
+                                }),
+                            })
+                          }
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Sil
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // --- Profile Page ---
 
 export default function ProfilePage() {
@@ -847,6 +1106,7 @@ export default function ProfilePage() {
       </div>
 
       <TOTPManagementCard />
+      <SecurityKeysCard />
       <TrustedDevicesCard />
       <NotificationPrefsCard />
       <ExternalChannelsCard />
