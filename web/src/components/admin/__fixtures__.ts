@@ -16,6 +16,7 @@ export const sampleUsers: AdminUser[] = [
     is_break_glass: false,
     totp_required: true,
     requires_client_cert: false,
+    webauthn_required: false,
   },
   {
     id: 'u2',
@@ -28,6 +29,7 @@ export const sampleUsers: AdminUser[] = [
     is_break_glass: false,
     totp_required: true,
     requires_client_cert: false,
+    webauthn_required: false,
   },
   {
     id: 'u3',
@@ -40,6 +42,7 @@ export const sampleUsers: AdminUser[] = [
     is_break_glass: false,
     totp_required: true,
     requires_client_cert: false,
+    webauthn_required: false,
   },
 ];
 

@@ -32,8 +32,9 @@ type adminUserRow struct {
 	LastLoginAt        *string  `json:"last_login_at,omitempty"`
 	CreatedAt          string   `json:"created_at"`
 	IsBreakGlass       bool     `json:"is_break_glass"`        // PR-N4
-	TOTPRequired       bool     `json:"totp_required"`         // PR-SEC1 — per-user TOTP enforcement
-	RequiresClientCert bool     `json:"requires_client_cert"`  // PR-SEC3 — mTLS client cert enforcement
+	TOTPRequired        bool     `json:"totp_required"`          // PR-SEC1 — per-user TOTP enforcement
+	RequiresClientCert  bool     `json:"requires_client_cert"`   // PR-SEC3 — mTLS client cert enforcement
+	WebAuthnRequired    bool     `json:"webauthn_required"`      // PR-SEC4 — WebAuthn/FIDO2 enforcement
 }
 
 type adminUsersResponse struct {
@@ -63,31 +64,32 @@ func (h *AdminHandlers) ListUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Page query — includes is_break_glass (PR-N4), totp_required (PR-SEC1),
-	// and requires_client_cert (PR-SEC3).
+	// requires_client_cert (PR-SEC3), and webauthn_required (PR-SEC4).
 	const sqlText = `
 		SELECT
-		    COALESCE(array_agg(id::text                         ORDER BY username), '{}'),
-		    COALESCE(array_agg(username                         ORDER BY username), '{}'),
-		    COALESCE(array_agg(email                            ORDER BY username), '{}'),
-		    COALESCE(array_agg(status                           ORDER BY username), '{}'),
+		    COALESCE(array_agg(id::text                          ORDER BY username), '{}'),
+		    COALESCE(array_agg(username                          ORDER BY username), '{}'),
+		    COALESCE(array_agg(email                             ORDER BY username), '{}'),
+		    COALESCE(array_agg(status                            ORDER BY username), '{}'),
 		    COALESCE(array_agg(COALESCE(last_login_at::text, '') ORDER BY username), '{}'),
-		    COALESCE(array_agg(created_at::text                 ORDER BY username), '{}'),
-		    COALESCE(array_agg(is_break_glass                   ORDER BY username), '{}'),
-		    COALESCE(array_agg(totp_required                    ORDER BY username), '{}'),
-		    COALESCE(array_agg(requires_client_cert             ORDER BY username), '{}')
+		    COALESCE(array_agg(created_at::text                  ORDER BY username), '{}'),
+		    COALESCE(array_agg(is_break_glass                    ORDER BY username), '{}'),
+		    COALESCE(array_agg(totp_required                     ORDER BY username), '{}'),
+		    COALESCE(array_agg(requires_client_cert              ORDER BY username), '{}'),
+		    COALESCE(array_agg(webauthn_required                 ORDER BY username), '{}')
 		FROM (
 		    SELECT id, username, email, status, last_login_at, created_at,
-		           is_break_glass, totp_required, requires_client_cert
+		           is_break_glass, totp_required, requires_client_cert, webauthn_required
 		    FROM users
 		    ORDER BY username
 		    LIMIT $1 OFFSET $2
 		) page
 	`
 	var ids, usernames, emails, statuses, lastLogins, createdAts []string
-	var isBreakGlassFlags, totpRequiredFlags, requiresCertFlags []bool
+	var isBreakGlassFlags, totpRequiredFlags, requiresCertFlags, webauthnRequiredFlags []bool
 	if err := h.Service.DB.QueryRow(ctx, sqlText, limit, offset).Scan(
 		&ids, &usernames, &emails, &statuses, &lastLogins, &createdAts,
-		&isBreakGlassFlags, &totpRequiredFlags, &requiresCertFlags,
+		&isBreakGlassFlags, &totpRequiredFlags, &requiresCertFlags, &webauthnRequiredFlags,
 	); err != nil {
 		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
 			"Kullanıcı listesi alınamadı.", err)
@@ -114,6 +116,7 @@ func (h *AdminHandlers) ListUsers(w http.ResponseWriter, r *http.Request) {
 		breakGlass := i < len(isBreakGlassFlags) && isBreakGlassFlags[i]
 		totpReq := i >= len(totpRequiredFlags) || totpRequiredFlags[i]  // default true if missing
 		requiresCert := i < len(requiresCertFlags) && requiresCertFlags[i]
+		webauthnReq := i < len(webauthnRequiredFlags) && webauthnRequiredFlags[i]
 		out = append(out, adminUserRow{
 			ID:                 ids[i],
 			Username:           usernames[i],
@@ -125,6 +128,7 @@ func (h *AdminHandlers) ListUsers(w http.ResponseWriter, r *http.Request) {
 			IsBreakGlass:       breakGlass,
 			TOTPRequired:       totpReq,
 			RequiresClientCert: requiresCert,
+			WebAuthnRequired:   webauthnReq,
 		})
 	}
 
@@ -780,6 +784,62 @@ func (h *AdminHandlers) SetBreakGlass(w http.ResponseWriter, r *http.Request) {
 		ResourceType: audit.ResourceUser,
 		ResourceID:   id,
 		Details:      map[string]any{"enabled": body.Enabled},
+		IPAddress:    parseIP(r.RemoteAddr),
+		UserAgent:    r.UserAgent(),
+	})
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// SetWebAuthnRequired implements PATCH /api/v1/admin/users/{id}/webauthn-required.
+//
+// Body: { "required": true | false }
+//
+// PR-SEC4: Per-user WebAuthn enforcement toggle. When true, the user must
+// authenticate with a registered FIDO2/WebAuthn credential in addition to
+// (or instead of) TOTP for each login.
+func (h *AdminHandlers) SetWebAuthnRequired(w http.ResponseWriter, r *http.Request) {
+	claims := ClaimsFromContext(r.Context())
+	if claims == nil {
+		writeMiddlewareUnauthorized(w, errors.New("no claims"))
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		writeError(w, h.Logger, http.StatusBadRequest, ErrCodeBadRequest,
+			"id zorunlu.", errors.New("missing id"))
+		return
+	}
+
+	var body struct {
+		Required bool `json:"required"`
+	}
+	if !decodeJSON(w, r, h.Logger, &body) {
+		return
+	}
+
+	ctx := r.Context()
+	tag, err := h.Service.DB.Exec(ctx,
+		`UPDATE users SET webauthn_required = $2 WHERE id = $1::uuid`,
+		id, body.Required,
+	)
+	if err != nil {
+		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
+			"WebAuthn zorunluluğu güncellenemedi.", err)
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		writeError(w, h.Logger, http.StatusNotFound, ErrCodeNotFound,
+			"Kullanıcı bulunamadı.", errors.New("no user"))
+		return
+	}
+
+	_ = h.Audit.Write(ctx, audit.Entry{
+		ActorUserID:  claims.Subject,
+		Action:       "admin.webauthn_requirement_changed",
+		ResourceType: audit.ResourceUser,
+		ResourceID:   id,
+		Details:      map[string]any{"required": body.Required},
 		IPAddress:    parseIP(r.RemoteAddr),
 		UserAgent:    r.UserAgent(),
 	})

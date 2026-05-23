@@ -90,6 +90,14 @@ type Config struct {
 
 	// Password reset token TTL (PR-NOTIFY).
 	PasswordResetTTL int // ENVANTER_PASSWORD_RESET_TTL_MINUTES — varsayılan 60
+
+	// WebAuthn / FIDO2 (PR-SEC4).
+	// RPID typically equals the domain (e.g. "ironstock.local" or "localhost").
+	// RPOrigins is a comma-separated list of allowed origins.
+	// When RPID is empty, WebAuthn endpoints return 501 Not Implemented.
+	WebAuthnRPID          string   // ENVANTER_WEBAUTHN_RPID
+	WebAuthnRPDisplayName string   // ENVANTER_WEBAUTHN_RP_DISPLAY_NAME (default "IronStock")
+	WebAuthnRPOrigins     []string // ENVANTER_WEBAUTHN_RP_ORIGINS (comma-separated)
 }
 
 // Load reads config from environment, applies defaults, and validates.
@@ -129,6 +137,9 @@ func Load() (*Config, error) {
 		SMTPTLSMode:           strings.ToLower(envOr("ENVANTER_SMTP_TLS", "starttls")),
 		AppURL:                envOr("ENVANTER_APP_URL", "http://localhost:5173"),
 		PasswordResetTTL:      envIntOr("ENVANTER_PASSWORD_RESET_TTL_MINUTES", 60),
+		WebAuthnRPID:          os.Getenv("ENVANTER_WEBAUTHN_RPID"),
+		WebAuthnRPDisplayName: envOr("ENVANTER_WEBAUTHN_RP_DISPLAY_NAME", "IronStack"),
+		WebAuthnRPOrigins:     envStringSliceOr("ENVANTER_WEBAUTHN_RP_ORIGINS", []string{"http://localhost:5173"}),
 	}
 	if err := cfg.Validate(); err != nil {
 		return nil, err

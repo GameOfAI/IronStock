@@ -187,6 +187,12 @@ const (
 	// ActionAdminReportGenerated: admin generated an HTML inventory report.
 	// Options and item count are logged; no secret field values are included.
 	ActionAdminReportGenerated = "admin.report_generated"
+
+	// WebAuthn / FIDO2 (PR-SEC4).
+	ActionAuthWebAuthnRegistered = "auth.webauthn_registered"
+	ActionAuthWebAuthnRemoved    = "auth.webauthn_removed"
+	ActionAuthWebAuthnLogin      = "auth.webauthn_login"
+	ActionAuthWebAuthnFailed     = "auth.webauthn_failed"
 )
 
 // ResourceGroup is the audit resource type for group rows.

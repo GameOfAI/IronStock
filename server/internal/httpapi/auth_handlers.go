@@ -7,6 +7,7 @@ import (
 	"envanter.app/server/internal/auth"
 	"envanter.app/server/internal/email"
 	"envanter.app/server/internal/notify"
+	webauthnpkg "envanter.app/server/internal/webauthn"
 	"envanter.app/server/internal/ws"
 )
 
@@ -29,4 +30,7 @@ type AuthHandlers struct {
 	AppURL string
 	// PasswordResetTTL, token geçerlilik süresi (dakika). 0 ise 60 kullanılır.
 	PasswordResetTTL int
+
+	// PR-SEC4: WebAuthn / FIDO2 / YubiKey support. nil if not configured.
+	WebAuthn *webauthnpkg.WAService
 }
