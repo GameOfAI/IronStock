@@ -238,6 +238,9 @@ func NewRouter(d Deps) http.Handler {
 			ir.Delete("/{id}/group-shares/{group_id}", d.Item.UnshareGroup)          // PR-GROUP-SHARE
 			ir.Post("/{id}/rotate", d.Item.RecordRotation)                           // PR-N1
 			ir.Get("/{id}/fields/{field_def_id}/versions", d.Item.ListFieldVersions) // PR-N2
+			ir.Get("/{id}/links", d.Item.ListLinks)                                  // PR-LINK
+			ir.Post("/{id}/links", d.Item.CreateLink)                                // PR-LINK
+			ir.Delete("/{id}/links/{link_id}", d.Item.DeleteLink)                   // PR-LINK
 
 			// PR-N7 tag + favorite routes under /items/{id}
 			if d.Tag != nil {

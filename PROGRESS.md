@@ -1,6 +1,6 @@
 # İlerleyiş
 
-Son güncelleme: 2026-05-23 (PR-SCALE: Redis pub/sub multi-pod WS fan-out + ticket store + circuit-breaker + Redis rate limiter tamamlandı)
+Son güncelleme: 2026-05-23 (PR-LINK: Linked Entries — mirror/reference bağlantılar, client-side E2E propagation, LinkedItemsTab tamamlandı)
 
 ## Mevcut Durum
 
@@ -41,6 +41,7 @@ Son güncelleme: 2026-05-23 (PR-SCALE: Redis pub/sub multi-pod WS fan-out + tick
 | **PR-SEC4: WebAuthn/FIDO2** | migration 00049 (user_credentials), `server/internal/webauthn/` WAService wrapper, 4 endpoint (register begin/finish, login begin/finish), admin SetWebAuthnRequired PATCH, web: SecurityKeysCard (profile), WebAuthn login dialog (login page), admin webauthn_required toggle, `lib/webauthn.ts` browser API wrapper | ✅ Tamamlandı |
 | **PR-SEC5: GeoIP + IP Whitelist** | migration 00050 (allowed_ip_cidrs + allowed_country_codes + deny_tor_exit), `server/internal/geoip/` (ip-api.com 24h cache + Tor exit list daily refresh), check.go IP/CIDR/country/Tor check, auth_login.go IP gate, admin_ip_restrictions.go GET+PATCH handlers, web: IP Kısıtlamaları dialog (user-actions-menu), admin-ip-restrictions.ts | ✅ Tamamlandı |
 | **PR-SCALE: Redis Pub/Sub + Yatay Ölçek** | `server/internal/cache/redis.go` (circuit-breaker wrapper, 5 hata → 30s open), `ws/hub.go` Redis pub/sub fan-out (NewHubWithRedis + subscribeLoop + podID self-echo skip), `ws/tickets.go` Redis-backed ticket store (fallback in-memory), `httpapi/middleware_ratelimit.go` RedisIPRateLimiter (Lua sliding window), config.go ENVANTER_REDIS_URL+PASSWORD+RATE_LIMIT_BACKEND, main.go wiring, deploy/k8s/redis.yaml StatefulSet, api.yaml replicas:3 + PDB minAvailable:1, testler | ✅ Tamamlandı |
+| **PR-LINK: Linked Entries** | migration 00051 (item_links: source_item+field → target_item+field, link_type mirror/reference, UNIQUE constraint), `httpapi/item_links.go` (CreateLink POST, ListLinks GET, DeleteLink DELETE + queryMirrorLinkIDs helper), item Update handler artık `mirror_link_ids` döndürüyor (client-side E2E propagation), router wiring, web: `api/item-links.ts` (useItemLinksQuery + create + delete mutations), `linked-items-tab.tsx` (mirror/reference badge, create dialog, E2E uyarı banner), item-detail.tsx Bağlantılar tab'ı | ✅ Tamamlandı |
 
 ---
 

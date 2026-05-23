@@ -795,7 +795,12 @@ func (h *ItemHandlers) Update(w http.ResponseWriter, r *http.Request) {
 	})
 	h.publishEvent(ws.EventItemUpdated, id, claims.Subject)
 
-	w.WriteHeader(http.StatusNoContent)
+	// PR-LINK: Return mirror link IDs so the client can propagate field changes
+	// to linked target items (client handles re-encryption per target DEK).
+	mirrorLinkIDs := queryMirrorLinkIDs(ctx, h.Service.DB, id)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"mirror_link_ids": mirrorLinkIDs,
+	})
 }
 
 // Delete implements DELETE /api/v1/items/{id}.
