@@ -27,7 +27,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/cn';
 import type { SSOProvider, CreateSSOProviderRequest } from '@/api/types';
 import {
@@ -173,12 +173,12 @@ function ProviderFormDialog({
 
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2">
-              <Switch checked={form.enabled} onCheckedChange={(v) => set('enabled', v)} />
+              <Switch checked={form.enabled} onCheckedChange={(v: boolean) => set('enabled', v)} />
               <Label>Etkin</Label>
             </div>
             <div className="flex items-center gap-2">
               <Switch checked={form.auto_provision}
-                onCheckedChange={(v) => set('auto_provision', v)} />
+                onCheckedChange={(v: boolean) => set('auto_provision', v)} />
               <Label>Otomatik kullanıcı oluştur</Label>
             </div>
           </div>
@@ -276,19 +276,19 @@ function ProviderFormDialog({
                   onChange={(e) => set('ldap_user_filter', e.target.value)}
                   placeholder="(uid={username})" />
                 <p className="text-xs text-muted-foreground">
-                  {"{"}"{"username}{"}"} kullanıcının girdiği isimle değiştirilir.
+                  {'{username}'} kullanıcının girdiği isimle değiştirilir.
                 </p>
               </div>
 
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
                   <Switch checked={form.ldap_use_starttls ?? false}
-                    onCheckedChange={(v) => set('ldap_use_starttls', v)} />
+                    onCheckedChange={(v: boolean) => set('ldap_use_starttls', v)} />
                   <Label>StartTLS</Label>
                 </div>
                 <div className="flex items-center gap-2">
                   <Switch checked={form.ldap_skip_tls_verify ?? false}
-                    onCheckedChange={(v) => set('ldap_skip_tls_verify', v)} />
+                    onCheckedChange={(v: boolean) => set('ldap_skip_tls_verify', v)} />
                   <Label className="text-amber-600">TLS doğrulamayı atla</Label>
                 </div>
               </div>

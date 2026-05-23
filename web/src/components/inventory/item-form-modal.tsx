@@ -313,7 +313,7 @@ export function ItemFormModal({
           fields: encryptedFields,
           owner_dek_wrapped: toBase64(ownerDEKWrapped),
           owner_wrap_nonce: toBase64(wrapNonce),
-          external_source: externalSource,
+          external_source: externalSource as Record<string, unknown> | null,
         });
       }
       onOpenChange(false);

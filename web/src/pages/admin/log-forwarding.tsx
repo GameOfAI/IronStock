@@ -129,7 +129,6 @@ function formToConfig(form: FormState): SyslogConfig | SlackConfig {
 export default function AdminLogForwardingPage() {
   const { toast } = useToast();
   const { data, isLoading } = useLogForwardingConfigsQuery();
-  const createMutation = useCreateLogForwardingMutation();
   const deleteMutation = useDeleteLogForwardingMutation();
   const testMutation = useTestLogForwardingMutation();
 
@@ -533,7 +532,7 @@ function ConfigDialog({
             <Switch
               id="lfenabled"
               checked={form.enabled}
-              onCheckedChange={(v) => set({ enabled: v })}
+              onCheckedChange={(v: boolean) => set({ enabled: v })}
             />
             <Label htmlFor="lfenabled" className="cursor-pointer">
               Aktif (kayıt sonrası hemen başlar)

@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/cn';
 import { apiFetch } from '@/api/client';
 import { useGenerateReportMutation } from '@/api/reports';
@@ -63,9 +63,9 @@ function ItemRow({
         {selected && <Check className="h-3 w-3 text-primary-foreground" />}
       </div>
       <span className="flex-1 font-medium truncate">{item.name}</span>
-      {item.item_type && (
+      {item.item_type_id && (
         <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded shrink-0">
-          {item.item_type}
+          {item.item_type_id}
         </span>
       )}
     </button>
@@ -191,8 +191,8 @@ export default function AdminReportsPage() {
                 className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 rounded-md text-sm"
               >
                 <span className="flex-1 truncate font-medium">{item.name}</span>
-                {item.item_type && (
-                  <span className="text-xs text-muted-foreground">{item.item_type}</span>
+                {item.item_type_id && (
+                  <span className="text-xs text-muted-foreground">{item.item_type_id}</span>
                 )}
                 <button
                   type="button"
@@ -249,7 +249,7 @@ export default function AdminReportsPage() {
                 <Switch
                   id="opt-k8s"
                   checked={options.include_k8s_live}
-                  onCheckedChange={(v) => setOpt('include_k8s_live', v)}
+                  onCheckedChange={(v: boolean) => setOpt('include_k8s_live', v)}
                 />
               </div>
 
@@ -265,7 +265,7 @@ export default function AdminReportsPage() {
                 <Switch
                   id="opt-rel"
                   checked={options.include_relationships}
-                  onCheckedChange={(v) => setOpt('include_relationships', v)}
+                  onCheckedChange={(v: boolean) => setOpt('include_relationships', v)}
                 />
               </div>
 
@@ -282,7 +282,7 @@ export default function AdminReportsPage() {
                 <Switch
                   id="opt-fields"
                   checked={options.include_field_values}
-                  onCheckedChange={(v) => setOpt('include_field_values', v)}
+                  onCheckedChange={(v: boolean) => setOpt('include_field_values', v)}
                 />
               </div>
             </div>

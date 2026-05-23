@@ -168,6 +168,12 @@ func NewRouter(d Deps) http.Handler {
 			ar.With(authBruteRL.Middleware).Post("/recover/init", d.Auth.RecoverInit)
 			ar.Post("/recover/complete", d.Auth.RecoverComplete)
 
+			// PR-NOTIFY: şifre sıfırlama (self-service, e-posta ile).
+			// forgot-password: her zaman 200 OK (email enumeration koruması).
+			// reset-password: token doğrula + yeni şifre + yeni keypair.
+			ar.With(authBruteRL.Middleware).Post("/forgot-password", d.Auth.ForgotPassword)
+			ar.With(authBruteRL.Middleware).Post("/reset-password", d.Auth.ResetPassword)
+
 			// Trusted device management (PR-F2b) — access-token protected.
 			ar.With(RequireAccessToken(d.Auth.Service.JWT)).Get("/trusted-devices", d.Auth.ListTrustedDevices)
 			ar.With(RequireAccessToken(d.Auth.Service.JWT)).Delete("/trusted-devices", d.Auth.RevokeAllTrustedDevices)
@@ -412,7 +418,7 @@ func NewRouter(d Deps) http.Handler {
 			Delete("/api/v1/access-requests/{req_id}", d.Item.CancelAccessRequest)
 	}
 
-	// Notification routes (PR-N8).
+	// Notification routes (PR-N8 + PR-NOTIFY channels).
 	if d.Notification != nil && d.Auth != nil {
 		r.Route("/api/v1/notifications", func(nr chi.Router) {
 			nr.Use(timeoutMW)
@@ -421,6 +427,18 @@ func NewRouter(d Deps) http.Handler {
 			nr.Get("/unread-count", d.Notification.UnreadCount)
 			nr.Post("/read-all", d.Notification.MarkAllRead)
 			nr.Post("/{id}/read", d.Notification.MarkRead)
+		})
+
+		// PR-NOTIFY: per-user notification preferences + external channels.
+		r.Route("/api/v1/users/me", func(mr chi.Router) {
+			mr.Use(timeoutMW)
+			mr.Use(RequireAccessToken(d.Auth.Service.JWT))
+			mr.Get("/notification-prefs", d.Notification.GetNotificationPrefs)
+			mr.Put("/notification-prefs", d.Notification.UpdateNotificationPrefs)
+			mr.Get("/channels", d.Notification.ListExternalChannels)
+			mr.Post("/channels", d.Notification.AddExternalChannel)
+			mr.Delete("/channels/{channel_id}", d.Notification.DeleteExternalChannel)
+			mr.Post("/channels/{channel_id}/test", d.Notification.TestExternalChannel)
 		})
 	}
 

@@ -45,7 +45,8 @@ export async function parseKdbx(
   const db = await Kdbx.load(fileBuffer, credentials);
   const entries: ParsedImportEntry[] = [];
 
-  function walkGroup(group: InstanceType<typeof Kdbx.prototype.getDefaultGroup.constructor>, path: string) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function walkGroup(group: any, path: string) {
     // Enumerate sub-groups recursively.
     for (const child of (group as any).groups ?? []) {
       walkGroup(child, path ? `${path}/${child.name}` : child.name);

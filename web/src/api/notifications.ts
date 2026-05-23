@@ -63,3 +63,115 @@ export function useMarkAllReadMutation() {
     },
   });
 }
+
+// ---------------------------------------------------------------------------
+// PR-NOTIFY: Notification Prefs + External Channels
+// ---------------------------------------------------------------------------
+
+export type NotificationType =
+  | 'access_request'
+  | 'share_added'
+  | 'credential_expiring'
+  | 'security_alert'
+  | 'mention'
+  | 'system_announcement'
+  | 'break_glass_alert';
+
+export type NotificationChannel = 'inapp' | 'email' | 'slack' | 'teams';
+
+export interface NotificationPref {
+  notification_type: NotificationType;
+  channels: NotificationChannel[];
+}
+
+export interface NotificationPrefsResponse {
+  prefs: NotificationPref[];
+}
+
+export interface ExternalChannel {
+  id: string;
+  channel_type: 'slack' | 'teams';
+  channel_name: string;
+  enabled: boolean;
+  last_used_at?: string;
+  last_error?: string;
+  created_at: string;
+}
+
+export interface ExternalChannelsResponse {
+  channels: ExternalChannel[];
+}
+
+export interface AddChannelRequest {
+  channel_type: 'slack' | 'teams';
+  webhook_url: string;
+  channel_name: string;
+}
+
+export const notificationPrefsQueryKey = ['notification-prefs'] as const;
+
+export function useNotificationPrefsQuery() {
+  return useQuery({
+    queryKey: notificationPrefsQueryKey,
+    queryFn: () => apiFetch<NotificationPrefsResponse>('/api/v1/users/me/notification-prefs'),
+    staleTime: 60_000,
+  });
+}
+
+export function useUpdateNotificationPrefsMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (prefs: NotificationPref[]) =>
+      apiFetch<{ message: string }>('/api/v1/users/me/notification-prefs', {
+        method: 'PUT',
+        body: { prefs },
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: notificationPrefsQueryKey });
+    },
+  });
+}
+
+export const externalChannelsQueryKey = ['external-channels'] as const;
+
+export function useExternalChannelsQuery() {
+  return useQuery({
+    queryKey: externalChannelsQueryKey,
+    queryFn: () => apiFetch<ExternalChannelsResponse>('/api/v1/users/me/channels'),
+    staleTime: 30_000,
+  });
+}
+
+export function useAddExternalChannelMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: AddChannelRequest) =>
+      apiFetch<ExternalChannel>('/api/v1/users/me/channels', {
+        method: 'POST',
+        body: input,
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: externalChannelsQueryKey });
+    },
+  });
+}
+
+export function useDeleteExternalChannelMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<void>(`/api/v1/users/me/channels/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: externalChannelsQueryKey });
+    },
+  });
+}
+
+export function useTestExternalChannelMutation() {
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<{ message: string }>(`/api/v1/users/me/channels/${id}/test`, {
+        method: 'POST',
+      }),
+  });
+}

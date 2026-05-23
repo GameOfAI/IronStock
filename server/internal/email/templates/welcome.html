@@ -1,0 +1,16 @@
+{{define "subject"}}IronStock'a Hoş Geldiniz — {{.Username}}{{end}}
+{{define "content"}}
+<h1>Hesabınız Hazır 🎉</h1>
+<p>Merhaba <strong>{{.Username}}</strong>,</p>
+<p>IronStock hesabınız yönetici tarafından oluşturuldu. Aşağıdaki butona tıklayarak ilk girişinizi yapabilirsiniz.</p>
+
+<a href="{{.AppURL}}/login" class="btn">Giriş Yap</a>
+
+<hr class="divider">
+
+<div class="meta-row"><span class="meta-label">Kullanıcı:</span> {{.Username}}</div>
+<div class="meta-row"><span class="meta-label">E-posta:</span> {{.Email}}</div>
+<div class="meta-row"><span class="meta-label">Rol:</span> {{.Role}}</div>
+
+<p style="font-size:13px;color:#a1a1aa;">İlk girişte şifrenizi değiştirmeniz istenecektir.</p>
+{{end}}
