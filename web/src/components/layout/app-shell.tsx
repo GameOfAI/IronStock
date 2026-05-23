@@ -42,6 +42,7 @@ import {
   Upload,
   ClipboardCheck,
   Users2,
+  ScanLine,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -398,6 +399,7 @@ const NAV_LABELS: Record<string, string> = {
   '/admin/log-forwarding': 'Log Yönlendirme',
   '/admin/sso': 'SSO / LDAP',
   '/admin/scim': 'SCIM Provisioning',
+  '/admin/secret-scanning': 'Sızıntı Taraması',
   '/admin/k8s-clusters': 'K8s Kümeleri',
   '/admin/reports': 'Raporlar',
   '/profile': 'Profil',
@@ -627,6 +629,12 @@ export function AppShell() {
                   to="/admin/scim"
                   icon={Users2}
                   label="SCIM Provisioning"
+                  collapsed={sidebarCollapsed && !mobileOpen}
+                />
+                <NavItem
+                  to="/admin/secret-scanning"
+                  icon={ScanLine}
+                  label="Sızıntı Taraması"
                   collapsed={sidebarCollapsed && !mobileOpen}
                 />
                 <NavItem
