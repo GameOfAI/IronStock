@@ -1,0 +1,122 @@
+---
+# PR-ALERT: IronStock PrometheusRule CRD
+# Requires the Prometheus Operator (kube-prometheus-stack or similar).
+# Install: helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack
+
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: ironstock-alerts
+  namespace: ironstock
+  labels:
+    app: ironstock
+    # Standard label selector required by most Prometheus Operator installs:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    # ─── Credential Health ────────────────────────────────────────────────────
+    - name: ironstock.credentials
+      interval: 5m
+      rules:
+        - alert: IronStockCredentialsExpiringSoon
+          expr: ironstock_credentials_expiring_total{within="7d"} > 0
+          for: 5m
+          labels:
+            severity: warning
+            team: operations
+          annotations:
+            summary: "IronStock: credentials expiring within 7 days"
+            description: |
+              {{ $value }} credentials will expire within 7 days.
+              Log in to IronStock and rotate or extend them.
+            runbook_url: "https://docs.ironstock.internal/ops/credential-expiry"
+
+        - alert: IronStockCredentialsExpired
+          expr: ironstock_credentials_expired_total > 0
+          for: 1m
+          labels:
+            severity: critical
+            team: operations
+          annotations:
+            summary: "IronStock: expired credentials detected"
+            description: |
+              {{ $value }} credentials have expired and are overdue for rotation.
+            runbook_url: "https://docs.ironstock.internal/ops/credential-expiry"
+
+    # ─── Item Health ──────────────────────────────────────────────────────────
+    - name: ironstock.health
+      interval: 10m
+      rules:
+        - alert: IronStockUnhealthyItemsHigh
+          expr: ironstock_items_unhealthy_total{severity="high"} > 5
+          for: 15m
+          labels:
+            severity: warning
+            team: operations
+          annotations:
+            summary: "IronStock: many unhealthy items (score < 50)"
+            description: |
+              {{ $value }} items have a health score below 50.
+              Review the health dashboard at /admin.
+
+    # ─── Authentication ───────────────────────────────────────────────────────
+    - name: ironstock.auth
+      interval: 1m
+      rules:
+        - alert: IronStockHighAuthFailureRate
+          expr: |
+            rate(ironstock_auth_failures_total[5m]) > 10
+          for: 3m
+          labels:
+            severity: warning
+            team: security
+          annotations:
+            summary: "IronStock: high authentication failure rate"
+            description: |
+              Authentication failure rate is {{ $value | printf "%.1f" }}/s over 5 minutes.
+              This may indicate a credential stuffing or brute-force attack.
+            runbook_url: "https://docs.ironstock.internal/security/auth-failures"
+
+        - alert: IronStockBreakGlassActive
+          expr: increase(ironstock_breakglass_logins_total[10m]) > 0
+          labels:
+            severity: critical
+            team: security
+          annotations:
+            summary: "IronStock: break-glass account login detected"
+            description: |
+              A break-glass emergency account logged in within the last 10 minutes.
+              Verify this is an authorized emergency access event.
+            runbook_url: "https://docs.ironstock.internal/security/break-glass"
+
+    # ─── API ──────────────────────────────────────────────────────────────────
+    - name: ironstock.api
+      interval: 1m
+      rules:
+        - alert: IronStockAPIHighErrorRate
+          expr: |
+            rate(ironstock_http_requests_total{status=~"5.."}[5m])
+            / rate(ironstock_http_requests_total[5m]) > 0.05
+          for: 5m
+          labels:
+            severity: warning
+            team: operations
+          annotations:
+            summary: "IronStock: API error rate > 5%"
+            description: |
+              {{ $value | printf "%.1f%%" }} of requests are returning 5xx errors.
+
+        - alert: IronStockAPIHighLatency
+          expr: |
+            histogram_quantile(0.95,
+              rate(ironstock_http_request_duration_seconds_bucket[5m])
+            ) > 0.5
+          for: 5m
+          labels:
+            severity: warning
+            team: operations
+          annotations:
+            summary: "IronStock: p95 API latency > 500ms"
+            description: |
+              95th percentile latency is {{ $value | printf "%.0fms" }}.
+              SLO target is p95 < 500ms.
