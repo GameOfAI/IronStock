@@ -145,6 +145,18 @@ func BuildForwarder(configID, targetType string, configJSON []byte) (Forwarder, 
 			return nil, err
 		}
 		return NewSlackForwarder(configID, cfg), nil
+	case "splunk":
+		cfg, err := ParseSplunkConfig(raw)
+		if err != nil {
+			return nil, err
+		}
+		return NewSplunkForwarder(configID, cfg), nil
+	case "elastic":
+		cfg, err := ParseElasticConfig(raw)
+		if err != nil {
+			return nil, err
+		}
+		return NewElasticForwarder(configID, cfg), nil
 	default:
 		return nil, nil
 	}

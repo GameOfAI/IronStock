@@ -56,6 +56,8 @@ import type {
   LogForwardingTargetType,
   SyslogConfig,
   SlackConfig,
+  SplunkConfig,
+  ElasticConfig,
 } from '@envanter/shared/api/types';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -73,6 +75,17 @@ type FormState = {
   webhook_url: string;
   channel: string;
   username: string;
+  // splunk
+  splunk_url: string;
+  splunk_token: string;
+  splunk_index: string;
+  splunk_source_type: string;
+  // elastic
+  elastic_url: string;
+  elastic_api_key: string;
+  elastic_username: string;
+  elastic_password: string;
+  elastic_index: string;
 };
 
 const emptyForm = (): FormState => ({
@@ -86,6 +99,15 @@ const emptyForm = (): FormState => ({
   webhook_url: '',
   channel: '',
   username: 'IronStock',
+  splunk_url: '',
+  splunk_token: '',
+  splunk_index: '',
+  splunk_source_type: 'ironstock:audit',
+  elastic_url: '',
+  elastic_api_key: '',
+  elastic_username: '',
+  elastic_password: '',
+  elastic_index: 'ironstock-audit',
 });
 
 function configToForm(cfg: LogForwardingConfig): FormState {
@@ -99,16 +121,29 @@ function configToForm(cfg: LogForwardingConfig): FormState {
     base.host = c.host ?? '';
     base.port = String(c.port ?? 514);
     base.app_name = c.app_name ?? 'ironstock';
-  } else {
+  } else if (cfg.target_type === 'slack') {
     const c = cfg.config as SlackConfig;
     base.webhook_url = c.webhook_url ?? '';
     base.channel = c.channel ?? '';
     base.username = c.username ?? 'IronStock';
+  } else if (cfg.target_type === 'splunk') {
+    const c = cfg.config as SplunkConfig;
+    base.splunk_url = c.url ?? '';
+    base.splunk_token = c.token ?? '';
+    base.splunk_index = c.index ?? '';
+    base.splunk_source_type = c.source_type ?? 'ironstock:audit';
+  } else if (cfg.target_type === 'elastic') {
+    const c = cfg.config as ElasticConfig;
+    base.elastic_url = c.url ?? '';
+    base.elastic_api_key = c.api_key ?? '';
+    base.elastic_username = c.username ?? '';
+    base.elastic_password = c.password ?? '';
+    base.elastic_index = c.index ?? 'ironstock-audit';
   }
   return base;
 }
 
-function formToConfig(form: FormState): SyslogConfig | SlackConfig {
+function formToConfig(form: FormState): SyslogConfig | SlackConfig | SplunkConfig | ElasticConfig {
   if (form.target_type === 'syslog') {
     return {
       protocol: form.protocol,
@@ -116,6 +151,26 @@ function formToConfig(form: FormState): SyslogConfig | SlackConfig {
       port: parseInt(form.port) || 514,
       app_name: form.app_name || undefined,
     } satisfies SyslogConfig;
+  }
+  if (form.target_type === 'splunk') {
+    return {
+      url: form.splunk_url,
+      token: form.splunk_token,
+      index: form.splunk_index || undefined,
+      source_type: form.splunk_source_type || 'ironstock:audit',
+    } satisfies SplunkConfig;
+  }
+  if (form.target_type === 'elastic') {
+    const cfg: ElasticConfig = {
+      url: form.elastic_url,
+      index: form.elastic_index || 'ironstock-audit',
+    };
+    if (form.elastic_api_key) cfg.api_key = form.elastic_api_key;
+    if (form.elastic_username) {
+      cfg.username = form.elastic_username;
+      cfg.password = form.elastic_password;
+    }
+    return cfg;
   }
   return {
     webhook_url: form.webhook_url,
@@ -178,7 +233,7 @@ export default function AdminLogForwardingPage() {
           <div>
             <h1 className="text-xl font-semibold text-slate-100">Log Yönlendirme</h1>
             <p className="text-sm text-slate-400">
-              Audit log eventlerini Syslog veya Slack'e ilet
+              Audit log eventlerini Syslog, Slack, Splunk veya Elasticsearch'e ilet
             </p>
           </div>
         </div>
@@ -198,7 +253,7 @@ export default function AdminLogForwardingPage() {
             <Radio className="mx-auto h-10 w-10 mb-3 opacity-30" />
             <p>Henüz log yönlendirme hedefi yok.</p>
             <p className="text-sm mt-1">
-              "Yeni Hedef" ile Syslog veya Slack webhook ekleyin.
+              "Yeni Hedef" ile Syslog, Slack, Splunk veya Elastic hedef ekleyin.
             </p>
           </CardContent>
         </Card>
@@ -280,17 +335,25 @@ function ConfigCard({ cfg, onEdit, onDelete, onTest, testing }: ConfigCardProps)
     );
   }
 
-  const configSummary =
-    cfg.target_type === 'syslog'
-      ? (() => {
-          const c = cfg.config as SyslogConfig;
-          return `${c.protocol?.toUpperCase() ?? 'UDP'} ${c.host}:${c.port ?? 514}`;
-        })()
-      : (() => {
-          const c = cfg.config as SlackConfig;
-          const url = c.webhook_url ?? '';
-          return url.length > 50 ? url.slice(0, 47) + '…' : url;
-        })();
+  const configSummary = (() => {
+    if (cfg.target_type === 'syslog') {
+      const c = cfg.config as SyslogConfig;
+      return `${c.protocol?.toUpperCase() ?? 'UDP'} ${c.host}:${c.port ?? 514}`;
+    }
+    if (cfg.target_type === 'splunk') {
+      const c = cfg.config as SplunkConfig;
+      const url = c.url ?? '';
+      return url.length > 50 ? url.slice(0, 47) + '…' : url;
+    }
+    if (cfg.target_type === 'elastic') {
+      const c = cfg.config as ElasticConfig;
+      const url = c.url ?? '';
+      return `${url.length > 40 ? url.slice(0, 37) + '…' : url} / ${c.index ?? 'ironstock-audit'}`;
+    }
+    const c = cfg.config as SlackConfig;
+    const url = c.webhook_url ?? '';
+    return url.length > 50 ? url.slice(0, 47) + '…' : url;
+  })();
 
   return (
     <Card className="border-slate-800 bg-slate-900">
@@ -435,6 +498,8 @@ function ConfigDialog({
                 <SelectContent>
                   <SelectItem value="syslog">Syslog (UDP/TCP)</SelectItem>
                   <SelectItem value="slack">Slack Webhook</SelectItem>
+                  <SelectItem value="splunk">Splunk HEC</SelectItem>
+                  <SelectItem value="elastic">Elasticsearch / Elastic Cloud</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -524,6 +589,107 @@ function ConfigDialog({
                   />
                 </div>
               </div>
+            </>
+          )}
+
+          {/* Splunk fields */}
+          {form.target_type === 'splunk' && (
+            <>
+              <div className="space-y-1.5">
+                <Label htmlFor="splunk_url">HEC Endpoint URL</Label>
+                <Input
+                  id="splunk_url"
+                  value={form.splunk_url}
+                  onChange={(e) => set({ splunk_url: e.target.value })}
+                  placeholder="https://splunk.example.com:8088/services/collector/event"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="splunk_token">HEC Token</Label>
+                <Input
+                  id="splunk_token"
+                  type="password"
+                  value={form.splunk_token}
+                  onChange={(e) => set({ splunk_token: e.target.value })}
+                  placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="splunk_index">Index (opsiyonel)</Label>
+                  <Input
+                    id="splunk_index"
+                    value={form.splunk_index}
+                    onChange={(e) => set({ splunk_index: e.target.value })}
+                    placeholder="main"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="splunk_source_type">Source Type</Label>
+                  <Input
+                    id="splunk_source_type"
+                    value={form.splunk_source_type}
+                    onChange={(e) => set({ splunk_source_type: e.target.value })}
+                    placeholder="ironstock:audit"
+                  />
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Elastic fields */}
+          {form.target_type === 'elastic' && (
+            <>
+              <div className="space-y-1.5">
+                <Label htmlFor="elastic_url">Elasticsearch URL</Label>
+                <Input
+                  id="elastic_url"
+                  value={form.elastic_url}
+                  onChange={(e) => set({ elastic_url: e.target.value })}
+                  placeholder="https://elastic.example.com:9200"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="elastic_index">Index Adı</Label>
+                <Input
+                  id="elastic_index"
+                  value={form.elastic_index}
+                  onChange={(e) => set({ elastic_index: e.target.value })}
+                  placeholder="ironstock-audit"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="elastic_api_key">API Key (veya kullanıcı adı/şifre)</Label>
+                <Input
+                  id="elastic_api_key"
+                  type="password"
+                  value={form.elastic_api_key}
+                  onChange={(e) => set({ elastic_api_key: e.target.value })}
+                  placeholder="id:api_key (base64)"
+                />
+              </div>
+              {!form.elastic_api_key && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="elastic_username">Kullanıcı Adı</Label>
+                    <Input
+                      id="elastic_username"
+                      value={form.elastic_username}
+                      onChange={(e) => set({ elastic_username: e.target.value })}
+                      placeholder="elastic"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="elastic_password">Şifre</Label>
+                    <Input
+                      id="elastic_password"
+                      type="password"
+                      value={form.elastic_password}
+                      onChange={(e) => set({ elastic_password: e.target.value })}
+                    />
+                  </div>
+                </div>
+              )}
             </>
           )}
 
