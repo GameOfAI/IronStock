@@ -10,7 +10,7 @@
  */
 
 import { useState } from 'react';
-import { Fingerprint, KeyRound, Loader2, MoreVertical, ShieldCheck } from 'lucide-react';
+import { Fingerprint, Globe, KeyRound, Loader2, MoreVertical, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -38,6 +38,7 @@ import {
   useUpdateWebAuthnRequirementMutation,
 } from '@/api/admin';
 import { useUpdateClientCertRequirementMutation } from '@/api/admin-client-certs';
+import { useIPRestrictionsQuery, useUpdateIPRestrictionsMutation } from '@/api/admin-ip-restrictions';
 import { useAuthStore } from '@/store/auth';
 import { ApiError } from '@/api/errors';
 import type { AdminUser } from '@/api/types';
@@ -51,6 +52,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { DisableConfirmDialog } from './disable-confirm-dialog';
 
 interface UserActionsMenuProps {
@@ -80,6 +92,13 @@ export function UserActionsMenu({ user }: UserActionsMenuProps) {
   const updateTotpReq = useUpdateTOTPRequirementMutation(user.id);
   const updateCertReq = useUpdateClientCertRequirementMutation(user.id);
   const updateWebAuthnReq = useUpdateWebAuthnRequirementMutation(user.id);
+
+  const [ipDialogOpen, setIpDialogOpen] = useState(false);
+  const ipQuery = useIPRestrictionsQuery(ipDialogOpen ? user.id : '');
+  const updateIP = useUpdateIPRestrictionsMutation(user.id);
+  const [ipCIDRs, setIpCIDRs] = useState('');
+  const [ipCountries, setIpCountries] = useState('');
+  const [denyTor, setDenyTor] = useState(false);
 
   const isSelf = me?.id === user.id;
   const userRoles = new Set(user.roles);
@@ -306,6 +325,23 @@ export function UserActionsMenu({ user }: UserActionsMenuProps) {
             <span>WebAuthn zorunlu</span>
           </DropdownMenuCheckboxItem>
           <DropdownMenuSeparator />
+          {/* PR-SEC5: IP kısıtlamaları */}
+          <DropdownMenuItem
+            onSelect={(e) => {
+              e.preventDefault();
+              // Pre-fill from server data if available
+              if (ipQuery.data) {
+                setIpCIDRs(ipQuery.data.allowed_ip_cidrs.join(', '));
+                setIpCountries(ipQuery.data.allowed_country_codes.join(', '));
+                setDenyTor(ipQuery.data.deny_tor_exit);
+              }
+              setIpDialogOpen(true);
+            }}
+          >
+            <Globe className="mr-2 h-4 w-4" />
+            IP Kısıtlamaları…
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
           {isDisabled ? (
             <DropdownMenuItem onSelect={handleEnable} disabled={statusPending || isSelf}>
               Etkinleştir
@@ -370,6 +406,83 @@ export function UserActionsMenu({ user }: UserActionsMenuProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* PR-SEC5: IP restrictions dialog */}
+      <Dialog open={ipDialogOpen} onOpenChange={(o) => { if (!o) setIpDialogOpen(false); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Globe className="h-4 w-4" />
+              IP Kısıtlamaları — {user.username}
+            </DialogTitle>
+            <DialogDescription>
+              Boş bırakılan alanlar kısıtlama uygulamaz (tüm IP / ülkelere izin verilir).
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const cidrs = ipCIDRs.split(',').map((s) => s.trim()).filter(Boolean);
+              const countries = ipCountries.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean);
+              updateIP.mutate(
+                { allowed_ip_cidrs: cidrs, allowed_country_codes: countries, deny_tor_exit: denyTor },
+                {
+                  onSuccess: () => {
+                    toast({ title: 'IP kısıtlamaları güncellendi.' });
+                    setIpDialogOpen(false);
+                  },
+                  onError: (err) =>
+                    toast({
+                      title: 'Güncellenemedi',
+                      description: describeError(err),
+                      variant: 'destructive',
+                    }),
+                },
+              );
+            }}
+            className="space-y-4 pt-2"
+          >
+            <div className="space-y-1.5">
+              <Label htmlFor="ip-cidrs">İzin Verilen IP/CIDR (virgülle ayrılmış)</Label>
+              <Input
+                id="ip-cidrs"
+                value={ipCIDRs}
+                onChange={(e) => setIpCIDRs(e.target.value)}
+                placeholder="192.168.1.0/24, 10.0.0.0/8"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="ip-countries">İzin Verilen Ülkeler (ISO 3166-1, virgülle ayrılmış)</Label>
+              <Input
+                id="ip-countries"
+                value={ipCountries}
+                onChange={(e) => setIpCountries(e.target.value)}
+                placeholder="TR, DE, US"
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <Switch
+                id="deny-tor"
+                checked={denyTor}
+                onCheckedChange={(v: boolean) => setDenyTor(v)}
+              />
+              <Label htmlFor="deny-tor">Tor çıkış node'larını reddet</Label>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIpDialogOpen(false)}>
+                İptal
+              </Button>
+              <Button
+                type="submit"
+                className="bg-indigo-600 hover:bg-indigo-500"
+                disabled={updateIP.isPending}
+              >
+                {updateIP.isPending ? 'Kaydediliyor…' : 'Kaydet'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
