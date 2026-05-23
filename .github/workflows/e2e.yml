@@ -1,0 +1,127 @@
+name: E2E Tests
+
+# PR-PROD3: Playwright end-to-end test suite.
+#
+# Runs on main-branch pushes and nightly (not on every PR — the docker-compose
+# stack with MinIO + Redis + the built API image is too heavy for PR CI).
+#
+# Trigger a manual run via workflow_dispatch to validate a hotfix branch.
+#
+# Stack:
+#   docker-compose.e2e.yml spins up: postgres + redis + minio + mailhog + api + web
+#   Playwright runs against http://localhost:5173 (web) and http://localhost:8080 (api)
+#
+# Artifacts:
+#   - playwright-report (HTML report, 7-day retention)
+#   - test-results (traces + videos on failure, 7-day retention)
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # Nightly at 03:00 UTC (after the security scan at 02:00)
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'IronStock image tag to test against'
+        required: false
+        default: 'latest'
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: Playwright E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      IRONSTOCK_IMAGE_TAG: ${{ github.event.inputs.image_tag || 'latest' }}
+      BASE_URL: http://localhost:5173
+      API_URL:  http://localhost:8080
+      E2E_ADMIN_USERNAME: e2e-admin
+      E2E_ADMIN_PASSWORD: E2eTestP@ss1
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Pull and start the E2E stack ──────────────────────────────────────
+      - name: Log in to GHCR (pull images)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Start E2E docker-compose stack
+        working-directory: deploy/compose
+        run: |
+          docker compose -f docker-compose.e2e.yml pull --quiet
+          docker compose -f docker-compose.e2e.yml up -d
+
+      # ── Wait for services to be ready ─────────────────────────────────────
+      - name: Wait for API health
+        timeout-minutes: 5
+        run: |
+          until curl -sf http://localhost:8080/healthz; do
+            echo "Waiting for API..."
+            sleep 3
+          done
+
+      - name: Wait for Web UI
+        timeout-minutes: 3
+        run: |
+          until curl -sf http://localhost:5173; do
+            echo "Waiting for Web UI..."
+            sleep 2
+          done
+
+      # ── Set up Node.js and Playwright ─────────────────────────────────────
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: e2e/package.json
+
+      - name: Install Playwright dependencies
+        working-directory: e2e
+        run: |
+          npm install
+          npx playwright install --with-deps chromium firefox
+
+      # ── Run tests ─────────────────────────────────────────────────────────
+      - name: Run Playwright tests
+        working-directory: e2e
+        run: npx playwright test
+        env:
+          CI: true
+
+      # ── Upload results ─────────────────────────────────────────────────────
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-${{ github.run_id }}
+          path: e2e/playwright-report/
+          retention-days: 7
+
+      - name: Upload test results (traces + videos)
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-results-${{ github.run_id }}
+          path: e2e/test-results/
+          retention-days: 7
+
+      # ── Teardown ───────────────────────────────────────────────────────────
+      - name: Stop E2E stack
+        if: always()
+        working-directory: deploy/compose
+        run: docker compose -f docker-compose.e2e.yml down -v --remove-orphans
