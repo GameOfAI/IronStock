@@ -522,6 +522,13 @@ func run() error {
 		Logger:  logger,
 	}
 
+	// --- Template handlers (PR-TPL) ---
+	templateHandlers := &httpapi.TemplateHandlers{
+		Service: authSvc,
+		Audit:   auditWriter,
+		Logger:  logger,
+	}
+
 	// --- HTTP layer ---
 	router := httpapi.NewRouter(httpapi.Deps{
 		Logger:         logger,
@@ -548,6 +555,7 @@ func run() error {
 		K8sCluster:   k8sClusterHandlers,   // PR-K8S
 		K8s:          k8sHandlers,          // PR-K8S
 		Report:       reportHandlers,       // PR-K8S
+		Template:     templateHandlers,     // PR-TPL
 	})
 
 	srv := &http.Server{
