@@ -8,6 +8,8 @@ import {
   subscribeQueryCacheForPersist,
   clearDiskCache,
 } from '@/lib/offline-cache';
+import { clearPendingOps } from '@/lib/pending-ops';
+import { useOfflineSync } from '@/hooks/use-offline-sync';
 import { useAuthStore } from '@/store/auth';
 import { useConnectionStore } from '@/store/connection';
 import { ThemeProvider } from '@/components/layout/theme-provider';
@@ -165,15 +167,28 @@ function OfflineCacheManager() {
     return unsubscribe;
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Oturum kapatıldığında disk cache'ini temizle.
+  // Oturum kapatıldığında disk cache'ini ve pending op kuyruğunu temizle.
   const prevUser = React.useRef(user);
   React.useEffect(() => {
     if (prevUser.current !== null && user === null) {
       void clearDiskCache();
+      void clearPendingOps();
     }
     prevUser.current = user;
   }, [user]);
 
+  return null;
+}
+
+/**
+ * Offline sync manager (PR-F3 outbox).
+ *
+ * - Mount'ta kuyruğu yükler.
+ * - Online event'inde kuyruktaki op'ları tekrar dener.
+ * - Kalıcı hata durumunda kullanıcıya toast gösterir.
+ */
+function OfflineSyncManager() {
+  useOfflineSync();
   return null;
 }
 
@@ -186,6 +201,7 @@ export default function App() {
           <KeyringBootstrap />
           <InactivityGuard />
           <OfflineCacheManager />
+          <OfflineSyncManager />
           <Routes>
             {/* Sunucu yapılandırma ekranı — ConnectionGate'den önce, her zaman erişilebilir */}
             <Route path="/config" element={<ConfigPage />} />

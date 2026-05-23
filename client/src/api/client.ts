@@ -16,7 +16,7 @@ import {
   setAccessToken,
   setRefreshToken,
 } from './token-storage';
-import { ApiError, ErrCode, isAccessTokenExpired } from './errors';
+import { ApiError, ErrCode, OfflineQueuedError, isAccessTokenExpired } from './errors';
 import type { ApiErrorResponse, RefreshResponse } from './types';
 
 export interface RequestOptions {
@@ -39,6 +39,11 @@ let _tlsSkipVerify = false;
 let _clientCertP12Base64 = '';
 /** mTLS client sertifikası parolası. */
 let _clientCertPassword = '';
+/**
+ * Offline mod aktifse, network hatası alan mutation'lar (POST/PUT/PATCH/DELETE)
+ * kuyruğa alınır ve bağlantı geri gelince otomatik tekrar denenir.
+ */
+let _offlineModeEnabled = false;
 
 export function setBaseUrl(url: string): void {
   _baseUrl = url.replace(/\/$/, '');
@@ -60,6 +65,15 @@ export function setClientCert(p12Base64: string, password: string): void {
 
 export function hasClientCert(): boolean {
   return _clientCertP12Base64.length > 0;
+}
+
+/** Offline mod flag'ini ayarlar. */
+export function setOfflineModeEnabled(value: boolean): void {
+  _offlineModeEnabled = value;
+}
+
+export function getOfflineModeEnabled(): boolean {
+  return _offlineModeEnabled;
 }
 
 /**
@@ -184,11 +198,25 @@ export async function apiFetch<T = unknown>(
   try {
     res = await rawFetch(url, init);
   } catch (err) {
-    throw new ApiError(0, {
+    const networkErr = new ApiError(0, {
       code: 'network_error',
       message: 'Sunucuya ulaşılamadı.',
       details: { reason: (err as Error).message },
     });
+
+    // Offline mod: mutation'ları (GET dışı, unauthenticated olmayan) kuyruğa al.
+    const isMutation =
+      method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE';
+    if (_offlineModeEnabled && isMutation && !unauthenticated) {
+      // Dinamik import — bu kod path'e yalnızca Tauri+offline modda girilir.
+      const { pushPendingOp } = await import('@/lib/pending-ops');
+      const { usePendingOpsStore } = await import('@/store/pending-ops');
+      const newOp = await pushPendingOp({ method, path, body });
+      usePendingOpsStore.getState().addOp(newOp);
+      throw new OfflineQueuedError(newOp.id);
+    }
+
+    throw networkErr;
   }
 
   if (res.ok) {

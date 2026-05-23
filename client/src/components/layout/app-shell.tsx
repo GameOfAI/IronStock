@@ -25,6 +25,7 @@ import {
   Menu,
   Lock,
   Shield,
+  WifiOff,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuthStore, selectIsAdmin } from '@/store/auth';
@@ -32,6 +33,8 @@ import { useUIStore } from '@/store/ui';
 import { useLogoutMutation } from '@/api/auth';
 import { cn } from '@/lib/cn';
 import { kekDelete } from '@/lib/tauri';
+import { usePendingOpsStore } from '@/store/pending-ops';
+import { useConnectionStore } from '@/store/connection';
 
 // --- Theme toggle ---
 
@@ -97,6 +100,10 @@ export function AppShell() {
   const logoutMut = useLogoutMutation();
   const [mobileOpen, setMobileOpen] = React.useState(false);
 
+  // Pending ops badge
+  const pendingCount = usePendingOpsStore((s) => s.ops.length);
+  const offlineModeEnabled = useConnectionStore((s) => s.offlineModeEnabled);
+
   async function handleLogout() {
     if (user) await kekDelete(user.username);
     clear();
@@ -138,6 +145,16 @@ export function AppShell() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Offline mod aktifken bekleyen işlem sayısı badge'i */}
+          {offlineModeEnabled && pendingCount > 0 && (
+            <div
+              className="flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-600 dark:text-amber-400"
+              title={`${pendingCount} işlem çevrimdışı kuyruğunda bekliyor`}
+            >
+              <WifiOff className="h-3 w-3 shrink-0" />
+              <span>{pendingCount}</span>
+            </div>
+          )}
           {user && (
             <span className="hidden text-sm text-muted-foreground sm:inline">{user.username}</span>
           )}

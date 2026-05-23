@@ -19,7 +19,7 @@
 
 import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Server, ShieldCheck, Upload, X, Eye, EyeOff } from 'lucide-react';
+import { Server, ShieldCheck, Upload, X, Eye, EyeOff, WifiOff, MonitorOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -59,13 +59,19 @@ export default function ConfigPage() {
     tlsSkipVerify,
     clientCertP12Base64,
     clientCertPassword,
+    offlineModeEnabled,
+    contentProtectionEnabled,
     setConnection,
     setClientCert,
     clearClientCert,
+    setOfflineMode,
+    setContentProtection: storeSetContentProtection,
   } = useConnectionStore();
 
   const [url, setUrl] = React.useState(serverUrl || 'https://');
   const [skipTls, setSkipTls] = React.useState(tlsSkipVerify);
+  const [offlineMode, setOfflineModeLocal] = React.useState(offlineModeEnabled);
+  const [contentProtection, setContentProtectionLocal] = React.useState(contentProtectionEnabled);
   const [error, setError] = React.useState('');
 
   // mTLS cert state
@@ -112,6 +118,8 @@ export default function ConfigPage() {
 
     setConnection(trimmed, skipTls);
     setClientCert(certP12Base64, certPassword);
+    setOfflineMode(offlineMode);
+    storeSetContentProtection(contentProtection);
     navigate('/login', { replace: true });
   }
 
@@ -220,6 +228,58 @@ export default function ConfigPage() {
                   </label>
                 </div>
               )}
+            </div>
+
+            {/* ── Offline Mod ── */}
+            <div className="flex flex-col gap-2 rounded-lg border border-dashed border-border p-4">
+              <div className="flex items-center gap-2">
+                <WifiOff className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="text-sm font-medium">Offline Mod</span>
+                <span className="ml-auto text-[11px] text-muted-foreground">opsiyonel</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Etkinleştirilirse ağ bağlantısı yokken yapılan değişiklikler yerel kuyruğa
+                alınır. Bağlantı geri geldiğinde otomatik olarak sunucuya gönderilir.
+              </p>
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  id="offline-mode"
+                  type="checkbox"
+                  checked={offlineMode}
+                  onChange={(e) => setOfflineModeLocal(e.target.checked)}
+                  className="h-4 w-4 rounded border-input"
+                />
+                <Label htmlFor="offline-mode" className="font-normal text-muted-foreground">
+                  Offline modu etkinleştir
+                </Label>
+              </div>
+            </div>
+
+            {/* ── Ekran Yakalama Koruması ── */}
+            <div className="flex flex-col gap-2 rounded-lg border border-dashed border-border p-4">
+              <div className="flex items-center gap-2">
+                <MonitorOff className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="text-sm font-medium">Ekran Yakalama Koruması</span>
+                <span className="ml-auto rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                  varsayılan açık
+                </span>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Etkinken uygulama penceresi ekran paylaşımı, ekran kaydı ve ekran görüntüsü
+                araçlarında gizlenir. Envanter içeriğinin sızmasını önler.
+              </p>
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  id="content-protection"
+                  type="checkbox"
+                  checked={contentProtection}
+                  onChange={(e) => setContentProtectionLocal(e.target.checked)}
+                  className="h-4 w-4 rounded border-input"
+                />
+                <Label htmlFor="content-protection" className="font-normal text-muted-foreground">
+                  Ekran yakalama korumasını etkinleştir
+                </Label>
+              </div>
             </div>
 
             <Button type="submit" className="w-full">

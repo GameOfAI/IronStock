@@ -171,6 +171,27 @@ pub async fn cache_clear(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+// --- Screen capture protection ---
+
+/// Pencereyi ekran yakalama (screen share/record) uygulamalarından gizler.
+///
+/// Windows  : `SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE)` — pencere
+///            içeriği ekran kaydı/paylaşım yazılımında siyah görünür.
+/// macOS    : `[NSWindow setSharingType: NSWindowSharingNone]` — içerik
+///            ekran paylaşımında gizlenir.
+///
+/// `enabled = true`  → ekran yakalamadan gizle (varsayılan, güvenli mod)
+/// `enabled = false` → normal davranış (kullanıcı devre dışı bıraktı)
+#[tauri::command]
+pub fn set_content_protection(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| "Ana pencere bulunamadı".to_string())?;
+    window
+        .set_content_protection(enabled)
+        .map_err(|e| e.to_string())
+}
+
 // --- Inactivity commands ---
 
 /// Frontend her kullanıcı aktivitesinde bu komutu çağırır; Rust timer'ı sıfırlar.

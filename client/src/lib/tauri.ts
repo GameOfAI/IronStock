@@ -46,6 +46,22 @@ export async function setInactivityTimeout(secs: number): Promise<void> {
   await invoke('set_inactivity_timeout', { secs });
 }
 
+// --- Screen capture protection ---
+
+/**
+ * Pencereyi ekran yakalama uygulamalarından gizler / gösterir.
+ *
+ * `enabled = true`  → ekrandan gizle (güvenli mod, varsayılan)
+ * `enabled = false` → normal görünüm (kullanıcı devre dışı bıraktı)
+ *
+ * Tauri dışında (browser/test) no-op.
+ */
+export async function setContentProtection(enabled: boolean): Promise<void> {
+  if (!isTauri()) return;
+  const { invoke } = await import('@tauri-apps/api/core');
+  await invoke('set_content_protection', { enabled });
+}
+
 // --- Events ---
 
 /** `inactivity_lock` Tauri eventini dinler. Tauri dışında no-op. */
