@@ -1,0 +1,8 @@
+# Playwright output
+node_modules/
+playwright-report/
+test-results/
+.auth/
+
+# TypeScript build cache
+*.tsbuildinfo

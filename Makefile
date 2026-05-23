@@ -1,6 +1,7 @@
 .PHONY: help up down logs ps \
 	build build-server build-web build-client \
 	test test-server test-web test-client test-integration \
+	e2e-up e2e-down e2e e2e-ui \
 	lint lint-server lint-web lint-client lint-openapi \
 	fmt fmt-server fmt-web fmt-client \
 	migrate-up migrate-down migrate-status migrate-redo \
@@ -58,6 +59,25 @@ test-client:
 
 test-integration: ## Server integration testleri (Docker + Postgres testcontainers)
 	cd server && go test -tags=integration -timeout=10m -v ./internal/db/...
+
+# ---------- E2E (Playwright) ----------
+COMPOSE_E2E := docker compose -f deploy/compose/docker-compose.e2e.yml
+
+e2e-up: ## E2E test stack'ini başlat (postgres+redis+minio+api+web)
+	$(COMPOSE_E2E) up -d
+	@echo "Waiting for API health..."
+	@until curl -sf http://localhost:8080/healthz; do sleep 2; done
+	@echo "E2E stack ready."
+
+e2e-down: ## E2E test stack'ini durdur ve volume'leri sil
+	$(COMPOSE_E2E) down -v --remove-orphans
+
+e2e: e2e-up ## E2E testleri çalıştır (stack zaten ayaktaysa e2e-up atlanır)
+	cd e2e && npm install && npx playwright test
+	$(MAKE) e2e-down
+
+e2e-ui: ## Playwright UI modunda E2E testleri çalıştır (interactive)
+	cd e2e && npm install && npx playwright test --ui
 
 # ---------- Lint ----------
 lint: lint-server lint-web lint-client ## Tüm linter'ları çalıştır
