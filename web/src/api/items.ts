@@ -141,16 +141,20 @@ export function useFieldVersionsQuery(itemId: string | null, fieldDefId: number 
 
 /**
  * PR-SEARCH: Cross-folder global search.
- * Calls GET /api/v1/items/search?q=<term> (min 2 chars).
+ * Calls GET /api/v1/items/search?q=<term>[&fuzzy=true] (min 2 chars).
  * Returns items from all folders the user can access.
+ *
+ * PR-SEARCH-FT: fuzzy=true uses pg_trgm similarity matching (typo-tolerant).
+ * Requires migration 00052 (pg_trgm extension + GIN indexes).
+ * E2E encrypted field values are never searchable (ADR-0004).
  */
-export function useGlobalItemSearch(q: string) {
+export function useGlobalItemSearch(q: string, fuzzy = false) {
   const trimmed = q.trim();
   return useQuery({
-    queryKey: ['items', 'global-search', trimmed],
+    queryKey: ['items', 'global-search', trimmed, fuzzy],
     queryFn: () =>
       apiFetch<ItemListResponse>('/api/v1/items/search', {
-        query: { q: trimmed },
+        query: { q: trimmed, ...(fuzzy ? { fuzzy: 'true' } : {}) },
       }),
     enabled: trimmed.length >= 2,
     staleTime: 10_000,
