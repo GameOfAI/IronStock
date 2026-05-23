@@ -13,6 +13,15 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { apiFetch } from './client';
 import type { VaultFetchResponse, VaultPathsResponse } from './types';
 
+// PR-VAULT-DYN: Dynamic credential response type.
+export interface DynamicCred {
+  username: string;
+  password: string;
+  lease_id: string;
+  lease_duration: number; // seconds
+  expires_at: string;     // RFC3339
+}
+
 /**
  * Fetches Vault-backed field values for a single item.
  *
@@ -24,6 +33,33 @@ export function useVaultFetchMutation(itemId: string) {
     mutationFn: () =>
       apiFetch<VaultFetchResponse>(`/api/v1/items/${itemId}/vault-fetch`, {
         method: 'POST',
+      }),
+  });
+}
+
+/**
+ * PR-VAULT-DYN: Issues an ephemeral dynamic credential from a Vault secrets
+ * engine (e.g. database, AWS). Returns plaintext username + password — caller
+ * must clear memory after the lease expires. NEVER cache this mutation result.
+ */
+export function useIssueDynamicCredMutation(itemId: string) {
+  return useMutation({
+    mutationFn: () =>
+      apiFetch<DynamicCred>(`/api/v1/items/${itemId}/dynamic-cred`, {
+        method: 'POST',
+      }),
+  });
+}
+
+/**
+ * PR-VAULT-DYN: Revokes a Vault lease early. Best-effort — server returns 204
+ * even if revocation fails (already-expired lease).
+ */
+export function useRevokeDynamicCredMutation(itemId: string) {
+  return useMutation({
+    mutationFn: (leaseId: string) =>
+      apiFetch<void>(`/api/v1/items/${itemId}/dynamic-cred/${encodeURIComponent(leaseId)}`, {
+        method: 'DELETE',
       }),
   });
 }

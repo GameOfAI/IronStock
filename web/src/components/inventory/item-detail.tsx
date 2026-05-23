@@ -45,7 +45,8 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import type { ExternalSourceVault, FieldDefinition, ItemType, RelationshipType, VaultFieldValue } from '@/api/types';
-import { useVaultFetchMutation } from '@/api/vault';
+import { useVaultFetchMutation, useIssueDynamicCredMutation, useRevokeDynamicCredMutation } from '@/api/vault';
+import type { DynamicCred } from '@/api/vault';
 import { useCreateAccessRequestMutation, useCancelAccessRequestMutation } from '@/api/access-requests';
 import { useItem, useRecordRotationMutation, useFieldVersionsQuery } from '@/api/items';
 import {
@@ -136,11 +137,29 @@ export function ItemDetail({ itemId, fieldDefinitions, itemTypes: _itemTypes }: 
   const [vaultVisible, setVaultVisible] = useState(false);
   const vaultClearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // PR-VAULT-DYN: ephemeral dynamic credentials — plaintext, never cached.
+  const dynCredMut = useIssueDynamicCredMutation(itemId ?? '');
+  const revokeCredMut = useRevokeDynamicCredMutation(itemId ?? '');
+  const [dynCred, setDynCred] = useState<DynamicCred | null>(null);
+  const [dynCredVisible, setDynCredVisible] = useState(false);
+  const [dynCountdown, setDynCountdown] = useState(0);
+  const dynClearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dynTickTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
   // Clear vault values whenever the selected item changes.
   useEffect(() => {
     setVaultFields(null);
     setVaultVisible(false);
     if (vaultClearTimer.current) clearTimeout(vaultClearTimer.current);
+  }, [itemId]);
+
+  // Clear dynamic credential whenever the selected item changes.
+  useEffect(() => {
+    setDynCred(null);
+    setDynCredVisible(false);
+    setDynCountdown(0);
+    if (dynClearTimer.current) clearTimeout(dynClearTimer.current);
+    if (dynTickTimer.current) clearInterval(dynTickTimer.current);
   }, [itemId]);
 
   function handleVaultFetch() {
@@ -161,6 +180,65 @@ export function ItemDetail({ itemId, fieldDefinitions, itemTypes: _itemTypes }: 
           description: err instanceof Error ? err.message : 'Sunucu hatası.',
           variant: 'destructive',
         });
+      },
+    });
+  }
+
+  function handleIssueDynamic() {
+    // Clear any existing cred first.
+    if (dynClearTimer.current) clearTimeout(dynClearTimer.current);
+    if (dynTickTimer.current) clearInterval(dynTickTimer.current);
+    setDynCred(null);
+
+    dynCredMut.mutate(undefined, {
+      onSuccess: (cred) => {
+        setDynCred(cred);
+        setDynCredVisible(false);
+        const secs = cred.lease_duration > 0 ? cred.lease_duration : 30;
+        setDynCountdown(secs);
+
+        // Countdown tick.
+        dynTickTimer.current = setInterval(() => {
+          setDynCountdown((n) => {
+            if (n <= 1) {
+              if (dynTickTimer.current) clearInterval(dynTickTimer.current);
+              return 0;
+            }
+            return n - 1;
+          });
+        }, 1_000);
+
+        // Auto-clear when lease expires.
+        dynClearTimer.current = setTimeout(() => {
+          setDynCred(null);
+          setDynCredVisible(false);
+          setDynCountdown(0);
+          toast({ title: 'Dinamik credential süresi doldu', description: 'Kimlik bilgileri hafızadan silindi.' });
+        }, secs * 1_000);
+      },
+      onError: (err) => {
+        toast({
+          title: 'Dinamik credential alınamadı',
+          description: err instanceof Error ? err.message : 'Vault hatası.',
+          variant: 'destructive',
+        });
+      },
+    });
+  }
+
+  function handleRevokeDynamic() {
+    if (!dynCred) return;
+    const leaseId = dynCred.lease_id;
+    // Clear UI immediately (best-effort revocation).
+    setDynCred(null);
+    setDynCredVisible(false);
+    setDynCountdown(0);
+    if (dynClearTimer.current) clearTimeout(dynClearTimer.current);
+    if (dynTickTimer.current) clearInterval(dynTickTimer.current);
+    revokeCredMut.mutate(leaseId, {
+      onError: () => {
+        // Revocation is best-effort; inform but don't block.
+        toast({ title: 'Lease iptal edilemedi', description: 'Lease zaten süresi dolmuş olabilir.', variant: 'destructive' });
       },
     });
   }
@@ -468,6 +546,87 @@ export function ItemDetail({ itemId, fieldDefinitions, itemTypes: _itemTypes }: 
                         Vault değerleri 30 saniye sonra otomatik temizlenir.
                       </p>
                     </div>
+
+                    {/* PR-VAULT-DYN: Dynamic credential panel */}
+                    {vaultSrc.dynamic && (
+                      <div className="rounded-md border bg-muted/30 p-3 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <DatabaseZap className="h-4 w-4 text-violet-500 dark:text-violet-400" aria-hidden />
+                            <span className="text-xs font-medium">Dinamik Credential</span>
+                            {dynCountdown > 0 && (
+                              <Badge variant="outline" className="font-mono text-[10px] tabular-nums text-amber-600 border-amber-500/40">
+                                {dynCountdown}s
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {dynCred && (
+                              <>
+                                <button
+                                  type="button"
+                                  aria-label={dynCredVisible ? 'Gizle' : 'Göster'}
+                                  className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                                  onClick={() => setDynCredVisible((v) => !v)}
+                                >
+                                  {dynCredVisible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                                </button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="gap-1.5 h-7 text-xs text-destructive border-destructive/40 hover:bg-destructive/10"
+                                  onClick={handleRevokeDynamic}
+                                  disabled={revokeCredMut.isPending}
+                                >
+                                  <X className="h-3 w-3" />
+                                  İptal Et
+                                </Button>
+                              </>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-1.5 h-7 text-xs"
+                              disabled={dynCredMut.isPending}
+                              onClick={handleIssueDynamic}
+                            >
+                              {dynCredMut.isPending
+                                ? <Loader2 className="h-3 w-3 animate-spin" />
+                                : <DatabaseZap className="h-3 w-3" />
+                              }
+                              {dynCred ? 'Yenile' : 'Credential Al'}
+                            </Button>
+                          </div>
+                        </div>
+
+                        {dynCred && dynCredVisible && (
+                          <div className="rounded-md border bg-background divide-y">
+                            <div className="flex items-center justify-between px-3 py-2 text-xs gap-3">
+                              <span className="text-muted-foreground font-medium shrink-0">Kullanıcı Adı</span>
+                              <span className="font-mono break-all select-all">{dynCred.username}</span>
+                            </div>
+                            <div className="flex items-center justify-between px-3 py-2 text-xs gap-3">
+                              <span className="text-muted-foreground font-medium shrink-0">Parola</span>
+                              <span className="font-mono break-all select-all">{dynCred.password}</span>
+                            </div>
+                            <div className="flex items-center justify-between px-3 py-2 text-xs gap-3">
+                              <span className="text-muted-foreground font-medium shrink-0">Lease ID</span>
+                              <span className="font-mono break-all text-muted-foreground truncate max-w-[180px]">{dynCred.lease_id}</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {dynCred && !dynCredVisible && (
+                          <p className="text-xs text-muted-foreground italic">Credential gizlendi. Göster butonuna basın.</p>
+                        )}
+
+                        {!dynCred && (
+                          <p className="text-[10px] text-muted-foreground">
+                            Vault'tan geçici kullanıcı adı + parola üretir. Lease süresi dolunca otomatik silinir.
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </section>
                 );
               })()}
