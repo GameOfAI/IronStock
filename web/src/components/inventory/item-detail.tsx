@@ -62,6 +62,7 @@ import { PermissionBadge } from './permission-badge';
 import { ItemFieldRow } from './item-field-row';
 import { ItemAttachmentPanel } from './item-attachment-panel';
 import { ShareLinkDialog } from './share-link-dialog';
+import { LinkedItemsTab } from './linked-items-tab'; // PR-LINK
 import { RelativeTime } from '@/components/common/relative-time';
 import { cn } from '@/lib/cn';
 import {
@@ -315,6 +316,7 @@ export function ItemDetail({ itemId, fieldDefinitions, itemTypes: _itemTypes }: 
             <TabsTrigger value="genel">Genel</TabsTrigger>
             <TabsTrigger value="alanlar">Alanlar {fields.length > 0 && <span className="ml-1 text-muted-foreground">({fields.length})</span>}</TabsTrigger>
             <TabsTrigger value="iliskiler">İlişkiler</TabsTrigger>
+            <TabsTrigger value="baglanti">Bağlantılar</TabsTrigger>
             <TabsTrigger value="yasam">Yaşam Döngüsü</TabsTrigger>
             <TabsTrigger value="gecmis">Geçmiş</TabsTrigger>
           </TabsList>
@@ -552,6 +554,15 @@ export function ItemDetail({ itemId, fieldDefinitions, itemTypes: _itemTypes }: 
           {/* ── İLİŞKİLER ────────────────────────────────────────────────────── */}
           <TabsContent value="iliskiler" className="px-0" forceMount>
             <RelationshipsTab itemId={item.id} canWrite={item.permission === 'write'} />
+          </TabsContent>
+
+          {/* ── BAĞLANTILI ITEM'LAR (PR-LINK) ───────────────────────────────── */}
+          <TabsContent value="baglanti" className="px-0" forceMount>
+            <LinkedItemsTab
+              itemId={item.id}
+              fieldDefs={fieldDefinitions.map((fd) => ({ id: String(fd.id), label: fd.label }))}
+              canWrite={item.permission === 'write'}
+            />
           </TabsContent>
 
           {/* ── YAŞAM DÖNGÜSÜ ────────────────────────────────────────────────── */}
