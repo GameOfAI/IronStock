@@ -545,6 +545,10 @@ func run() error {
 		LLM:   llmClient,
 	}
 
+	// --- Ansible + API token handlers (PR-ANSIBLE) ---
+	ansibleHandlers := &httpapi.AnsibleInventoryHandlers{ItemH: itemHandlers}
+	apiTokenHandlers := &httpapi.APITokenHandlers{ItemH: itemHandlers}
+
 	// --- HTTP layer ---
 	router := httpapi.NewRouter(httpapi.Deps{
 		Logger:         logger,
@@ -573,6 +577,8 @@ func run() error {
 		Report:       reportHandlers,       // PR-K8S
 		Template:     templateHandlers,     // PR-TPL
 		AISuggestion: aiSuggestionHandlers, // PR-AI
+		Ansible:      ansibleHandlers,       // PR-ANSIBLE
+		APIToken:     apiTokenHandlers,      // PR-ANSIBLE
 	})
 
 	srv := &http.Server{
