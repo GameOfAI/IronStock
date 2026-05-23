@@ -110,6 +110,14 @@ type Config struct {
 	// "redis"            = shared sliding-window counter via Redis (requires RedisURL).
 	// Falls back to "memory" if Redis is unavailable regardless of setting.
 	RateLimitBackend string // ENVANTER_RATE_LIMIT_BACKEND: memory|redis (default "memory")
+
+	// LLM provider for AI tag/relationship suggestions (PR-AI).
+	// When LLMProvider is empty the /suggest endpoint returns 501 Not Implemented.
+	// Supported providers: "anthropic", "openai" (OpenAI-compatible, e.g. Ollama).
+	LLMProvider string // ENVANTER_LLM_PROVIDER: anthropic|openai (default "")
+	LLMAPIKey   string // ENVANTER_LLM_API_KEY
+	LLMBaseURL  string // ENVANTER_LLM_BASE_URL — override endpoint (Ollama: "http://localhost:11434/v1")
+	LLMModel    string // ENVANTER_LLM_MODEL — default: claude-sonnet-4-5 (anthropic) or gpt-4o (openai)
 }
 
 // Load reads config from environment, applies defaults, and validates.
@@ -155,6 +163,10 @@ func Load() (*Config, error) {
 		RedisURL:              os.Getenv("ENVANTER_REDIS_URL"),
 		RedisPassword:         os.Getenv("ENVANTER_REDIS_PASSWORD"),
 		RateLimitBackend:      strings.ToLower(envOr("ENVANTER_RATE_LIMIT_BACKEND", "memory")),
+		LLMProvider:           strings.ToLower(os.Getenv("ENVANTER_LLM_PROVIDER")),
+		LLMAPIKey:             os.Getenv("ENVANTER_LLM_API_KEY"),
+		LLMBaseURL:            os.Getenv("ENVANTER_LLM_BASE_URL"),
+		LLMModel:              os.Getenv("ENVANTER_LLM_MODEL"),
 	}
 	if err := cfg.Validate(); err != nil {
 		return nil, err

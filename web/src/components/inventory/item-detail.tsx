@@ -50,6 +50,8 @@ import type { DynamicCred } from '@/api/vault';
 import { useCreateAccessRequestMutation, useCancelAccessRequestMutation } from '@/api/access-requests';
 import { useItem, useRecordRotationMutation, useFieldVersionsQuery } from '@/api/items';
 import { useItemHealthQuery } from '@/api/health';
+import { useSuggestMutation, useSuggestionsQuery, useAcceptSuggestionMutation, useRejectSuggestionMutation } from '@/api/ai-suggestions';
+import type { AISuggestion } from '@/api/ai-suggestions';
 import {
   useAddFavoriteMutation,
   useRemoveFavoriteMutation,
@@ -399,6 +401,7 @@ export function ItemDetail({ itemId, fieldDefinitions, itemTypes: _itemTypes }: 
             <TabsTrigger value="yasam">Yaşam Döngüsü</TabsTrigger>
             <TabsTrigger value="gecmis">Geçmiş</TabsTrigger>
             <TabsTrigger value="saglik">Sağlık</TabsTrigger>
+            <TabsTrigger value="ai-oneriler">✨ AI Önerileri</TabsTrigger>
           </TabsList>
 
           {/* ── GENEL ────────────────────────────────────────────────────────── */}
@@ -739,6 +742,11 @@ export function ItemDetail({ itemId, fieldDefinitions, itemTypes: _itemTypes }: 
           {/* ── SAĞLIK ──────────────────────────────────────────────────────── */}
           <TabsContent value="saglik" className="px-0" forceMount>
             <HealthTab itemId={item.id} />
+          </TabsContent>
+
+          {/* ── AI ÖNERİLERİ ────────────────────────────────────────────────── */}
+          <TabsContent value="ai-oneriler" className="px-0" forceMount>
+            <AISuggestionsTab itemId={item.id} />
           </TabsContent>
         </Tabs>
       </div>
@@ -1331,6 +1339,113 @@ function HealthTab({ itemId }: { itemId: string }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AI Önerileri Tab — PR-AI
+// Field values are NEVER sent to LLM (E2E encrypted — ADR-0004 §PII).
+// ─────────────────────────────────────────────────────────────────────────────
+
+function AISuggestionsTab({ itemId }: { itemId: string }) {
+  const suggestMut = useSuggestMutation(itemId);
+  const { data, isLoading } = useSuggestionsQuery(itemId);
+  const acceptMut = useAcceptSuggestionMutation(itemId);
+  const rejectMut = useRejectSuggestionMutation(itemId);
+
+  const suggestions = data?.suggestions ?? [];
+
+  return (
+    <div className="space-y-4 p-4">
+      {/* PII notice */}
+      <p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300">
+        AI önerileri yalnızca item adı, açıklama ve tip bilgisini kullanır.
+        Şifreli alan değerleri hiçbir zaman gönderilmez.
+      </p>
+
+      {/* Generate button */}
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => suggestMut.mutate()}
+        disabled={suggestMut.isPending}
+        className="gap-1.5"
+      >
+        {suggestMut.isPending ? (
+          <><Loader2 className="h-3.5 w-3.5 animate-spin" />Öneri alınıyor…</>
+        ) : (
+          <span>✨ Öneri Al</span>
+        )}
+      </Button>
+      {suggestMut.isError && (
+        <p className="text-xs text-destructive">
+          {suggestMut.error instanceof Error
+            ? suggestMut.error.message
+            : 'Öneri alınamadı. LLM yapılandırması eksik olabilir.'}
+        </p>
+      )}
+
+      {/* Pending suggestions list */}
+      {isLoading ? (
+        <div className="space-y-2">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+      ) : suggestions.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Henüz öneri yok — "Öneri Al" tuşuna basın.</p>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Bekleyen Öneriler ({suggestions.length})
+          </p>
+          {suggestions.map((s: AISuggestion) => (
+            <SuggestionCard
+              key={s.id}
+              suggestion={s}
+              onAccept={() => acceptMut.mutate(s.id)}
+              onReject={() => rejectMut.mutate(s.id)}
+              isPending={acceptMut.isPending || rejectMut.isPending}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SuggestionCard({
+  suggestion,
+  onAccept,
+  onReject,
+  isPending,
+}: {
+  suggestion: AISuggestion;
+  onAccept: () => void;
+  onReject: () => void;
+  isPending: boolean;
+}) {
+  const label =
+    suggestion.suggestion_type === 'tag'
+      ? `Tag ekle: "${suggestion.payload.tag_label ?? ''}"`
+      : `İlişki öner: ${suggestion.payload.target_name ?? ''} — ${suggestion.payload.relationship_type ?? ''}`;
+
+  return (
+    <div className="flex items-center justify-between rounded-md border bg-muted/30 px-3 py-2 text-sm">
+      <div>
+        <span className="mr-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          {suggestion.suggestion_type}
+        </span>
+        {label}
+      </div>
+      <div className="ml-3 flex shrink-0 gap-1.5">
+        <Button size="sm" variant="outline" className="h-6 px-2 text-xs text-green-700 border-green-300 hover:bg-green-50" onClick={onAccept} disabled={isPending}>
+          Kabul
+        </Button>
+        <Button size="sm" variant="ghost" className="h-6 px-2 text-xs text-muted-foreground" onClick={onReject} disabled={isPending}>
+          Reddet
+        </Button>
+      </div>
     </div>
   );
 }
