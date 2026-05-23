@@ -16,6 +16,7 @@ import (
 	"envanter.app/server/internal/auth"
 	"envanter.app/server/internal/clientcert"
 	"envanter.app/server/internal/crypto"
+	"envanter.app/server/internal/geoip"
 	"envanter.app/server/internal/notify"
 	"envanter.app/server/internal/ws"
 )
@@ -129,6 +130,33 @@ func (s *AuthHandlers) Login(w http.ResponseWriter, r *http.Request) {
 			})
 			writeError(w, s.Logger, http.StatusUnauthorized, ErrCodeClientCertInvalid,
 				"İstemci sertifikası geçersiz, süresi dolmuş veya iptal edilmiş.", err)
+			return
+		}
+	}
+
+	// PR-SEC5: IP restriction check — after cert (so cert-required users get
+	// cert-missing error first), before status/lockout to avoid IP enumeration.
+	// Generic error message to prevent location probing.
+	if len(userRow.AllowedIPCIDRs) > 0 || len(userRow.AllowedCountries) > 0 || userRow.DenyTorExit {
+		clientIP := clientIP(r)
+		result := geoip.CheckIP(ctx, clientIP, geoip.IPRestrictions{
+			AllowedCIDRs:        userRow.AllowedIPCIDRs,
+			AllowedCountryCodes: userRow.AllowedCountries,
+			DenyTorExit:         userRow.DenyTorExit,
+		})
+		if !result.Allowed {
+			s.recordLoginFail(ctx, r, userRow.ID, result.Reason)
+			_ = s.Audit.Write(ctx, audit.Entry{
+				ActorUserID:  userRow.ID,
+				Action:       "auth." + result.Reason,
+				ResourceType: audit.ResourceUser,
+				ResourceID:   userRow.ID,
+				Details:      map[string]any{"client_ip": clientIP},
+				IPAddress:    parseIP(r.RemoteAddr),
+				UserAgent:    r.UserAgent(),
+			})
+			writeError(w, s.Logger, http.StatusForbidden, ErrCodeForbidden,
+				"Erişim reddedildi.", errors.New(result.Reason))
 			return
 		}
 	}
@@ -431,9 +459,12 @@ type userLoginRow struct {
 	FailedAttempts     int
 	LockedUntil        *time.Time
 	MustChangePassword bool
-	IsBreakGlass       bool // PR-N4 — triggers emergency alert on successful login
-	TOTPRequired       bool // PR-SEC1 — per-user TOTP enforcement (default true)
-	RequiresClientCert bool // PR-SEC3 — mTLS client certificate enforcement (default false)
+	IsBreakGlass       bool     // PR-N4 — triggers emergency alert on successful login
+	TOTPRequired       bool     // PR-SEC1 — per-user TOTP enforcement (default true)
+	RequiresClientCert bool     // PR-SEC3 — mTLS client certificate enforcement (default false)
+	AllowedIPCIDRs     []string // PR-SEC5 — CIDR whitelist (empty = allow all)
+	AllowedCountries   []string // PR-SEC5 — ISO 3166-1 alpha-2 whitelist (empty = allow all)
+	DenyTorExit        bool     // PR-SEC5 — block Tor exit nodes
 }
 
 // fetchUserForLogin returns the row needed to verify the password and check
@@ -443,7 +474,8 @@ func fetchUserForLogin(ctx context.Context, db auth.DBExec, usernameLower string
 		SELECT id::text, password_hash, argon2_params,
 		       status, failed_login_attempts, locked_until,
 		       must_change_password, is_break_glass, totp_required,
-		       requires_client_cert
+		       requires_client_cert,
+		       allowed_ip_cidrs, allowed_country_codes, deny_tor_exit
 		FROM users
 		WHERE username = $1
 		LIMIT 1
@@ -454,6 +486,7 @@ func fetchUserForLogin(ctx context.Context, db auth.DBExec, usernameLower string
 		&row.Status, &row.FailedAttempts, &row.LockedUntil,
 		&row.MustChangePassword, &row.IsBreakGlass, &row.TOTPRequired,
 		&row.RequiresClientCert,
+		&row.AllowedIPCIDRs, &row.AllowedCountries, &row.DenyTorExit,
 	)
 	return row, err
 }

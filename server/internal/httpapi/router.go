@@ -278,6 +278,9 @@ func NewRouter(d Deps) http.Handler {
 			ar.Patch("/users/{id}/totp-required", d.Admin.SetTOTPRequired)
 			// Admin WebAuthn zorunluluğu toggle (PR-SEC4).
 			ar.Patch("/users/{id}/webauthn-required", d.Admin.SetWebAuthnRequired)
+			// IP kısıtlamaları (PR-SEC5).
+			ar.Get("/users/{id}/ip-restrictions", d.Admin.GetIPRestrictions)
+			ar.Patch("/users/{id}/ip-restrictions", d.Admin.SetIPRestrictions)
 			// Break-glass toggle (PR-N4).
 			ar.Post("/users/{id}/break-glass", d.Admin.SetBreakGlass)
 			// Export (PR-Export) — registered inside this block so auth/role MW applies.

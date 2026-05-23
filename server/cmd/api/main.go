@@ -28,6 +28,7 @@ import (
 	"envanter.app/server/internal/config"
 	"envanter.app/server/internal/db"
 	"envanter.app/server/internal/email"
+	"envanter.app/server/internal/geoip"
 	"envanter.app/server/internal/httpapi"
 	"envanter.app/server/internal/logfwd"
 	"envanter.app/server/internal/logging"
@@ -195,6 +196,13 @@ func run() error {
 	} else {
 		logger.Info("webauthn not configured (ENVANTER_WEBAUTHN_RPID not set) — endpoints return 501")
 	}
+
+	// --- GeoIP background refresh (PR-SEC5) ---
+	// Downloads Tor exit list and caches country lookups. Fail-open: if the
+	// initial download fails, the empty set is used (no Tor blocking until first
+	// successful refresh). ctx passed so shutdown cancels the goroutine.
+	geoip.StartBackgroundRefresh(rootCtx, logger)
+	logger.Info("geoip: Tor exit list refresh goroutine started")
 
 	// --- Auth handlers ---
 	// Constructed after hub + notifyWriter so break-glass alerts (PR-N4) work.
