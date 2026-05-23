@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useCreateItemMutation, useUpdateItemMutation } from '@/api/items';
+import { useCreateItemMutation, useUpdateItemMutation, useItemDuplicatesQuery } from '@/api/items';
 import { useAuthStore } from '@/store/auth';
 import { generateDEK, encryptField, toBase64, fromBase64, openDEKWithKEK, decryptField } from '@/lib/crypto';
 import type { ExternalSourceVault, FieldDefinition, Item, ItemType } from '@/api/types';
@@ -111,6 +111,13 @@ export function ItemFormModal({
 
   // Cached DEK for edit mode — re-used on save to avoid re-wrapping.
   const [editDek, setEditDek] = useState<Uint8Array | null>(null);
+
+  // PR-DUP: duplicate detection — query fires after user stops typing in name field.
+  // In edit mode, exclude the current item from results.
+  const dupQuery = useItemDuplicatesQuery(name, editItem?.id);
+  const dupCount = dupQuery.data?.count ?? 0;
+  const dupItems = dupQuery.data?.items ?? [];
+  const showDupWarning = dupCount > 0 && name.trim().length >= 1;
 
   // PR-VAULT: external Vault source configuration (create mode only).
   const [useVault, setUseVault] = useState(false);
@@ -396,6 +403,22 @@ export function ItemFormModal({
               autoFocus
               disabled={isPending}
             />
+            {/* PR-DUP: duplicate name warning */}
+            {showDupWarning && (
+              <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
+                <p className="font-medium">
+                  Bu ada sahip {dupCount} item zaten var:
+                </p>
+                <ul className="mt-1 list-inside list-disc space-y-0.5 text-xs">
+                  {dupItems.slice(0, 5).map((it) => (
+                    <li key={it.id}>{it.name}</li>
+                  ))}
+                </ul>
+                <p className="mt-1.5 text-xs text-amber-700 dark:text-amber-300">
+                  Yine de devam edebilirsiniz — aynı ad birden fazla item'da olabilir.
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="space-y-1.5">

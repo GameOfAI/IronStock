@@ -161,6 +161,40 @@ export function useGlobalItemSearch(q: string, fuzzy = false) {
   });
 }
 
+// ---------------------------------------------------------------------------
+// PR-DUP: Duplicate name detection
+// ---------------------------------------------------------------------------
+
+/** Shape returned by GET /api/v1/items/duplicates */
+export interface DuplicateCheckResponse {
+  count: number;
+  items: Item[];
+}
+
+/**
+ * PR-DUP: Check whether any items share the same name (case-insensitive HMAC blind-index).
+ * Calls GET /api/v1/items/duplicates?name=<name>[&exclude_id=<id>][&limit=N].
+ *
+ * Enabled only when name has at least 1 character. Non-admins see only duplicates
+ * within folders they can read; admins see vault-wide.
+ */
+export function useItemDuplicatesQuery(name: string, excludeId?: string) {
+  const trimmed = name.trim();
+  return useQuery({
+    queryKey: ['items', 'duplicates', trimmed, excludeId ?? ''],
+    queryFn: () =>
+      apiFetch<DuplicateCheckResponse>('/api/v1/items/duplicates', {
+        query: {
+          name: trimmed,
+          ...(excludeId ? { exclude_id: excludeId } : {}),
+          limit: '5',
+        },
+      }),
+    enabled: trimmed.length >= 1,
+    staleTime: 5_000,
+  });
+}
+
 /** PR-N1: Record that a credential has been manually rotated. Sets last_rotated_at = now(). */
 export function useRecordRotationMutation(itemId: string) {
   const qc = useQueryClient();
