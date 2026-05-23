@@ -1,6 +1,6 @@
 # İlerleyiş
 
-Son güncelleme: 2026-05-23 (PR-SEARCH-FT: Full-text + trigram fuzzy arama — pg_trgm GIN index migration, fuzzy=true query param, ~ toggle UI)
+Son güncelleme: 2026-05-23 (PR-TPL: Kullanıcı tanımlı item şablonları — CRUD API + TemplateGallery bileşeni + 5 birim test)
 
 ## Mevcut Durum
 
@@ -45,6 +45,7 @@ Son güncelleme: 2026-05-23 (PR-SEARCH-FT: Full-text + trigram fuzzy arama — p
 | **PR-VAULT-DYN: Dinamik Vault Secret'ları** | `vault/client.go` ExternalSourceVault'a dynamic+ttl alanları, DynamicCred struct, IssueDynamicCred() (GET/POST /v1/{mount}, TTL desteği), RevokeLease() (PUT /v1/sys/leases/revoke), doRequest 204 desteği; `httpapi/vault_dynamic.go` IssueDynamicCred handler (POST /api/v1/items/{id}/dynamic-cred, izin+dynamic=true kontrolü, audit item.dynamic_cred_issued), RevokeDynamicCred handler (DELETE ..., best-effort revocation, audit); router wiring; web: DynamicCred interface + useIssueDynamicCredMutation + useRevokeDynamicCredMutation (api/vault.ts); item-detail.tsx dinamik credential paneli (Al/Yenile butonu, gizle/göster, countdown timer, İptal Et, 30s auto-clear); 7 birim test (httptest.Server mock Vault) | ✅ Tamamlandı |
 | **PR-EXPORT: Şifreli Bulk Export** | `httpapi/admin_export_encrypted.go` POST /api/v1/admin/export/encrypted (admin-only, ZIP stream); ZIP içeriği: manifest.json (version+scope+counts), items.json (name_enc+name_nonce+server_dek_wrapped+field value_enc/nonce base64), shares.json (e2e_dek_wrapped+wrap_nonce aktif paylaşımlar), keypairs.json (public_key+private_key_enc+kek_salt+kek_params); scope: all/folder:{uuid}/user:{uuid}; audit admin.export_encrypted_started + _completed; router wiring; web: downloadEncryptedExport() + EncryptedExportRequest (admin.ts); admin dashboard Şifreli ZIP Export paneli (kapsam seçimi, custom scope input, indir butonu); 5 birim test | ✅ Tamamlandı |
 | **PR-SEARCH-FT: Full-Text + Trigram Arama** | migration 00052 (pg_trgm extension, GIN index idx_items_name_plain_trgm + idx_items_description_trgm + idx_tags_label_plain_trgm); item_handlers.go Search() ?fuzzy=true parametresi — trigram benzerlik sorgusu (% operator + similarity() ORDER BY) vs ILIKE substring (mevcut davranış); audit log fuzzy flag eklendi; web: useGlobalItemSearch(q, fuzzy) güncellemesi, inventory index.tsx fuzzy durumu + ~ buton (global search açıkken); 4 birim test (QueryParam, WhereClause, TermType, MinLength) | ✅ Tamamlandı |
+| **PR-TPL: Kullanıcı Tanımlı Şablonlar** | migration 00053 (item_templates: name+description+item_type_id+fields JSONB+tags+is_public+created_by, updated_at trigger, GIN-suitable indexes); `httpapi/item_templates.go` TemplateHandlers (List GET scope=mine/public/all, Create POST, Update PUT owner/admin check, Delete DELETE owner/admin check); router wiring + main.go wiring; web: `api/templates.ts` (useTemplatesQuery + useCreateTemplateMutation + useUpdateTemplateMutation + useDeleteTemplateMutation), `components/inventory/template-gallery.tsx` (TemplateGallery: arama, liste, silme, hızlı oluşturma formu, herkese açık/özel göstergesi); 5 birim test (compile guard, scope, default scope, required fields, ownership) | ✅ Tamamlandı |
 
 ---
 

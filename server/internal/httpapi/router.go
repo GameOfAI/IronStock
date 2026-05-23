@@ -56,6 +56,7 @@ type Deps struct {
 	K8sCluster     *K8sClusterHandlers    // PR-K8S: Kubernetes cluster admin CRUD
 	K8s            *K8sHandlers           // PR-K8S: Per-item live K8s data proxy
 	Report         *ReportHandlers        // PR-K8S: HTML inventory report generation
+	Template       *TemplateHandlers      // PR-TPL: User-defined item templates
 }
 
 // NewRouter builds a chi router with the standard middleware stack.
@@ -507,6 +508,16 @@ func NewRouter(d Deps) http.Handler {
 			Post("/api/v1/items/{id}/dynamic-cred", d.Vault.IssueDynamicCred)
 		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
 			Delete("/api/v1/items/{id}/dynamic-cred/{lease_id}", d.Vault.RevokeDynamicCred)
+	}
+
+	// PR-TPL: User-defined item templates. Any authenticated user can read/create;
+	// only owner or admin can update/delete.
+	if d.Template != nil && d.Auth != nil {
+		mw := []func(http.Handler) http.Handler{timeoutMW, RequireAccessToken(d.Auth.Service.JWT)}
+		r.With(mw...).Get("/api/v1/templates", d.Template.List)
+		r.With(mw...).Post("/api/v1/templates", d.Template.Create)
+		r.With(mw...).Put("/api/v1/templates/{id}", d.Template.Update)
+		r.With(mw...).Delete("/api/v1/templates/{id}", d.Template.Delete)
 	}
 
 	// PR-K8S: Per-item live K8s proxy routes. Read permission sufficient for data;
