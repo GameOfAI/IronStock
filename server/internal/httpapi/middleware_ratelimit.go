@@ -1,6 +1,8 @@
 package httpapi
 
 import (
+	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -8,6 +10,8 @@ import (
 	"time"
 
 	"golang.org/x/time/rate"
+
+	"envanter.app/server/internal/cache"
 )
 
 // IPRateLimiter is a per-IP token bucket. Each unique remote IP gets its own
@@ -137,4 +141,103 @@ func writeRateLimitExceeded(w http.ResponseWriter, retryAfter time.Duration) {
 	w.Header().Set("Retry-After", strconv.Itoa(secs))
 	w.WriteHeader(http.StatusTooManyRequests)
 	_, _ = w.Write([]byte(`{"code":"rate_limited","message":"Çok fazla istek. Lütfen biraz sonra tekrar deneyin."}`))
+}
+
+// --- Redis-backed sliding window rate limiter ---
+
+// RedisIPRateLimiter is a per-IP sliding window rate limiter backed by Redis.
+//
+// It uses a sorted-set (ZSET) per IP. Each request adds a timestamped entry;
+// entries older than the window are pruned atomically before counting.
+// Falls back to the in-memory IPRateLimiter when Redis is unavailable.
+//
+// This limiter is shared across all pods — ideal for multi-replica deployments
+// (ENVANTER_RATE_LIMIT_BACKEND=redis).
+type RedisIPRateLimiter struct {
+	redis    *cache.Client
+	fallback *IPRateLimiter
+	limit    int           // max requests per window
+	window   time.Duration // sliding window length
+	keyPfx   string        // Redis key prefix
+}
+
+// NewRedisIPRateLimiter constructs a Redis-backed sliding window limiter.
+// limit = max requests per window; window = window duration.
+// keyPfx is used to namespace Redis keys (e.g. "rl:login").
+// When redis is nil or the circuit is open, falls back to the in-memory limiter.
+func NewRedisIPRateLimiter(
+	redis *cache.Client,
+	fallback *IPRateLimiter,
+	limit int,
+	window time.Duration,
+	keyPfx string,
+) *RedisIPRateLimiter {
+	return &RedisIPRateLimiter{
+		redis:    redis,
+		fallback: fallback,
+		limit:    limit,
+		window:   window,
+		keyPfx:   keyPfx,
+	}
+}
+
+// Allow returns true if the request from ip is within the rate limit.
+// It increments the counter atomically; returns false when over the limit.
+func (r *RedisIPRateLimiter) Allow(ip string) bool {
+	if r.redis == nil || r.redis.IsOpen() {
+		// Redis unavailable — use in-memory fallback.
+		lim := r.fallback.get(ip)
+		return lim.Allow()
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+
+	key := fmt.Sprintf("%s:%s", r.keyPfx, ip)
+	now := time.Now()
+
+	// Lua script — atomic sliding window check + increment:
+	//   ZREMRANGEBYSCORE key -inf (now - window)   — remove old entries
+	//   ZCARD key                                   — count remaining
+	//   ZADD key NX score member                    — add current request
+	//   EXPIRE key window_seconds                   — keep key alive
+	const script = `
+local key    = KEYS[1]
+local now    = tonumber(ARGV[1])
+local win    = tonumber(ARGV[2])
+local limit  = tonumber(ARGV[3])
+local winStart = now - win
+redis.call('ZREMRANGEBYSCORE', key, '-inf', winStart)
+local count = redis.call('ZCARD', key)
+if count >= limit then
+  return 0
+end
+redis.call('ZADD', key, now, now)
+redis.call('PEXPIRE', key, win)
+return 1
+`
+	res, err := r.redis.Underlying().Eval(
+		ctx, script,
+		[]string{key},
+		now.UnixMilli(),
+		r.window.Milliseconds(),
+		r.limit,
+	).Int()
+	if err != nil {
+		// Redis error — fall back to in-memory.
+		return r.fallback.get(ip).Allow()
+	}
+	return res == 1
+}
+
+// Middleware returns an http.Handler middleware that enforces the sliding window limit.
+func (r *RedisIPRateLimiter) Middleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		ip := clientIP(req)
+		if !r.Allow(ip) {
+			writeRateLimitExceeded(w, r.window)
+			return
+		}
+		next.ServeHTTP(w, req)
+	})
 }

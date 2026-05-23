@@ -1,0 +1,105 @@
+# Redis StatefulSet for PR-SCALE horizontal scaling.
+#
+# This manifest deploys a single-instance Redis for development / small
+# production workloads. For HA production deployments, use the Bitnami
+# Redis Helm chart instead:
+#
+#   helm install ironstock-redis bitnami/redis \
+#     --set architecture=replication \
+#     --set replica.replicaCount=2 \
+#     --set auth.password="<strong-password>"
+#
+# The in-cluster Service name is "redis.envanter.svc.cluster.local:6379".
+# Set ENVANTER_REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0 in the secret.
+#
+# NOTE: when ENVANTER_REDIS_URL is not set, the API falls back to single-pod
+# in-memory mode automatically — no Redis dependency at startup.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis
+  namespace: envanter
+spec:
+  serviceName: redis
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          args:
+            - redis-server
+            - --requirepass
+            - $(REDIS_PASSWORD)
+            - --save
+            - "60"
+            - "1"
+            - --loglevel
+            - notice
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: envanter-secret
+                  key: ENVANTER_REDIS_PASSWORD
+                  optional: true   # password auth disabled when key absent
+          ports:
+            - containerPort: 6379
+              name: redis
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "256Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          livenessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: redis-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: envanter
+spec:
+  clusterIP: None   # headless for StatefulSet DNS
+  selector:
+    app: redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379

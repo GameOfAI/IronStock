@@ -8,6 +8,7 @@ resources:
 - namespace.yaml
 - configmap.yaml
 - postgres.yaml
+- redis.yaml     # PR-SCALE: optional Redis for multi-pod WS fan-out + rate limiter
 - api.yaml
 - web.yaml
 - adminer.yaml
