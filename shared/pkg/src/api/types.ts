@@ -840,9 +840,9 @@ export interface CertRequiredRequest {
   required: boolean;
 }
 
-// ─── Log Forwarding (PR-LOG1) ────────────────────────────────────────────────
+// ─── Log Forwarding (PR-LOG1 + PR-SIEM) ─────────────────────────────────────
 
-export type LogForwardingTargetType = 'syslog' | 'slack';
+export type LogForwardingTargetType = 'syslog' | 'slack' | 'splunk' | 'elastic';
 
 export interface SyslogConfig {
   protocol: 'udp' | 'tcp';
@@ -857,12 +857,34 @@ export interface SlackConfig {
   username?: string;
 }
 
+/** PR-SIEM: Splunk HTTP Event Collector config. */
+export interface SplunkConfig {
+  url: string;
+  token: string;
+  index?: string;
+  source?: string;
+  source_type?: string;
+  tls_insecure_skip_verify?: boolean;
+}
+
+/** PR-SIEM: Elasticsearch / Elastic Cloud config (ECS format). */
+export interface ElasticConfig {
+  url: string;
+  index?: string;
+  api_key?: string;
+  username?: string;
+  password?: string;
+  tls_insecure_skip_verify?: boolean;
+}
+
+export type AnyForwardingConfig = SyslogConfig | SlackConfig | SplunkConfig | ElasticConfig;
+
 export interface LogForwardingConfig {
   id: string;
   name: string;
   target_type: LogForwardingTargetType;
   enabled: boolean;
-  config: SyslogConfig | SlackConfig;
+  config: AnyForwardingConfig;
   created_at: string;
   updated_at: string;
   created_by: string;
@@ -876,13 +898,13 @@ export interface CreateLogForwardingRequest {
   name: string;
   target_type: LogForwardingTargetType;
   enabled: boolean;
-  config: SyslogConfig | SlackConfig;
+  config: AnyForwardingConfig;
 }
 
 export interface UpdateLogForwardingRequest {
   name?: string;
   enabled?: boolean;
-  config?: SyslogConfig | SlackConfig;
+  config?: AnyForwardingConfig;
 }
 
 // --- HashiCorp Vault Integration (PR-VAULT, ADR-0007) ---

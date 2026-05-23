@@ -82,6 +82,10 @@ func ParseConfig(targetType string, configJSON json.RawMessage) (any, error) {
 		return ParseSyslogConfig(configJSON)
 	case "slack":
 		return ParseSlackConfig(configJSON)
+	case "splunk":
+		return ParseSplunkConfig(configJSON)
+	case "elastic":
+		return ParseElasticConfig(configJSON)
 	default:
 		return nil, fmt.Errorf("logfwd: unknown target_type %q", targetType)
 	}
