@@ -41,6 +41,7 @@ import {
   Radio,
   Upload,
   ClipboardCheck,
+  Users2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -396,6 +397,7 @@ const NAV_LABELS: Record<string, string> = {
   '/admin/client-certs': 'Sertifikalar',
   '/admin/log-forwarding': 'Log Yönlendirme',
   '/admin/sso': 'SSO / LDAP',
+  '/admin/scim': 'SCIM Provisioning',
   '/admin/k8s-clusters': 'K8s Kümeleri',
   '/admin/reports': 'Raporlar',
   '/profile': 'Profil',
@@ -619,6 +621,12 @@ export function AppShell() {
                   to="/admin/sso"
                   icon={ShieldCheck}
                   label="SSO / LDAP"
+                  collapsed={sidebarCollapsed && !mobileOpen}
+                />
+                <NavItem
+                  to="/admin/scim"
+                  icon={Users2}
+                  label="SCIM Provisioning"
                   collapsed={sidebarCollapsed && !mobileOpen}
                 />
                 <NavItem
