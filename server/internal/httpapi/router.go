@@ -57,6 +57,7 @@ type Deps struct {
 	K8s            *K8sHandlers           // PR-K8S: Per-item live K8s data proxy
 	Report         *ReportHandlers        // PR-K8S: HTML inventory report generation
 	Template       *TemplateHandlers      // PR-TPL: User-defined item templates
+	AISuggestion   *AISuggestionHandlers  // PR-AI: AI tag/relationship suggestions
 }
 
 // NewRouter builds a chi router with the standard middleware stack.
@@ -521,6 +522,15 @@ func NewRouter(d Deps) http.Handler {
 		r.With(mw...).Post("/api/v1/templates", d.Template.Create)
 		r.With(mw...).Put("/api/v1/templates/{id}", d.Template.Update)
 		r.With(mw...).Delete("/api/v1/templates/{id}", d.Template.Delete)
+	}
+
+	// PR-AI: AI suggestion routes.
+	if d.AISuggestion != nil && d.Auth != nil {
+		mw := []func(http.Handler) http.Handler{timeoutMW, RequireAccessToken(d.Auth.Service.JWT)}
+		r.With(mw...).Post("/api/v1/items/{id}/suggest", d.AISuggestion.Suggest)
+		r.With(mw...).Get("/api/v1/items/{id}/suggestions", d.AISuggestion.ListSuggestions)
+		r.With(mw...).Post("/api/v1/items/{id}/suggestions/{sid}/accept", d.AISuggestion.AcceptSuggestion)
+		r.With(mw...).Post("/api/v1/items/{id}/suggestions/{sid}/reject", d.AISuggestion.RejectSuggestion)
 	}
 
 	// PR-K8S: Per-item live K8s proxy routes. Read permission sufficient for data;

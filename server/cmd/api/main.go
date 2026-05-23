@@ -35,6 +35,7 @@ import (
 	"envanter.app/server/internal/logging"
 	"envanter.app/server/internal/notify"
 	"envanter.app/server/internal/storage"
+	"envanter.app/server/internal/llm"
 	"envanter.app/server/internal/vault"
 	webauthnpkg "envanter.app/server/internal/webauthn"
 	"envanter.app/server/internal/ws"
@@ -529,6 +530,21 @@ func run() error {
 		Logger:  logger,
 	}
 
+	// --- AI suggestion handlers (PR-AI) ---
+	var llmClient *llm.Client
+	if cfg.LLMProvider != "" {
+		if c, err := llm.New(cfg.LLMProvider, cfg.LLMAPIKey, cfg.LLMBaseURL, cfg.LLMModel); err != nil {
+			logger.Warn("LLM client init failed — AI suggestions disabled", "err", err)
+		} else {
+			llmClient = c
+			logger.Info("LLM provider configured", "provider", cfg.LLMProvider, "model", cfg.LLMModel)
+		}
+	}
+	aiSuggestionHandlers := &httpapi.AISuggestionHandlers{
+		ItemH: itemHandlers,
+		LLM:   llmClient,
+	}
+
 	// --- HTTP layer ---
 	router := httpapi.NewRouter(httpapi.Deps{
 		Logger:         logger,
@@ -556,6 +572,7 @@ func run() error {
 		K8s:          k8sHandlers,          // PR-K8S
 		Report:       reportHandlers,       // PR-K8S
 		Template:     templateHandlers,     // PR-TPL
+		AISuggestion: aiSuggestionHandlers, // PR-AI
 	})
 
 	srv := &http.Server{
