@@ -50,6 +50,18 @@ repos:
         types: [go]
         pass_filenames: false
 
+  # TypeScript / ESLint (web)
+  - repo: local
+    hooks:
+      - id: eslint-web
+        name: ESLint (web)
+        language: node
+        entry: web/node_modules/.bin/eslint
+        types: [file]
+        files: web/src/.*\.(ts|tsx)$
+        args: ['--max-warnings=0']
+        pass_filenames: true
+
   # Secret scanning
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.18.0
