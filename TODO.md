@@ -1,8 +1,8 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-05-23 — PR-NOTIFY tamamlandı ✅
-PR-SEC1/SEC2/SEC3 + PR-F3 + PR-TIME/LOG1/VAULT/GROUP-SHARE/IMPORT/N3/LDAP + PR-K8S + PR-NOTIFY.
-Sonraki: PR-SEC4 (WebAuthn/FIDO2), PR-SEC5 (GeoIP+IP Whitelist), PR-SCALE (Redis Pub/Sub).
+Son güncelleme: 2026-05-24 — PR-PROD4 (UX Polish) devam ediyor; PR-PROD1/2/3 tamamlandı ✅
+Tüm Faz 9 (PR-ANSIBLE/ALERT/SCIM/SIEM/SCAN) + Faz 10 (PR-CLI) + Faz 11 PR-PROD1/2/3 merged.
+Sonraki: PR-PROD4 entegrasyon işleri (App.tsx, app-shell, sayfalar), ardından PR-PROD5/6/7.
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 
@@ -687,6 +687,74 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 - Session recording (video/stream — çok büyük altyapı)
 - RADIUS authentication (niche)
 - JIT privilege elevation (tam PAM ürünü kapsamı; IronStack için erken)
+
+### ✅ Faz 11 — Production Readiness
+
+#### ✅ PR-PROD1: CI Security Scanning Automation — merged `5ead7a7`
+
+- [x] `.github/workflows/security.yml` — gosec, govulncheck, trivy, npm audit, cargo audit, semgrep, gitleaks, checkov/kubesec; SARIF upload GitHub Security tab
+- [x] `.github/dependabot.yml` — weekly Go/npm/actions updates
+- [x] Pre-commit hooks: gitleaks + gofmt + golangci-lint + eslint
+
+#### ✅ PR-PROD2: Test Coverage Uplift — merged `291f3c5`
+
+- [x] `server/internal/httpapi/admin_k8s_test.go` — compile guard (ListClusters/CreateCluster/UpdateCluster/DeleteCluster/TestCluster) + auth/validation tests (121 lines)
+- [x] `server/internal/httpapi/k8s_proxy_test.go` — compile guard (SetBinding/GetBinding/ListPods/ListDeployments/ListServices/ListEvents/ListMetrics) + namespace validation mirror (169 lines)
+- [x] `server/internal/httpapi/admin_report_test.go` — compile guard + item count validation + mirror functions (mirrorFormatTime/mirrorSeverityClass/mirrorMetricPercent) (251 lines)
+- [x] `server/internal/clientcert/clientcert_test.go` — real ECDSA cert generation, 5 test scenarios, error sentinels (215 lines)
+
+#### ✅ PR-PROD3: E2E Test Suite — merged `1faaea1`
+
+- [x] `e2e/playwright.config.ts` — workers=1, chromium+firefox, 60s timeout, 30min global timeout
+- [x] `e2e/tests/global-setup.ts` — healthz wait + bootstrap + storageState save
+- [x] `e2e/tests/fixtures.ts` — adminPage + apiToken fixtures + helper functions
+- [x] 10 spec files: 01-bootstrap-admin → 10-pipeline-editor (39 total tests)
+- [x] `deploy/compose/docker-compose.e2e.yml` — ephemeral stack (tmpfs, offset ports)
+- [x] `.github/workflows/e2e.yml` — push:main + nightly schedule + playwright-report artifact
+- [x] `Makefile` — e2e-up/e2e-down/e2e/e2e-ui targets
+
+#### [~] PR-PROD4: UX Polish & Bug Bash — DEVAM EDİYOR
+
+**Tamamlanan bileşenler (staged, commit bekliyor):**
+- [x] `web/src/components/ui/empty-state.tsx` — role="status", icon, title, description, CTA button, size variants (sm/default)
+- [x] `web/src/components/layout/skip-link.tsx` — WCAG 2.4.1 Bypass Blocks, "Ana içeriğe atla", focus:top-0 geçiş
+- [x] `web/src/hooks/use-document-title.ts` — WCAG 2.4.2 Page Titled, "${title} — IronStock" format, cleanup on unmount
+- [x] `web/src/components/onboarding/onboarding-tour.tsx` — 4-adım tour, localStorage dismiss, focus trap, ESC key, progress dots, backdrop click
+
+**Kalan entegrasyon işleri (sonraki session):**
+- [ ] `web/src/App.tsx` — `<SkipLink />` AppShell öncesine ekle; `<OnboardingTour>` + `useOnboardingTour` hook
+- [ ] `web/src/components/layout/app-shell.tsx` — `id="main-content"` main content'e; Help menu → `onboardingTour.reopen()`
+- [ ] `web/src/pages/inventory/index.tsx` — `<EmptyState>` (item/klasör yoksa); `useDocumentTitle('Envanter')`
+- [ ] Tüm admin sayfaları — `useDocumentTitle('Admin / ...')` + boş liste EmptyState
+- [ ] `web/src/pages/admin/users.tsx`, `audit-log.tsx` — axe-core ARIA fix'leri
+- [ ] Dark/light mode screenshot diff + responsive breakpoint kontrol
+- [ ] Lighthouse Performance 90+, Accessibility 95+ hedef
+
+#### [ ] PR-PROD5: Performance Testing & SLO
+
+- [ ] k6 yük testi senaryoları (login burst, search, WS 1000 bağlantı, rapor üretimi)
+- [ ] `go tool pprof` CPU+memory profil
+- [ ] `pg_stat_statements` N+1 query tespiti
+- [ ] `docs/ops/slo.md` — p95 < 200ms, p99 < 500ms, WS < 100ms, login < 2s, 99.9% availability
+
+#### [ ] PR-PROD6: Dokümantasyon Tamamlama
+
+- [ ] `docs/user-guide/` — son kullanıcı kılavuzu
+- [ ] `docs/admin-guide/` — admin kılavuzu
+- [ ] `docs/ops-guide/` — operatör kılavuzu (deploy, backup, monitoring)
+- [ ] `docs/api/` — OpenAPI 3.1 full sync + Swagger UI serve
+- [ ] `docs/integrations/` — Ansible, Terraform, browser extension, MCP, CLI
+- [ ] `docs/security/` — threat model, crypto details, audit log fields
+- [ ] `docs/adr/` — tüm major kararlar güncel
+
+#### [ ] PR-PROD7: Disaster Recovery + Backup
+
+- [ ] `scripts/backup.sh` — `pg_dump` + MinIO mirror + S3 upload
+- [ ] `scripts/restore.sh` — clean cluster restore
+- [ ] `deploy/k8s/cronjob-backup.yaml` — günlük otomatik yedek
+- [ ] `docs/ops/backup.md`, `docs/ops/restore.md`, `docs/ops/disaster-recovery.md`
+- [ ] Shamir secret sharing escrow prosedürü → ADR-0012
+- [ ] Quarterly restore drill runbook
 
 ### ⏸ Ertelenen (Deferred)
 
