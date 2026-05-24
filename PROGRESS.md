@@ -1,11 +1,14 @@
 # İlerleyiş
 
-Son güncelleme: 2026-05-24 (PR-PROD4: UX Polish — temel bileşenler oluşturuldu, entegrasyon devam ediyor)
+Son güncelleme: 2026-05-24 (TODO.md + PROGRESS.md senkronize edildi — 22/27 PR tamamlandı)
 
 ## Mevcut Durum
 
-- **Aktif Faz:** Post-v1.0.0 Kapsamlı Geliştirmeler (Faz 6+)
-- **Tamamlanan Faz:** Faz 0 + 1 + 2 + 3 + 4 + 5 ✅
+- **Aktif Faz:** Faz 11 — Production Readiness (devam ediyor)
+- **Tamamlanan Fazlar:** Faz 0–10 + Faz 11 kısmi ✅
+- **Tamamlanan PR:** 22/27 (%82) — Faz 6 (4/4) · Faz 7 (5/5) · Faz 8 (5/5) · Faz 9 (5/5) · Faz 10 (1/1) · Faz 11 (3/7)
+- **Devam eden:** PR-PROD4 (UX Polish entegrasyon işleri — App.tsx/app-shell/sayfalar)
+- **Kalan:** PR-PROD5 (Perf+SLO) · PR-PROD6 (Docs) · PR-PROD7 (DR+Backup) · PR-TF (Terraform ayrı repo) · PR-BROWSER (Extension ayrı dizin)
 
 ### Tamamlanan PR'lar (kod taramasıyla doğrulandı — 2026-05-22)
 

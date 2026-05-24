@@ -630,17 +630,31 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 - [x] **PR-N2** — Secret Versioning: `item_field_versions` tablosu (max 10, FIFO). Trigger-benzeri hook field update'te. `GET /items/{id}/fields/{field_def_id}/versions` endpoint. Web: field history modal + restore.
 - [x] **PR-N5** — One-Time Paylaşım Linki: `item_share_links` tablosu (token_hash SHA-256, dek_wrapped, view_limit 1-10, TTL). Public `GET /api/v1/share/{token}` (no auth, atomic view_count++, 410 Gone). E2E: link_key URL fragment'ta, asla sunucuya gitmez. Web: ShareLinkDialog + public SharePage.
 
-### ✅ Son Tamamlananlar (2026-05-17~19)
+### ✅ Son Tamamlananlar (2026-05-17~24)
 
-- [x] **PR-UX1~5** — Kapsamlı UI/UX İyileştirmeleri (scrollbar, modal 2-col, pipeline node delete, etiket picker, admin tab, TOTP reset, graf filtre, lifecycle onboarding, paylaşım modal fix) ✅ 2026-05-17
+- [x] **PR-UX1~5** — Kapsamlı UI/UX İyileştirmeleri ✅ 2026-05-17
 - [x] **Item tam alan düzenleme** — edit modda DEK çözümleme + alan decrypt + re-encrypt on save ✅ 2026-05-17
 - [x] **WS proxy + origin fix** — Vite proxy WS rule + `coder/websocket` OriginPatterns ✅ 2026-05-17
 - [x] **Renkli telemetri dot** — yeşil/amber/kırmızı WS status indicator + hata detayı popover ✅ 2026-05-17
 - [x] **CI test fix'leri** — `ws-provider.test` getDetail mock + `item-form-modal.test` waitFor pattern ✅ 2026-05-18
-- [x] **PR-UX7** — Item Detail 5-tab layout: Genel/Alanlar/İlişkiler/Yaşam Döngüsü/Geçmiş tabları, forceMount, STAGE_COLORS, FieldHistorySection ✅ 2026-05-19
-- [x] **PR-UX4+UX6** — Inventory tip filtre chip'leri + ItemList ikon-satır tasarımı (TYPE_COLORS, renkli ikonlar, metin ExpiryBadge) ✅ 2026-05-19
-- [x] **PR-UX8** — Admin Dashboard: /admin route, RadialGauge güvenlik skoru, kullanıcı istatistikleri, expiry uyarıları, audit log özeti, hızlı linkler ✅ 2026-05-19
-- [x] **PR-UX9** — Item form şablon galerisi: 11 quickstart şablon (MySQL, PostgreSQL, Linux SSH, SSH Key, AWS, GCP, Sertifika, API Key, Web URL, Not, Genel) ✅ 2026-05-19
+- [x] **PR-UX7** — Item Detail 5-tab layout ✅ 2026-05-19
+- [x] **PR-UX4+UX6** — Inventory tip filtre chip'leri + ItemList ikon-satır tasarımı ✅ 2026-05-19
+- [x] **PR-UX8** — Admin Dashboard (RadialGauge, expiry uyarıları, audit özeti) ✅ 2026-05-19
+- [x] **PR-UX9** — Item form şablon galerisi: 11 quickstart şablon ✅ 2026-05-19
+- [x] **PR-SEC4: WebAuthn/FIDO2** — migration 00049, `server/internal/webauthn/`, 4 endpoint (register/login begin/finish), admin toggle, web SecurityKeysCard + login dialog ✅ 2026-05-24
+- [x] **PR-SEC5: GeoIP + IP Whitelist** — migration 00050, `server/internal/geoip/` (ip-api.com + Tor exit list), IP/CIDR/country check auth_login, admin_ip_restrictions.go, web dialog ✅ 2026-05-24
+- [x] **PR-SCALE: Redis Pub/Sub** — `internal/cache/redis.go` (circuit-breaker), hub.go Redis fan-out, tickets.go Redis TTL, ratelimit Lua sliding window, deploy/k8s/redis.yaml, api.yaml replicas:3 ✅ 2026-05-24
+- [x] **PR-LINK: Linked Entries** — migration 00051 (item_links mirror/reference), item_links.go CRUD, item update → mirror_link_ids, web linked-items-tab (E2E propagation) ✅ 2026-05-24
+- [x] **PR-VAULT-DYN: Dinamik Vault Secret'ları** — vault/client.go IssueDynamicCred/RevokeLease, vault_dynamic.go POST /items/{id}/dynamic-cred, web countdown timer + auto-clear ✅ 2026-05-24
+- [x] **PR-EXPORT: Şifreli Bulk Export** — admin_export_encrypted.go POST /admin/export/encrypted, ZIP (manifest+items+shares+keypairs), scope all/folder/user, web admin paneli ✅ 2026-05-24
+- [x] **PR-SEARCH-FT: pg_trgm Trigram Arama** — migration 00052 (pg_trgm + GIN index), Search() ?fuzzy=true trigram sorgusu, web fuzzy ~ buton ✅ 2026-05-24
+- [x] **PR-TPL: Kullanıcı Tanımlı Şablonlar** — migration 00053 (item_templates), TemplateHandlers CRUD mine/public/all, web template-gallery.tsx ✅ 2026-05-24
+- [x] **PR-DUP: Duplicate Detection** — item_duplicates.go CheckDuplicates HMAC blind index, web item-form-modal amber uyarı banner ✅ 2026-05-24
+- [x] **PR-HEALTH: Item Health Score** — migration 00054, `internal/health/score.go`, GetHealth + GetHealthReport endpoint, web Sağlık tab + admin UnhealthyItemsWidget ✅ 2026-05-24
+- [x] **PR-CLI: ironstock Go CLI** — `cli/` monorepo, cobra komut ağacı, .goreleaser.yml multi-arch, docs/integrations/cli.md ✅ 2026-05-24
+- [x] **PR-PROD1: CI Security Scanning** — security.yml (gosec+trivy+semgrep+gitleaks+kubesec), dependabot.yml ✅ 2026-05-24
+- [x] **PR-PROD2: Test Coverage Uplift** — 41 yeni test, 4 paket (admin_k8s, k8s_proxy, admin_report, clientcert) ✅ 2026-05-24
+- [x] **PR-PROD3: Playwright E2E Suite** — 10 senaryo 39 test, docker-compose.e2e.yml, e2e.yml workflow ✅ 2026-05-24
 
 ### ⏳ Kalan
 
@@ -669,15 +683,15 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 **Orta vadeli — kritik gaplar (hafta):**
 - [ ] **SSO / OIDC entegrasyonu** — Azure AD (Entra ID) ve Okta. Kurumsal ortamlarda AD zorunlu; bu olmadan enterprise satışı güç. SAML 2.0 + OIDC. Backend: `POST /auth/sso/callback` + `users.external_id` kolonu. Önce Entra ID, sonra Okta.
 - [ ] **PR-N3 (Onay/Checkout Workflow)** — Kritik credential erişimi → onay isteği → admin onayı → zaman-sınırlı görüntüleme. `access_requests` tablosu. WS event'lar. Büyük iş, ayrı plan session.
-- [ ] **Bağlı kayıtlar (Linked Entries)** — `item_links` tablosu: `source_item_id → target_item_id, field_def_id`. Kaynak alan güncellenince bağlı item'lar da güncellenir (re-encrypt). Örn: tek SSH key birden fazla sunucuda kullanılıyor.
+- [x] **Bağlı kayıtlar (Linked Entries)** — `item_links` tablosu, mirror/reference propagation. ✅ 2026-05-24 (PR-LINK)
 - [x] **Bulk import/export** — CSV + KeePass .kdbx import sihirbazı (kdbxweb istemci-taraflı; server stdlib csv). Toplu şifreli item oluşturma, E2E guarantee. ✅ 2026-05-22 (PR-IMPORT)
 - [x] **Share modal grup desteği** — `item_group_shares` tablosu + `ResolveItemPermission` 4-sinyal (owner > user share > group share > folder ACL). Frontend: paylaşım modalına "Grup" sekmesi. ✅ 2026-05-22 (PR-GROUP-SHARE)
 
 **Uzun vadeli — büyük özellikler (ay):**
 - [ ] **Otomatik parola rotasyonu** — Rotation scheduler + agent/runner ile SSH/API üzerinden credential push. Backend'de rotation policy engine. Devolutions'da PAM add-on; IronStock'ta built-in olabilir.
-- [ ] **WebAuthn / YubiKey MFA** — TOTP ötesi donanım anahtarı. `webauthn-go` library. `user_credentials` tablosu. TOTP'a alternatif/ek.
+- [x] **WebAuthn / YubiKey MFA** — TOTP ötesi donanım anahtarı, `user_credentials` tablosu, passkey desteği. ✅ 2026-05-24 (PR-SEC4)
 - [ ] **Tauri offline cache** — SQLite local cache + sync-on-connect. Ağ kesildiğinde client çalışmaya devam eder.
-- [ ] **CLI client** — `ironstock` komutu: credential fetch, copy-to-clipboard, script-friendly. DevOps pipeline entegrasyonu.
+- [x] **CLI client** — `ironstock` komutu: credential fetch, copy-to-clipboard, script-friendly, multi-arch binary. ✅ 2026-05-24 (PR-CLI)
 - [x] **Vault backend (PR-VAULT)** — HashiCorp Vault proxy tamamlandı. ✅ 2026-05-22
 - [ ] **OIDC SSO** — Azure AD / Okta / Keycloak (yukarıdaki kısa vadeli sonrası genişletme).
 - [ ] **Mobile client** — Tauri 2 mobile (iOS/Android).
@@ -759,7 +773,7 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 ### ⏸ Ertelenen (Deferred)
 
 - [ ] **PR-RT-2** — SSE fallback (WS bloklu kurumsal ağlar için)
-- [ ] **PR-RT-3** — Redis pub/sub (horizontal scale)
+- [x] **PR-RT-3** — Redis pub/sub (horizontal scale) ✅ 2026-05-24 (PR-SCALE)
 - [ ] **PR-RT-4** — Per-user WS event routing (meta-leak azaltma)
 
 ### Observability
