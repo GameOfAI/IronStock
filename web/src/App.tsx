@@ -10,6 +10,8 @@ import { AppShell } from '@/components/layout/app-shell';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthGate, MustChangePasswordGate, MustSetupTOTPGate, RoleGate } from '@/routes/auth-gate';
 import { WsProvider } from '@/components/ws-provider';
+import { SkipLink } from '@/components/layout/skip-link';
+import { OnboardingTour, useOnboardingTour } from '@/components/onboarding/onboarding-tour';
 
 import LoginPage from '@/pages/login';
 import RegisterPage from '@/pages/register';
@@ -79,11 +81,17 @@ function HydrateBoot() {
   return null;
 }
 
+function OnboardingTourBridge() {
+  const { open, dismiss } = useOnboardingTour();
+  return <OnboardingTour open={open} onDismiss={dismiss} />;
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <BrowserRouter>
+          <SkipLink />
           <AuthEventBridge />
           <HydrateBoot />
           <Routes>
@@ -118,7 +126,7 @@ export default function App() {
                 {/* MustSetupTOTPGate: must_setup_totp=true ise /totp/setup'a yönlendirir */}
                 <Route element={<MustSetupTOTPGate />}>
                   <Route element={<WsProvider><Outlet /></WsProvider>}>
-                  <Route element={<AppShell />}>
+                  <Route element={<><OnboardingTourBridge /><AppShell /></>}>
                     <Route index element={<Navigate to="/inventory" replace />} />
                     <Route path="/inventory/*" element={<InventoryPage />} />
                     <Route path="/tags" element={<TagsPage />} />

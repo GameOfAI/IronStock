@@ -34,8 +34,10 @@ import {
 import { useLifecycleStagesQuery } from '@/api/lifecycle';
 import { PipelineCanvas } from '@/components/pipeline/pipeline-canvas';
 import { DiagramSidebar } from '@/components/pipeline/diagram-sidebar';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 export default function DiagramPage() {
+  useDocumentTitle('Pipeline Diyagramı');
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [deleteOpen, setDeleteOpen] = React.useState(false);

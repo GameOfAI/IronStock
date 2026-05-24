@@ -23,8 +23,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { bootstrapStatus, bootstrapLogin } from '@/api/bootstrap';
 import { useAuthStore } from '@/store/auth';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 export default function AdminLoginPage() {
+  useDocumentTitle('Admin Giriş');
   const navigate = useNavigate();
   const { toast } = useToast();
   const setBootstrapSession = useAuthStore((s) => s.setBootstrapSession);

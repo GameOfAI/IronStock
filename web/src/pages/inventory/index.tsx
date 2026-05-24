@@ -35,11 +35,13 @@ import {
   PIPELINE_TYPE_LABELS,
 } from '@/components/pipeline/pipeline-constants';
 import type { Item } from '@/api/types';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 type FolderModal = 'create-root' | 'create-sub' | 'rename' | 'delete' | null;
 type ItemModal = 'create' | 'edit' | 'delete' | 'share' | null;
 
 export default function InventoryPage() {
+  useDocumentTitle('Envanter');
   const [searchParams, setSearchParams] = useSearchParams();
   const folderId = searchParams.get('folder');
   const itemId = searchParams.get('item');
@@ -104,9 +106,13 @@ export default function InventoryPage() {
   );
 
   // PR-SEARCH: Global search active items or folder items
-  const activeItems = globalSearch
-    ? (globalSearchQuery.data?.items ?? (query.trim().length >= 2 ? undefined : []))
-    : itemsQuery.data?.items;
+  const activeItems = useMemo(
+    () =>
+      globalSearch
+        ? (globalSearchQuery.data?.items ?? (query.trim().length >= 2 ? undefined : []))
+        : itemsQuery.data?.items,
+    [globalSearch, globalSearchQuery.data?.items, itemsQuery.data?.items, query],
+  );
 
   // PR-UX4: Mevcut klasördeki unique tip ID'leri (chip'leri oluşturmak için)
   const presentTypeIds = useMemo(

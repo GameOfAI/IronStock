@@ -596,7 +596,12 @@ func run() error {
 		APIToken:     apiTokenHandlers,      // PR-ANSIBLE
 		SCIM:         scimHandlers,          // PR-SCIM
 		Scan:         scanHandlers,          // PR-SCAN
+		PprofEnabled: cfg.PprofEnabled,      // PR-PROD5
 	})
+
+	if cfg.PprofEnabled {
+		logger.Warn("pprof debug endpoints enabled at /debug/pprof/ — disable in production")
+	}
 
 	srv := &http.Server{
 		Addr:              cfg.Addr,

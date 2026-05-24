@@ -69,6 +69,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { ApiError } from '@/api/errors';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 function describeError(err: unknown): string {
   if (err instanceof ApiError) return err.message;
@@ -707,6 +708,7 @@ function UserCertificatesTab() {
 // ---------- Page ----------
 
 export default function AdminClientCertsPage() {
+  useDocumentTitle('Sertifika Yönetimi');
   return (
     <div className="flex flex-col gap-6 p-6">
       <div>

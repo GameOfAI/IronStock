@@ -69,6 +69,7 @@ import { ShareLinkDialog } from './share-link-dialog';
 import { LinkedItemsTab } from './linked-items-tab'; // PR-LINK
 import { RelativeTime } from '@/components/common/relative-time';
 import { cn } from '@/lib/cn';
+import { EmptyState } from '@/components/ui/empty-state';
 import {
   PIPELINE_TYPE_ICONS,
   PIPELINE_TYPE_LABELS,
@@ -300,10 +301,12 @@ export function ItemDetail({ itemId, fieldDefinitions, itemTypes: _itemTypes }: 
   // ── Empty state ──────────────────────────────────────────────────────────
   if (!itemId) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center text-muted-foreground">
-        <MousePointerClick className="h-8 w-8" aria-hidden />
-        <p className="text-sm">Detayları görmek için listeden bir item seçin.</p>
-      </div>
+      <EmptyState
+        icon={MousePointerClick}
+        title="Item seçilmedi"
+        description="Detayları görmek için listeden bir item seçin."
+        className="h-full"
+      />
     );
   }
 

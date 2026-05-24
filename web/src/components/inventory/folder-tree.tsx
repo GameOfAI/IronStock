@@ -10,6 +10,7 @@ import { useState } from 'react';
 import { Loader2, FolderX, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useRootFolders } from '@/api/folders';
+import { EmptyState } from '@/components/ui/empty-state';
 import { FolderTreeNode } from './folder-tree-node';
 
 interface FolderTreeProps {
@@ -57,10 +58,12 @@ export function FolderTree({ selectedId, onSelect }: FolderTreeProps) {
 
   if (roots.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-2 p-6 text-center text-sm text-muted-foreground">
-        <FolderX className="h-8 w-8" aria-hidden />
-        <span>Görüntüleyebileceğiniz klasör yok.</span>
-      </div>
+      <EmptyState
+        icon={FolderX}
+        title="Klasör yok"
+        description="Görüntüleyebileceğiniz klasör bulunmuyor."
+        size="sm"
+      />
     );
   }
 

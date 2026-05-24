@@ -31,8 +31,10 @@ import { useToast } from '@/hooks/use-toast';
 import { useTOTPInitMutation, useTOTPVerifyMutation } from '@/api/auth';
 import { TOTPQRCode } from '@/components/auth/totp-qr';
 import { useAuthStore } from '@/store/auth';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 export default function TOTPSetupPage() {
+  useDocumentTitle('TOTP Kurulumu');
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();

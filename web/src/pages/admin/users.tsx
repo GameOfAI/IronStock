@@ -24,6 +24,7 @@ import { ApiError } from '@/api/errors';
 import { UserTable } from '@/components/admin/user-table';
 import { Pagination } from '@/components/common/pagination';
 import { CreateUserModal } from '@/components/admin/create-user-modal';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 // Lazy-load groups and roles tabs
 const AdminGroupsTab = lazy(() => import('./groups'));
@@ -126,6 +127,7 @@ function UsersTabContent() {
 // --- Main Page ---
 
 export default function AdminUsersPage() {
+  useDocumentTitle('Kullanıcı Yönetimi');
   const [searchParams, setSearchParams] = useSearchParams();
 
   const tabParam = searchParams.get('tab') ?? 'users';

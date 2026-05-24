@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import type { RelationshipType, GraphNode, GraphEdge } from '@/api/types';
 import { cn } from '@/lib/cn';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 // --- Item type name map (matches item_types seeded data) ---
 const ITEM_TYPE_LABELS: Record<number, string> = {
@@ -207,6 +208,7 @@ function NodeCard({ node, edges, allNodes, selected, onClick, onDeleteEdge }: No
 // --- Graph Page ---
 
 export function GraphPage() {
+  useDocumentTitle('İlişki Haritası');
   const { data, isLoading, isError } = useGraphQuery();
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [addingForId, setAddingForId] = React.useState<string | null>(null);

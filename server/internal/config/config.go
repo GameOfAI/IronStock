@@ -118,6 +118,10 @@ type Config struct {
 	LLMAPIKey   string // ENVANTER_LLM_API_KEY
 	LLMBaseURL  string // ENVANTER_LLM_BASE_URL — override endpoint (Ollama: "http://localhost:11434/v1")
 	LLMModel    string // ENVANTER_LLM_MODEL — default: claude-sonnet-4-5 (anthropic) or gpt-4o (openai)
+
+	// PR-PROD5: pprof debug endpoint (CPU + memory profiling).
+	// Production'da kapalı tutulmalı — yalnızca sorun giderme sırasında açılır.
+	PprofEnabled bool // ENVANTER_PPROF_ENABLED (default false)
 }
 
 // Load reads config from environment, applies defaults, and validates.
@@ -167,6 +171,7 @@ func Load() (*Config, error) {
 		LLMAPIKey:             os.Getenv("ENVANTER_LLM_API_KEY"),
 		LLMBaseURL:            os.Getenv("ENVANTER_LLM_BASE_URL"),
 		LLMModel:              os.Getenv("ENVANTER_LLM_MODEL"),
+		PprofEnabled:          envBoolOr("ENVANTER_PPROF_ENABLED", false),
 	}
 	if err := cfg.Validate(); err != nil {
 		return nil, err
