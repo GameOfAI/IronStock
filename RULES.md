@@ -66,11 +66,11 @@ Proje boyunca uyulacak konvensiyonlar ve kurallar. Yeni kural çıktıkça buray
   3. `PROGRESS.md`'de faz tamamlandı entry'si.
   4. Sonraki faz task'ları TodoWrite'a yüklenir.
 
-## Repo Konumu ve Tracking Dosyaları (canonical: Repos)
+## Repo Konumu
 
-- **Canonical dizin:** `C:\Users\burak.haslaman\Desktop\Repos\Envanter_App`. GitHub'a push edilen tek konum buradır.
-- `Claude-Chat\Envanter_App` **legacy** — Faz 0 sonu donmuş. Kaldırılması user kararına bırakıldı; çalışma kaynağı değildir.
-- Claude tüm dosya işlemlerini absolute path ile **Repos** altına yapar. Yeni session başlatılırken Claude session'ı **Repos dizininde** açılırsa working directory zaten doğru olur.
+- **GitHub:** `https://github.com/GameOfAI/IronStock`
+- Claude tüm dosya işlemlerini proje kökünden (`IronStock/`) yapar.
+- Yeni session: repo kökünde (`IronStock/`) Claude Code açılırsa working directory doğru olur.
 
 ### Push öncesi tracking dosyaları kontrolü (zorunlu — otomatik zorlanır)
 

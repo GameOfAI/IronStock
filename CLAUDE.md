@@ -1,105 +1,128 @@
-# Envanter App — Claude Context
+# IronStock — Claude Context
 
 Bu dosya her Claude Code session'ında otomatik yüklenir. Proje hakkında kalıcı bağlam sağlar.
 
 ## Proje Özeti
 
-DevOps/SRE takımı için envanter yönetim uygulaması. KeePassXC'ye alternatif olarak geliştirilen, merkezi + canlı sync'li + MFA destekli sistem.
+DevOps/SRE takımı için credential vault uygulaması. KeePassXC'ye alternatif: merkezi, canlı sync'li, MFA destekli, E2E şifreli.
 
 **Kapsam:**
-- Server: Kubernetes üzerinde, Go tabanlı REST + WebSocket API
-- Web Admin UI: React + Vite + TypeScript — kullanıcı/rol yönetimi, envanter görüntüleme
-- Client: Tauri (Rust) — Windows + macOS native, ağaç UI + offline cache
-- Auth: Username + password (Argon2id) + TOTP (RFC 6238, Google Authenticator uyumlu) + Trusted Device (30 gün cookie)
-- **3-katmanlı RBAC:**
-  - Global rol: `admin` / `write` / `read`
-  - Klasör-level ACL: `folder_permissions` (inherit_to_children) + `folder_group_permissions` (grup bazlı)
-  - Item-level share: `item_shares` (per-user wrapped DEK) + `item_share_links` (one-time public links)
-- **Gruplar:** `groups` + `group_members` — grup bazlı klasör izni (PR-F6a/b)
-- **Dinamik veri modeli:** `item_types` (server/url/database/ssh_key/…) + `field_definitions` (merkezi field sözlüğü, hostname/ip_address/environment vs), `item_relationships` (hosted_on, accessed_via, depends_on, uses_tool, builds_to, scans_with, deploys_to…).
-- **Versiyonlama:** `item_field_versions` — max 10 versiyon, FIFO (PR-N2)
-- **Etiketler + Favoriler:** `tags`, `item_tags`, `user_favorites` (PR-N7)
-- **Bildirimler:** `notifications` — in-app + WS push (PR-N8)
-- **Credential expiry:** `items.expires_at/rotation_interval_days/last_rotated_at` + nightly scanner (PR-N1)
-- **Break-glass:** `users.is_break_glass` — acil erişim, tüm adminlere anlık uyarı (PR-N4)
-- **One-time share:** `item_share_links` — token_hash + dek_wrapped, link_key URL fragment'ta (PR-N5)
-- **External secret backends:** HashiCorp Vault proxy (Faz 5, parking) — ADR-0007.
+- Server: Kubernetes üzerinde Go tabanlı REST + WebSocket API
+- Web Admin UI: React + Vite + TypeScript
+- Client: Tauri 2.x (Rust) — Windows + macOS native, offline cache
+- Auth: Argon2id + TOTP + WebAuthn/FIDO2 + Trusted Device + mTLS client cert
+- **3-katmanlı RBAC:** Global rol (admin/write/read) + Klasör ACL (grup dahil) + Item-level share
+- **Gruplar:** `groups` + `group_members` + `folder_group_permissions`
+- **Dinamik veri modeli:** `item_types` + `field_definitions` + `item_relationships`
+- **Versiyonlama:** `item_field_versions` — max 10 versiyon, FIFO
+- **Etiketler + Favoriler:** `tags`, `item_tags`, `user_favorites`
+- **Bildirimler:** `notifications` + in-app WS push + email + Slack/Teams webhook
+- **Credential expiry:** nightly scanner + health score (0-100)
+- **Break-glass:** `users.is_break_glass` — acil erişim, tüm adminlere anlık uyarı
+- **One-time share:** `item_share_links` — E2E, link_key URL fragment'ta
+- **External secret backends:** HashiCorp Vault proxy + dinamik credential
+- **Pipeline/Lifecycle:** ReactFlow görselleştirme + swimlane + PNG/SVG export
+- **İlişki haritası:** `item_relationships` graph + D3 render
+- **Linked entries:** `item_links` — mirror/reference field propagation
+- **Arama:** pg_trgm trigram fuzzy + HMAC blind index
+- **Şablonlar:** kullanıcı tanımlı + 11 quickstart
+- **Duplicate detection:** HMAC blind index ile aynı isim uyarısı
+- **Bulk export:** Şifreli ZIP (E2E, disaster recovery)
+- **Import:** CSV + KeePass .kdbx
+- **MCP server:** `cmd/mcp/` — Claude Code ve LLM agent'larına read-only vault erişimi
+- **AI önerileri:** tag + ilişki önerisi (LLM, PII korumalı)
+- **CLI:** `cli/` — `ironstock` komutu, multi-arch Go binary
+- **Ekosistem:** Ansible dynamic inventory, Prometheus AlertRules, SCIM 2.0, Splunk/Elastic forwarding, Secret scanning
 
 ## Tech Stack
 
 | Katman | Teknoloji |
 |--------|-----------|
-| Backend dili | Go 1.22+ |
-| Client framework | Tauri 2.x (Rust + Vite frontend) |
-| Admin web | React + Vite + TypeScript |
-| Veritabanı | PostgreSQL 16 |
-| Şifreleme | AES-256-GCM (envelope) + X25519 (key wrap) |
-| Auth | Argon2id (password) + TOTP + JWT session |
+| Backend | Go 1.23 |
+| Client | Tauri 2.x (Rust) + Vite frontend |
+| Admin web | React 18 + Vite + TypeScript + Tailwind 4 + shadcn/ui |
+| State | Zustand (auth/ui) + TanStack Query (server state) |
+| Veritabanı | PostgreSQL 16 + goose migration |
+| Şifreleme | AES-256-GCM (envelope) + X25519 (key wrap) + Argon2id (KEK) |
+| Auth | JWT (15dk access + 7g refresh) + TOTP + WebAuthn + mTLS |
+| Realtime | WebSocket + Redis pub/sub (horizontal scale) |
+| Storage | MinIO (attachments) |
 | Dev stack | Docker Compose |
-| Container images | Multi-stage Dockerfile, native cross-compile (server: alpine+goose embed, web: nginx) → GHCR |
-| Deploy | Raw k8s YAML + ArgoCD GitOps + DB migration init container (Helm Faz 5'te değerlendirilecek; ADR-0008) |
-| CI | GitHub Actions (server + pre-commit + docker multi-arch ~8dk) |
-| Secrets | `kubectl create secret` (Sealed Secrets/External Secrets Operator Faz 5'te) |
+| Container | Multi-stage Dockerfile → GHCR (multi-arch amd64+arm64) |
+| Deploy | Raw k8s YAML + ArgoCD GitOps + Sealed Secrets |
+| CI | GitHub Actions (server + web + e2e + security scan) |
 
 ## Güvenlik Modeli (Hibrit)
 
-- **Metadata** (item isim, IP, hostname, klasör yapısı, hardware specs): server-side envelope encryption — master key KMS'te, per-item DEK.
-- **Secret field'lar** (parola, private key, token, URL credential): client-side E2E — kullanıcı master parolasından Argon2id ile türetilen key ile şifrelenir. Server plaintext'i asla görmez.
-- **Paylaşılan item'lar**: per-item DEK üretilir, yetkili kullanıcıların public key'leri (X25519) ile wrap edilir.
-- **Audit log**: server-side plaintext (uyumluluk ve okunabilirlik için).
-- **Vault-backed item'lar**: Envanter path referansı tutar, secret'ı DB'ye yazmaz. Erişim anında Vault'tan canlı çekilir (proxy). Detay ADR-0007.
+- **Metadata** (item isim, IP, hostname): server-side envelope encryption — master key KMS'te, per-item DEK.
+- **Secret field'lar** (parola, private key, token): client-side E2E — Argon2id KEK ile şifrelenir. **Server plaintext asla görmez.**
+- **Paylaşılan item'lar**: per-item DEK, yetkili kullanıcıların public key'leri (X25519) ile wrap edilir.
+- **Vault-backed item'lar**: path referansı tutar, secret DB'ye yazılmaz. Erişimde Vault proxy. ADR-0007.
+- **LLM/AI**: item field değerleri (secret veya değil) LLM'e **asla gönderilmez** — sadece name+description+tag+type.
+- **Audit log**: server-side plaintext (uyumluluk için).
 
-Detaylı tasarım: [docs/adr/0002-security-model.md](docs/adr/0002-security-model.md) (Faz 1'de yazıldı) + [docs/adr/0004-encryption-details.md](docs/adr/0004-encryption-details.md) (algoritma detayları).
+Detay: `docs/adr/0002-security-model.md` + `docs/adr/0004-encryption-details.md`
 
 ## Dizin Yapısı
 
 ```
-Envanter_App/
+IronStock/
 ├── server/                  # Go backend (cmd/, internal/, migrations/)
+│   └── migrations/          # En son: 00059_secret_fingerprints.sql
 ├── client/                  # Tauri app (src-tauri/ + src/)
 ├── web/                     # Admin UI (React + Vite)
+├── cli/                     # ironstock CLI (Go, ayrı modül)
+├── e2e/                     # Playwright E2E testleri
 ├── shared/                  # OpenAPI spec + generated types
-├── deploy/                  # Helm chart + docker-compose
-├── docs/                    # Mimari, ADR'ler, diyagramlar
-│   └── adr/                 # Architecture Decision Records
-├── .github/workflows/       # CI tanımları
-├── CLAUDE.md                # Bu dosya
-├── PROGRESS.md              # Faz durumu + günlük
-├── RULES.md                 # Development kuralları
-├── TODO.md                  # Aktif + gelecek task'lar
-├── README.md                # Kullanıcı-yüzü dokümantasyon
+├── deploy/                  # k8s YAML + docker-compose
+├── scripts/                 # check-tracking-files.sh vb.
+├── docs/                    # ADR'ler + diyagramlar
+│   └── adr/                 # 0001–0012 (0012: geliştirme tracking disiplini)
+├── .github/workflows/       # CI: ci.yml + security.yml + e2e.yml
+├── .github/PULL_REQUEST_TEMPLATE.md
+├── .pre-commit-config.yaml  # gofmt + golangci-lint + eslint + gitleaks + tracking check
+├── CLAUDE.md                # Bu dosya (her session otomatik yüklenir)
+├── PROGRESS.md              # Güncel durum + tamamlanan PR detayları
+├── RULES.md                 # Geliştirme kuralları (tracking zorunluluğu dahil)
+├── TODO.md                  # Aktif + tamamlanan task'lar
 └── Makefile                 # Ortak komutlar
 ```
 
-## İletişim ve Çalışma Tarzı
+## Güncel Durum (2026-05-24)
 
-- **Dil:** Türkçe (kullanıcı tercihi).
-- **Planlama:** Mimari kararlar detaylı planlanır. Koda başlamadan önce tasarımda mutabık kalınır.
-- **Faz bazlı ilerleme:** Aynı anda bir faz aktif. Faz bitmeden sonraki başlamaz.
-- **TodoWrite eşleniği:** Aktif faz task'ları TodoWrite'ta tutulur, `TODO.md` kalıcı yansımadır.
-
-## İş Bölümü — Çift Makine Workflow (▶ Faz 3'te aktif, Post-v1.0.0'da tek makine)
-
-**Mevcut durum (2026-05-16):** Post-v1.0.0 Kapsamlı Geliştirme Planı kapsamındaki 17 PR tamamlandı (PR-RT-1 → PR-N5). Tek makine (Win) ile çalışılıyor. Kalan: PR-F3 (Tauri Sync), PR-N3 (büyük iş, ayrı plan).
-
-**Stack kararları (Faz 3):** ADR-0009 — Zustand + TanStack Query + Tailwind 4 + shadcn/ui + argon2-browser + WS subprotocol auth.
-
-**Migration sayısı (2026-05-17):** En son migration `00033_pipeline_diagrams.sql`. Yeni migration eklerken sıradaki numara `00034`.
+- **Tamamlanan:** 22/27 PR (%82) — Faz 6–10 tam, Faz 11 kısmi
+- **Aktif:** PR-PROD4 (UX Polish — bileşenler hazır, App.tsx/app-shell/sayfa entegrasyonu eksik)
+- **Kalan:** PR-PROD5 (Perf+SLO), PR-PROD6 (Docs), PR-PROD7 (DR+Backup), PR-TF (ayrı repo), PR-BROWSER (ayrı dizin)
+- **Migration:** En son `00059_secret_fingerprints.sql` → yeni migration eklerken `00060`'tan başla
 
 ## Her Session'da Yapılacaklar
 
-1. `PROGRESS.md` oku — aktif faz ve son durum.
-2. `TODO.md` oku — sıradaki task.
-3. `RULES.md`'yi dikkate al — kod/commit/test kuralları.
-4. İş bitince: `PROGRESS.md` güncelle (günlük entry), `TODO.md` işaretle, gerekirse `RULES.md`'ye yeni kural ekle.
+1. `PROGRESS.md` oku — aktif faz, son PR detayları, güncel durum.
+2. `TODO.md` oku — sıradaki task, kalan PR'lar.
+3. `RULES.md` dikkate al — kod/commit/test/tracking kuralları.
+4. **İş bitince:** `PROGRESS.md` + `TODO.md` aynı commit'e dahil et (pre-commit hook da zorlar).
 
 ## Kritik Kurallar (Özet)
 
-Tam liste: `RULES.md`.
+Tam liste: `RULES.md` + `docs/adr/0012-development-tracking-discipline.md`
 
-- Secret field (parola, token, private key) asla plaintext log'lanmaz **veya repo'ya commit edilmez** (`secret.yaml` gibi). `.gitignore` + Sealed Secrets / SOPS pattern'i kullanılır.
+- Secret field (parola, token, private key) asla plaintext log'lanmaz veya repo'ya commit edilmez.
 - Test yazılmadan public API merge edilmez.
-- Her mimari karar `docs/adr/` altında ADR olarak yazılır.
-- Her task sonunda `PROGRESS.md` güncellenir (aynı commit içinde).
-- Conventional Commits formatı zorunlu.
-- Repos canonical, Claude-Chat legacy (RULES.md "Repo Konumu" bölümü).
+- Her mimari karar `docs/adr/NNNN-*.md` formatında ADR olarak yazılır.
+- **Her kod commit'inde `PROGRESS.md` + `TODO.md` aynı commit'e dahil edilir** (pre-commit hook zorlar; `SKIP_TRACKING_CHECK=1` meşru bypass).
+- Conventional Commits formatı zorunlu (`feat/fix/chore/docs/refactor`).
+- `ClaimsFromContext(ctx)` kullan — `claimsFromCtx` diye bir şey yok.
+- `auth.ResolveItemPermission(ctx, db, userID, itemID)` — doğru permission resolver.
+- LLM'e item field değerleri (secret veya değil) **asla gönderilmez**.
+- Password reset E2E private key'i kaybettirir → amber uyarı UI'da zorunlu.
+- MCP server: sadece read-only tool'lar (mutation yok).
+
+## Yeni Geliştirici Kurulum
+
+```bash
+git clone https://github.com/GameOfAI/IronStock.git
+cd IronStock
+pip install pre-commit && pre-commit install   # tracking hook + gitleaks + linter
+cd server && go mod download
+cd ../web && npm install
+```
