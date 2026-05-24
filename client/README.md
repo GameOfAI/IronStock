@@ -1,249 +1,262 @@
-# Client (Tauri Desktop)
+# IronStock Desktop
 
-Windows ve macOS için native desktop uygulaması.
-Tauri 2 (Rust) + React 18 + TypeScript yapısı. Client-side E2E şifreleme, offline cache ve system tray desteği içerir.
+<p>
+  <a href="https://github.com/GameOfAI/IronStock/releases/latest"><img src="https://img.shields.io/badge/Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white" alt="Windows" /></a>
+  <a href="https://github.com/GameOfAI/IronStock/releases/latest"><img src="https://img.shields.io/badge/macOS-000000?style=for-the-badge&logo=apple&logoColor=white" alt="macOS" /></a>
+</p>
+
+<p>
+  <img src="https://img.shields.io/badge/Tauri-2-FFC131?logo=tauri&logoColor=black" alt="Tauri" />
+  <img src="https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black" alt="React" />
+  <img src="https://img.shields.io/badge/Rust-backend-000000?logo=rust&logoColor=white" alt="Rust" />
+</p>
+
+Native desktop application for IronStock. Full vault access with client-side E2E encryption, offline mode, and system tray integration.
 
 ---
 
-## Mimari
+## Download
+
+| Platform | Format | Link |
+|----------|--------|------|
+| Windows | `.msi` installer | [Download](https://github.com/GameOfAI/IronStock/releases/latest) |
+| macOS | `.dmg` universal (Intel + Apple Silicon) | [Download](https://github.com/GameOfAI/IronStock/releases/latest) |
+
+---
+
+## Features
+
+- **Zero-knowledge encryption** &mdash; X25519 + AES-256-GCM client-side. Server never sees plaintext.
+- **Offline mode** &mdash; encrypted IndexedDB cache with outbox for pending writes. Works without connectivity.
+- **Auto-sync** &mdash; WebSocket real-time updates with automatic reconnection.
+- **Inactivity lock** &mdash; auto-locks after 15 minutes, clears private key from RAM.
+- **System tray** &mdash; quick access from taskbar/menu bar.
+- **Auto-updater** &mdash; server-based update checking and installation.
+- **Screen capture protection** &mdash; content protection API prevents screenshots.
+- **mTLS support** &mdash; client certificate authentication with .p12 picker.
+- **Multi-factor auth** &mdash; TOTP and WebAuthn/FIDO2 support.
+- **Connection gate** &mdash; graceful offline/reconnect UX.
+
+---
+
+## Architecture
 
 ```mermaid
 graph TD
-    subgraph tauri["Tauri 2 (Rust — src-tauri/)"]
-        rust_core["lib.rs\nTauri Builder"]
+    subgraph tauri["Tauri 2 (Rust)"]
+        builder["lib.rs\nTauri Builder"]
         tray["tray-icon plugin"]
         updater["tauri-plugin-updater"]
-        keyring["keyring\nsistem anahtar deposu"]
+        keyring["keyring\nOS keychain"]
+        commands["Rust Commands\ncache, content protection"]
     end
 
-    subgraph frontend["Frontend (src/)"]
-        router["React Router\nAuthGate · ConnectionGate"]
-
-        subgraph pages_grp["Pages"]
-            login["login.tsx"]
-            inventory["inventory.tsx"]
-            config["config.tsx"]
-            totp["totp-setup.tsx"]
+    subgraph frontend["React Frontend"]
+        router["React Router\nAuthGate + ConnectionGate"]
+        
+        subgraph pages["Pages"]
+            login["Login"]
+            inventory["Inventory"]
+            config["Settings"]
+            totp["TOTP Setup"]
         end
 
-        subgraph state["State (Zustand)"]
-            auth_store["store/auth\nprivateKey · accessToken"]
-            conn_store["store/connection\nWS durum"]
-            ui_store["store/ui"]
+        subgraph state["Zustand Stores"]
+            auth["auth\nprivateKey + tokens"]
+            conn["connection\nWS state"]
+            pending["pending-ops\noffline outbox"]
         end
 
-        subgraph api_grp["API Layer"]
-            http_client["api/client.ts\nfetch wrapper + token refresh"]
-            ws_client["api/ws.ts\nWebSocket client"]
-            crypto_lib["lib/crypto.ts\nArgon2id · X25519 · AES-GCM"]
-        end
-
-        subgraph inv_comp["Inventory Components"]
-            folder_tree["folder-tree.tsx"]
-            item_list["item-list.tsx"]
-            item_detail["item-detail.tsx\nDEK unwrap + field decrypt"]
-            item_form["item-form-modal.tsx\nE2E field encrypt"]
-            attach["item-attachment-panel.tsx"]
+        subgraph crypto["Crypto"]
+            argon2["Argon2id"]
+            x25519["X25519"]
+            aes["AES-256-GCM"]
         end
     end
 
-    rust_core --> frontend
+    builder --> frontend
     frontend --> tauri
-    auth_store --> crypto_lib
-    item_detail --> crypto_lib
-    item_form --> crypto_lib
+    inventory --> crypto
+    auth --> crypto
 ```
 
 ---
 
-## Uygulama Durum Makinesi
-
-```mermaid
-stateDiagram-v2
-    [*] --> ConnectionCheck: Uygulama açılır
-
-    ConnectionCheck --> Offline: Sunucu erişilemiyor
-    Offline --> ConnectionCheck: Yeniden dene
-
-    ConnectionCheck --> AuthCheck: Bağlantı var
-
-    AuthCheck --> Login: Token yok / süresi dolmuş
-    AuthCheck --> TOTPSetup: TOTP kayıtlı değil
-    AuthCheck --> App: Kimlik doğrulandı
-
-    Login --> TOTPSetup: TOTP gerekli
-    Login --> App: Başarılı giriş
-    TOTPSetup --> App: TOTP tamamlandı
-
-    App --> InactivityLock: 15 dk hareketsizlik
-    InactivityLock --> Login: privateKey RAM'den silindi
-
-    App --> [*]: Uygulama kapatıldı
-```
-
----
-
-## Sayfa Akışı
-
-```mermaid
-flowchart LR
-    Start([Uygulama açılış]) --> CG{ConnectionGate}
-    CG -->|sunucu yok| Offline[Offline gösterge]
-    CG -->|bağlandı| AG{AuthGate}
-    AG -->|token yok| Login[Login Sayfası]
-    AG -->|TOTP eksik| TOTP[TOTP Setup]
-    AG -->|giriş tamam| Inv[Envanter Sayfası]
-    Login -->|başarılı| Inv
-    Inv --> Detail[Item Detail\notomatik DEK çözümleme]
-    Inv --> Config[Ayarlar Sayfası]
-```
-
----
-
-## Inventory Sayfası Bileşen Ağacı
-
-```mermaid
-graph TD
-    InvPage["pages/inventory.tsx"]
-
-    InvPage --> FT["FolderTree\nsol panel"]
-    InvPage --> IL["ItemList\norta panel"]
-    InvPage --> ID["ItemDetail\nsağ panel"]
-
-    FT --> FTN["FolderTreeNode\nözyinelemeli"]
-    FTN --> FFM["FolderFormModal\nyeni/düzenle"]
-    FTN --> FDD["FolderDeleteDialog"]
-
-    IL --> IS["ItemSearch\ndebounce 300ms"]
-    IL --> PB["PermissionBadge"]
-    IL --> IFM["ItemFormModal\nyeni item"]
-
-    ID --> FR["FieldRow × N\nblur + copy + 30sn timer"]
-    ID --> IAP["ItemAttachmentPanel\npresign upload/download"]
-    ID --> RT["RelativeTime\ncreated_at / updated_at"]
-
-    IL -->|"seçim"| ID
-    FT -->|"klasör seçimi"| IL
-
-    ID -->|"DEK unwrap"| CL["lib/crypto.ts"]
-    IAP -->|"presign URL"| API["api/attachments.ts"]
-```
-
----
-
-## E2E Şifreleme (Client Tarafı)
+## E2E Encryption Flow
 
 ```mermaid
 sequenceDiagram
-    participant U as Kullanıcı
-    participant App as Uygulama
+    participant User
+    participant App as Desktop App
     participant Crypto as lib/crypto.ts
     participant Server as Go API
 
-    Note over U,Server: Kayıt
-    U->>App: Master parola gir
-    App->>Crypto: Argon2id(parola, salt) → user_key
-    App->>Crypto: X25519 keypair üret
-    App->>Crypto: AES-GCM(private_key, user_key) → private_key_enc
+    Note over User,Server: Registration
+    User->>App: Enter master password
+    App->>Crypto: Argon2id(password, salt) → user_key
+    App->>Crypto: Generate X25519 keypair
+    App->>Crypto: AES-GCM(private_key, user_key) → encrypted
     App->>Server: POST /auth/register {public_key, private_key_enc}
 
-    Note over U,Server: Login
-    U->>App: Parola gir
-    App->>Crypto: Argon2id(parola, salt) → user_key
+    Note over User,Server: Login
+    User->>App: Enter password
+    App->>Crypto: Argon2id(password, salt) → user_key
     App->>Server: POST /auth/login
     Server-->>App: access_token + private_key_enc
-    App->>Crypto: AES-GCM decrypt(private_key_enc, user_key) → private_key
-    App->>App: private_key RAM'de sakla (store/auth)
-
-    Note over U,Server: Item okuma
+    App->>Crypto: Decrypt private_key → hold in RAM
+    
+    Note over User,Server: Read Item
     App->>Server: GET /items/:id
-    Server-->>App: metadata + owner_dek_wrapped + field_enc[]
-    App->>Crypto: X25519 unseal(owner_dek_wrapped, private_key) → DEK
-    App->>Crypto: AES-GCM decrypt(field_enc, DEK) → plaintext[]
-    App-->>U: Alan değerlerini göster
+    Server-->>App: metadata + wrapped DEK + encrypted fields
+    App->>Crypto: X25519 unwrap DEK with private_key
+    App->>Crypto: AES-GCM decrypt fields with DEK
+    App-->>User: Show plaintext values
 
-    Note over U,Server: Item yazma
-    App->>Crypto: random 256-bit DEK üret
-    App->>Crypto: AES-GCM encrypt(field_value, DEK) → field_enc
-    App->>Crypto: X25519 seal(DEK, public_key) → dek_wrapped
-    App->>Server: POST /items {metadata, field_enc[], dek_wrapped}
+    Note over User,Server: Write Item
+    App->>Crypto: Generate random 256-bit DEK
+    App->>Crypto: AES-GCM encrypt field values with DEK
+    App->>Crypto: X25519 wrap DEK with public_key
+    App->>Server: POST /items {encrypted fields + wrapped DEK}
 ```
 
 ---
 
-## Offline Cache Akışı
+## Offline Mode
 
 ```mermaid
 flowchart TD
-    Start([Uygulama başladı]) --> Check{"Bağlantı\nvar mı?"}
+    Start([App Launch]) --> Check{"Connected?"}
 
-    Check -->|Evet| Fetch["API'den veri çek\nTanStack Query"]
-    Fetch --> Cache["IndexedDB'ye şifreli yaz\nDEK ile"]
-    Cache --> Show["Kullanıcıya göster"]
+    Check -->|Yes| Fetch["Fetch from API\nTanStack Query"]
+    Fetch --> Cache["Write encrypted\nto IndexedDB"]
+    Cache --> Show["Display to user"]
 
-    Check -->|Hayır| ReadCache["IndexedDB'den\nşifreli oku"]
-    ReadCache --> Decrypt["RAM'deki\nprivate_key ile çöz"]
+    Check -->|No| ReadCache["Read encrypted\nfrom IndexedDB"]
+    ReadCache --> Decrypt["Decrypt with\nprivate_key (RAM)"]
     Decrypt --> Show
 
-    Show --> WS["WebSocket\nolaylarını dinle"]
-    WS -->|"item güncellendi"| Fetch
+    Show --> Listen["Listen for\nWebSocket events"]
+    Listen -->|"item updated"| Fetch
+
+    Show --> Write["User edits item"]
+    Write --> Outbox["Queue in\npending-ops outbox"]
+    Outbox --> Sync["Sync when\nconnection restored"]
 ```
 
 ---
 
-## Temel Dosyalar
+## Application State Machine
 
-| Dosya | Açıklama |
-|-------|---------|
-| `src/store/auth.ts` | `privateKey`, `accessToken`, `user` — uygulama geneli auth durumu |
+```mermaid
+stateDiagram-v2
+    [*] --> ConnectionCheck: App opens
+
+    ConnectionCheck --> Offline: Server unreachable
+    Offline --> ConnectionCheck: Retry
+
+    ConnectionCheck --> AuthCheck: Connected
+
+    AuthCheck --> Login: No token / expired
+    AuthCheck --> TOTPSetup: TOTP not enrolled
+    AuthCheck --> App: Authenticated
+
+    Login --> TOTPSetup: TOTP required
+    Login --> App: Login successful
+    TOTPSetup --> App: TOTP complete
+
+    App --> InactivityLock: 15 min idle
+    InactivityLock --> Login: privateKey cleared from RAM
+
+    App --> [*]: App closed
+```
+
+---
+
+## Key Files
+
+| File | Purpose |
+|------|---------|
+| `src/store/auth.ts` | `privateKey`, `accessToken`, `user` &mdash; app-wide auth state |
 | `src/lib/crypto.ts` | `openDEKWithKEK`, `decryptField`, `encryptField`, `fromBase64` |
-| `src/api/client.ts` | Fetch wrapper — 401'de otomatik token yenileme |
-| `src/api/ws.ts` | WebSocket bağlantısı + heartbeat + yeniden bağlanma |
-| `src/components/inventory/item-detail.tsx` | DEK çözme, alan görüntüleme, pano temizleme (30sn) |
-| `src/components/inventory/item-form-modal.tsx` | Yeni/düzenle modal — şifreli field yazma |
-| `src/routes/auth-gate.tsx` | Auth + TOTP durumu kontrolü |
-| `src/routes/connection-gate.tsx` | Sunucu erişilebilirlik kontrolü |
-| `src/hooks/use-inactivity-lock.ts` | Hareketsizlik sonrası otomatik kilit |
+| `src/api/client.ts` | Fetch wrapper with 401 auto-refresh |
+| `src/api/ws.ts` | WebSocket with heartbeat + reconnection |
+| `src/components/inventory/item-detail.tsx` | DEK unwrap, field display, clipboard auto-clear (30s) |
+| `src/components/inventory/item-form-modal.tsx` | E2E encrypted field creation |
+| `src/routes/auth-gate.tsx` | Auth + TOTP state checking |
+| `src/routes/connection-gate.tsx` | Server reachability gate |
+| `src/hooks/use-inactivity-lock.ts` | Auto-lock on idle |
+| `src-tauri/src/lib.rs` | Tauri builder + plugin registration |
 
 ---
 
-## Kurulum ve Derleme
+## Tauri Plugins
 
-```bash
-cd client
+| Plugin | Purpose |
+|--------|---------|
+| `tray-icon` | System tray icon and right-click menu |
+| `tauri-plugin-updater` | Server-based auto-update |
+| `keyring` | OS keychain integration for optional token persistence |
 
-# Bağımlılıklar
-npm install
+---
 
-# Dev modu (Tauri penceresiyle)
-npm run tauri:dev
+## Development
 
-# Sadece frontend dev
-npm run dev
+### Prerequisites
 
-# Release build
-npm run tauri:build
-# Çıktı: src-tauri/target/release/bundle/
-#   Windows: .msi (NSIS installer)
-#   macOS:   .dmg (Universal — arm64 + x86_64)
-
-# Testler
-npm test
-
-# Lint + tip kontrolü
-npm run lint && npx tsc -b
-```
-
-Platform gereksinimleri:
+- **Node.js** 20+
+- **Rust** 1.75+ (for Tauri)
 - **Windows:** MS Build Tools + WebView2
 - **macOS:** Xcode CLI tools (`xcode-select --install`)
 
+### Setup
+
+```bash
+cd client
+npm install
+
+# Dev mode (opens Tauri window with HMR)
+npm run tauri:dev
+
+# Frontend only (no Tauri)
+npm run dev
+
+# Tests
+npm test
+
+# Lint + type check
+npm run lint && npx tsc -b
+```
+
+### Release Build
+
+```bash
+npm run tauri:build
+
+# Output: src-tauri/target/release/bundle/
+#   Windows: .msi (NSIS installer)
+#   macOS:   .dmg (Universal binary)
+```
+
 ---
 
-## Tauri Eklentileri
+## Project Structure
 
-| Eklenti | Kullanım |
-|---------|---------|
-| `tray-icon` | System tray simgesi ve sağ-tık menüsü |
-| `tauri-plugin-updater` | Otomatik güncelleme (sunucu tabanlı) |
-| `keyring` | OS anahtar deposu — opsiyonel token kalıcılığı |
+```
+client/
+├── src/                          # React frontend
+│   ├── pages/                    # Login, inventory, config, admin
+│   ├── components/               # Inventory, layout, UI
+│   ├── api/                      # REST + WebSocket clients
+│   ├── lib/                      # Crypto, WebAuthn, utilities
+│   ├── store/                    # Zustand (auth, connection, pending-ops)
+│   ├── hooks/                    # Inactivity lock, offline sync
+│   └── routes/                   # Auth gate, connection gate
+├── src-tauri/                    # Rust backend
+│   ├── src/lib.rs                # Tauri builder + commands
+│   ├── Cargo.toml                # Rust dependencies
+│   ├── tauri.conf.json           # App config (IronStock, 1200x800)
+│   ├── capabilities/             # Permission scoping
+│   └── icons/                    # App icons
+├── package.json
+└── vite.config.ts
+```

@@ -1,190 +1,265 @@
-# Envanter App
+<p align="center">
+  <img src="docs/diagrams/logo-placeholder.png" alt="IronStock" width="120" />
+</p>
 
-[![CI](https://github.com/bhaslaman/Envanter_App/actions/workflows/ci.yml/badge.svg)](https://github.com/bhaslaman/Envanter_App/actions/workflows/ci.yml)
+<h1 align="center">IronStock</h1>
 
-DevOps/SRE takımı için merkezi envanter ve credential yönetimi.
-KeePassXC'ye alternatif — canlı sync, TOTP MFA, RBAC ve client-side E2E şifreleme.
+<p align="center">
+  <strong>Self-hosted credential vault for DevOps & SRE teams</strong>
+</p>
 
-**Durum:** `v1.0.0` — Production-ready. Tüm fazlar tamamlandı ✅
+<p align="center">
+  <a href="https://github.com/GameOfAI/IronStock/actions/workflows/ci.yml"><img src="https://github.com/GameOfAI/IronStock/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/GameOfAI/IronStock/actions/workflows/security.yml"><img src="https://github.com/GameOfAI/IronStock/actions/workflows/security.yml/badge.svg" alt="Security" /></a>
+  <img src="https://img.shields.io/badge/Go-1.22-00ADD8?logo=go&logoColor=white" alt="Go" />
+  <img src="https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black" alt="React" />
+  <img src="https://img.shields.io/badge/Tauri-2-FFC131?logo=tauri&logoColor=black" alt="Tauri" />
+  <img src="https://img.shields.io/badge/version-0.4.0-blue" alt="Version" />
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="License" />
+</p>
+
+<p align="center">
+  A zero-knowledge credential manager built for infrastructure teams.<br/>
+  Store secrets, share with your team, and integrate with your entire DevOps toolchain &mdash;<br/>
+  all with client-side end-to-end encryption. The server <em>never</em> sees your plaintext.
+</p>
 
 ---
 
-## Mimari Genel Bakış
+<p align="center">
+  <a href="#-quick-start">Quick Start</a> &bull;
+  <a href="#-download">Download</a> &bull;
+  <a href="#-features">Features</a> &bull;
+  <a href="#-architecture">Architecture</a> &bull;
+  <a href="#-documentation">Docs</a>
+</p>
+
+---
+
+## Why IronStock?
+
+Most credential managers treat DevOps as an afterthought. IronStock is built from the ground up for infrastructure teams:
+
+- **Zero-knowledge encryption** &mdash; X25519 key exchange + AES-256-GCM. Your secrets are encrypted client-side before they ever leave your device. The server stores only ciphertext.
+- **Native DevOps integrations** &mdash; Terraform provider, Ansible dynamic inventory, CLI tool, MCP server for AI assistants, Kubernetes secret scanning, and HashiCorp Vault proxy &mdash; all built in.
+- **Real-time collaboration** &mdash; WebSocket-powered live sync with Redis pub/sub for horizontal scaling. Share a credential and your teammate sees it instantly.
+- **Enterprise auth** &mdash; OIDC/LDAP SSO with JWKS verification, SCIM 2.0 provisioning (Azure AD, Okta), WebAuthn/FIDO2, TOTP, and mTLS client certificates.
+- **Works everywhere** &mdash; Desktop app (Windows & macOS), browser extension (Chrome/Edge), web admin panel, CLI, and Terraform. Offline mode with encrypted local cache.
+
+---
+
+## Features
+
+| Category | Highlights |
+|----------|-----------|
+| **Encryption** | Client-side E2E (X25519 + AES-256-GCM), server-side envelope encryption, zero-knowledge architecture |
+| **Authentication** | TOTP, WebAuthn/FIDO2, mTLS certificates, OIDC/LDAP SSO, SCIM 2.0 provisioning |
+| **Access Control** | RBAC with folder-level permissions, approval/checkout workflows, GeoIP + IP whitelist, time-based access windows |
+| **Collaboration** | Per-item sharing with public key wrapping, real-time WebSocket sync, group management |
+| **Kubernetes** | Cluster management, secret scanning, dynamic Vault credentials, resource proxy |
+| **IaC & Automation** | Terraform provider, Ansible dynamic inventory, CLI tool, MCP server for AI assistants |
+| **Monitoring** | Prometheus metrics, Grafana dashboards, alert rules, SLO targets, item health scores |
+| **Data Management** | CSV & KeePass import, encrypted bulk export, full-text + fuzzy search, relationship graph |
+| **Operations** | Full audit trail, log forwarding (Syslog/Splunk), automated backups, disaster recovery |
+| **AI** | MCP server (6 tools) for Claude/ChatGPT, LLM-powered field suggestions |
+
+---
+
+## Download
+
+### Desktop App (Tauri)
+
+<p>
+  <a href="https://github.com/GameOfAI/IronStock/releases/latest"><img src="https://img.shields.io/badge/Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white" alt="Windows" /></a>
+  <a href="https://github.com/GameOfAI/IronStock/releases/latest"><img src="https://img.shields.io/badge/macOS-000000?style=for-the-badge&logo=apple&logoColor=white" alt="macOS" /></a>
+</p>
+
+Download the latest `.msi` (Windows) or `.dmg` (macOS Universal) from [GitHub Releases](https://github.com/GameOfAI/IronStock/releases/latest).
+
+### Browser Extension
+
+<p>
+  <a href="#"><img src="https://img.shields.io/badge/Chrome_Web_Store-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Chrome" /></a>
+  <a href="#"><img src="https://img.shields.io/badge/Edge_Add--ons-0078D7?style=for-the-badge&logo=microsoftedge&logoColor=white" alt="Edge" /></a>
+</p>
+
+One-click autofill from your vault. Also available as an unpacked extension &mdash; see [browser-extension/README.md](browser-extension/README.md).
+
+### CLI
+
+```bash
+# macOS (Apple Silicon)
+curl -L https://github.com/GameOfAI/IronStock/releases/latest/download/ironstock_darwin_arm64.tar.gz | tar xz
+sudo mv ironstock /usr/local/bin/
+
+# Linux (amd64)
+curl -L https://github.com/GameOfAI/IronStock/releases/latest/download/ironstock_linux_amd64.tar.gz | tar xz
+sudo mv ironstock /usr/local/bin/
+
+# Windows (PowerShell)
+Invoke-WebRequest -Uri https://github.com/GameOfAI/IronStock/releases/latest/download/ironstock_windows_amd64.zip -OutFile ironstock.zip
+Expand-Archive ironstock.zip -DestinationPath $env:LOCALAPPDATA\ironstock
+```
+
+See [cli/README.md](cli/README.md) for full command reference.
+
+---
+
+## Quick Start
+
+Get a local instance running in 30 seconds:
+
+```bash
+git clone https://github.com/GameOfAI/IronStock.git
+cd IronStock
+
+# Start PostgreSQL, MinIO, Redis, and supporting services
+make up
+
+# Apply database migrations
+make migrate
+
+# Start the API server
+make run
+
+# In another terminal — start the admin web UI
+cd web && npm install && npm run dev
+```
+
+Open [http://localhost:5173](http://localhost:5173) and create your first admin account.
+
+---
+
+## Architecture
 
 ```mermaid
 graph TD
-    subgraph clients["İstemciler"]
-        TC["Tauri Desktop\n(Windows + macOS)"]
-        WA["Admin Web UI\n(React)"]
+    subgraph clients["Clients"]
+        Desktop["Tauri Desktop\nWindows + macOS"]
+        Web["Web Admin\nReact + TypeScript"]
+        Ext["Browser Extension\nChrome / Edge"]
+        CLI["CLI\nGo binary"]
+        TF["Terraform\nProvider"]
+        Ansible["Ansible\nDynamic Inventory"]
+        MCP["MCP Server\nAI Assistants"]
     end
 
-    subgraph server["Kubernetes Kümesi"]
+    subgraph cluster["Kubernetes Cluster"]
         API["Go API Server\nREST + WebSocket"]
-        PG[("PostgreSQL 16")]
-        MN[("MinIO\nS3-compatible")]
+        Redis["Redis\nCache + Pub/Sub"]
+        PG[("PostgreSQL 16\n60 migrations")]
+        MinIO[("MinIO\nS3 Attachments")]
+        Vault["HashiCorp Vault\nDynamic Secrets"]
+        Prom["Prometheus\nMetrics + Alerts"]
     end
 
-    TC -- "HTTPS + WSS" --> API
-    WA -- "HTTPS + WSS" --> API
-    API -- "pgx/v5" --> PG
-    API -- "minio-go/v7" --> MN
+    Desktop -- "HTTPS + WSS" --> API
+    Web -- "HTTPS + WSS" --> API
+    Ext -- "HTTPS" --> API
+    CLI -- "HTTPS" --> API
+    TF -- "HTTPS" --> API
+    Ansible -- "HTTPS" --> API
+    MCP -- "stdio JSON-RPC" --> API
+
+    API --> PG
+    API --> Redis
+    API --> MinIO
+    API --> Vault
+    API --> Prom
+```
+
+### Encryption Boundary
+
+```
+ Client Device                    Server (Kubernetes)
+ ┌──────────────────┐            ┌──────────────────────────┐
+ │                  │            │                          │
+ │  Plaintext       │───E2E────▶│  Ciphertext only         │
+ │  (user sees)     │  encrypt  │  (server never decrypts) │
+ │                  │            │                          │
+ │  Argon2id KDF    │            │  Envelope encryption     │
+ │  X25519 key wrap │            │  (metadata fields)       │
+ │  AES-256-GCM     │            │                          │
+ └──────────────────┘            └──────────────────────────┘
 ```
 
 ---
 
-## Şifreleme Sınırı
+## Components
 
-```mermaid
-graph LR
-    subgraph boundary["Şifreleme Sınırı"]
-        subgraph client_zone["İstemci (kullanıcı cihazı)"]
-            plain["Açık metin\n(kullanıcı görür)"]
-            crypto_c["client/lib/crypto.ts\nArgon2id · X25519 · AES-GCM"]
-        end
-
-        subgraph server_zone["Sunucu (k8s)"]
-            meta_enc["Metadata şifreli\n(AES-256-GCM envelope)"]
-            secret_enc["Secret field'lar\nserver asla açık görmez"]
-            audit["Audit log\nplaintext (uyumluluk)"]
-            minio["MinIO\nbinary blob, içeriği bilmez"]
-        end
-    end
-
-    plain -->|"Argon2id + X25519 wrap"| secret_enc
-    plain -->|"server-side envelope"| meta_enc
-    plain -->|"kim ne yaptı"| audit
-    plain -->|"presigned URL, doğrudan"| minio
-```
+| Component | Description | README |
+|-----------|-------------|--------|
+| **[server/](server/)** | Go REST + WebSocket API &mdash; auth, crypto, RBAC, audit, integrations | [server/README.md](server/README.md) |
+| **[web/](web/)** | React 18 admin panel &mdash; full vault management UI | [web/README.md](web/README.md) |
+| **[client/](client/)** | Tauri 2 desktop app &mdash; native Windows & macOS with offline mode | [client/README.md](client/README.md) |
+| **[browser-extension/](browser-extension/)** | Chrome/Edge extension &mdash; autofill credentials from vault | [browser-extension/README.md](browser-extension/README.md) |
+| **[cli/](cli/)** | `ironstock` CLI &mdash; terminal access to your vault | [cli/README.md](cli/README.md) |
+| **[terraform/](terraform/)** | Terraform provider &mdash; manage vault resources as code | [terraform/README.md](terraform/README.md) |
+| **[deploy/](deploy/)** | Kubernetes manifests + Docker Compose | [deploy/README.md](deploy/README.md) |
+| **[shared/](shared/)** | OpenAPI spec + shared TypeScript types | [shared/api/README.md](shared/api/README.md) |
+| **[docs/](docs/)** | Architecture decisions, ops guides, security docs | [docs/README.md](docs/README.md) |
+| **[e2e/](e2e/)** | Playwright end-to-end tests | &mdash; |
 
 ---
 
-## İstek Yaşam Döngüsü
+## Tech Stack
 
-```mermaid
-sequenceDiagram
-    actor U as Kullanıcı
-    participant TC as Tauri Client
-    participant API as Go API
-    participant PG as PostgreSQL
-    participant MN as MinIO
-
-    U->>TC: Parola gir
-    TC->>TC: Argon2id → user_key
-    TC->>API: POST /auth/login
-    API->>PG: Argon2id doğrula
-    API-->>TC: access_token + şifreli private_key
-    TC->>TC: private_key çöz (RAM'de)
-
-    U->>TC: Item seç
-    TC->>API: GET /items/:id
-    API->>PG: şifreli metadata + wrapped DEK
-    API->>API: master_key → metadata çöz
-    API-->>TC: metadata (açık) + secret_fields (şifreli)
-    TC->>TC: private_key → DEK unwrap
-    TC->>TC: DEK → field değerleri çöz
-    TC-->>U: Tüm veriler gösterilir
-```
+| Layer | Technology |
+|-------|-----------|
+| **Backend** | Go 1.22, chi v5, pgx/v5, Redis, MinIO |
+| **Web Frontend** | React 18, TypeScript, Vite, Tailwind CSS 4, shadcn/ui, TanStack Query |
+| **Desktop** | Tauri 2 (Rust), React, system tray, auto-updater |
+| **Browser Extension** | Manifest V3, Chrome/Edge, service worker |
+| **CLI** | Go, Cobra, GoReleaser |
+| **IaC** | Terraform Plugin Framework |
+| **Database** | PostgreSQL 16, 60 migrations |
+| **Crypto** | Argon2id, X25519, AES-256-GCM, WebAuthn, FIDO2 |
+| **Auth** | JWT (HS256), TOTP, OIDC/LDAP SSO, SCIM 2.0, mTLS |
+| **Monitoring** | Prometheus, Grafana, 5 alert rule groups |
+| **CI/CD** | GitHub Actions, GoReleaser, Kustomize |
 
 ---
 
-## Özellikler
+## Security
 
-| Kategori | Özellik |
-|----------|---------|
-| **Auth** | Username + Argon2id, TOTP (RFC 6238), JWT access/refresh |
-| **Yetkilendirme** | Folder-level RBAC — `read` / `write` rolleri |
-| **Şifreleme** | Metadata → server-side AES-256-GCM envelope; Secret field → client-side X25519 E2E |
-| **Paylaşım** | Per-item DEK, yetkili kullanıcıların public key'iyle wrap |
-| **Live Sync** | WebSocket hub — anlık item/folder değişiklik bildirimi |
-| **Offline Cache** | Client bağlantısı koparsa son veriye şifreli erişim |
-| **Dosya Ekleri** | MinIO presigned URL upload/download — server plaintext görmez |
-| **Audit Log** | Tüm mutasyonlar server-side plaintext kaydı |
-| **Metrikler** | Prometheus `/metrics` endpoint |
+IronStock uses a hybrid encryption model:
 
----
+- **Secret fields** (passwords, tokens, API keys) are encrypted client-side with X25519 + AES-256-GCM. The server stores only ciphertext and cannot decrypt these values.
+- **Metadata** (names, descriptions, hostnames) is protected with server-side envelope encryption.
+- **Sharing** uses per-item DEKs wrapped with recipient public keys &mdash; no master key sharing.
 
-## Dizin Yapısı
+Additional security measures:
 
-```
-├── server/          # Go backend — REST + WebSocket + şifreleme
-├── client/          # Tauri desktop app (Windows + macOS)
-├── web/             # React admin web UI
-├── shared/          # OpenAPI spec + oluşturulan TypeScript tipleri
-├── deploy/
-│   ├── k8s/         # Kubernetes manifests + Kustomize
-│   └── compose/     # Docker Compose (local dev)
-└── docs/
-    └── adr/         # Architecture Decision Records (0001–0007)
-```
+- Session revocation with database-backed session checking
+- OIDC JWKS signature verification with key caching
+- SSRF protection for Kubernetes cluster URLs
+- Path traversal guards for Vault operations
+- Rate limiting (token bucket + Redis sliding window)
+- GeoIP and CIDR-based access control
+- Full audit trail with structured events
 
-Her katmanın ayrıntılı belgesi ilgili dizindeki `README.md`'dedir:
-[server/README.md](server/README.md) · [client/README.md](client/README.md) · [web/README.md](web/README.md) · [deploy/README.md](deploy/README.md)
+See [docs/security/threat-model.md](docs/security/threat-model.md) for the full threat model.
 
 ---
 
-## Hızlı Başlangıç (Geliştirici)
-
-Gereksinimler: **Docker**, **Go 1.22+**, **Node 20+**, **Rust 1.75+**
+## Contributing
 
 ```bash
-# 1. Dev stack başlat (Postgres + MinIO + Adminer + Mailhog)
-make up
+# Run all tests
+make test                  # Server (Go)
+cd web && npm test         # Web (179 tests)
+cd cli && go test ./...    # CLI
+cd terraform && go test ./... # Terraform provider
 
-# 2. Migrasyonları uygula
-make migrate
-
-# 3. Server'ı çalıştır
-make run
-
-# 4. Admin Web UI (ayrı terminal)
-cd web && npm run dev
-
-# 5. Desktop client (ayrı terminal)
-cd client && npm run tauri:dev
+# Lint
+make lint                  # Go (golangci-lint + gofmt)
+cd web && npm run lint     # Web (ESLint)
 ```
 
-Tüm komutlar için: `make help`
+Pre-commit hooks enforce: gofmt, go mod tidy, ESLint, gitleaks secret scanning, and tracking file updates.
 
 ---
 
-## Güvenlik Modeli (Özet)
+## License
 
-```
-Metadata (isim, IP, hostname)   → Server-side envelope encryption (AES-256-GCM)
-Secret field (parola, token)    → Client-side E2E (Argon2id KDF + X25519 wrap)
-Audit log                       → Server-side plaintext (uyumluluk için)
-Attachments                     → MinIO presigned URL — server plaintext görmez
-```
-
-Detay: [docs/adr/0002-security-model.md](docs/adr/0002-security-model.md)
-
----
-
-## CI/CD
-
-| Tetikleyici | Çalışan Job'lar |
-|-------------|----------------|
-| PR → main | Server (lint+test+build), Web (lint+test+build), Client (TS check), Integration tests |
-| Push → main | + Docker Build & Push (GHCR), Kustomize image tag update |
-| Push `v*` tag | + Tauri binary (Win NSIS + macOS Universal DMG), GitHub Release |
-
-Container registry: `ghcr.io/gameofai/envanter-api` / `envanter-web`
-
----
-
-## Dokümantasyon
-
-| Dosya | İçerik |
-|-------|--------|
-| [PROGRESS.md](PROGRESS.md) | Faz durumu + geliştirme günlüğü |
-| [RULES.md](RULES.md) | Kod, commit ve test kuralları |
-| [TODO.md](TODO.md) | Tamamlanan ve planlanan task'lar |
-| [docs/adr/0001](docs/adr/0001-tech-stack.md) | Tech stack kararı |
-| [docs/adr/0002](docs/adr/0002-security-model.md) | Hibrit şifreleme modeli |
-| [docs/adr/0003](docs/adr/0003-repo-layout.md) | Monorepo yapısı |
-
----
-
-## Lisans
-
-Proprietary — internal project.
+MIT License. See [LICENSE](LICENSE) for details.
