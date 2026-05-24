@@ -90,10 +90,10 @@ IronStock/
 
 ## Güncel Durum (2026-05-24)
 
-- **Tamamlanan:** 23/27 PR (%85) — Faz 6–10 tam, Faz 11 kısmi (PR-PROD1/2/3/4 done)
-- **Aktif:** PR-PROD5 (Perf+SLO)
-- **Kalan:** PR-PROD5 (Perf+SLO), PR-PROD6 (Docs), PR-PROD7 (DR+Backup), PR-TF (ayrı repo), PR-BROWSER (ayrı dizin)
-- **Migration:** En son `00059_secret_fingerprints.sql` → yeni migration eklerken `00060`'tan başla
+- **Tamamlanan:** 24/27 PR (%89) — Faz 6–10 tam, Faz 11 kısmi (PR-PROD1/2/3/4/5 done)
+- **Aktif:** PR-PROD6 (Docs)
+- **Kalan:** PR-PROD6 (Docs), PR-PROD7 (DR+Backup), PR-TF (ayrı repo), PR-BROWSER (ayrı dizin)
+- **Migration:** En son `00060_pg_stat_statements.sql` → yeni migration eklerken `00061`'den başla
 
 ## Her Session'da Yapılacaklar
 

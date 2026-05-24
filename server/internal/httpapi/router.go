@@ -10,6 +10,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"net/http/pprof"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -62,6 +63,7 @@ type Deps struct {
 	APIToken       *APITokenHandlers         // PR-ANSIBLE: API token management
 	SCIM           *SCIMHandlers             // PR-SCIM: SCIM 2.0 user provisioning
 	Scan           *ScanHandlers             // PR-SCAN: Secret fingerprint scanning
+	PprofEnabled   bool                      // PR-PROD5: pprof debug endpoints
 }
 
 // NewRouter builds a chi router with the standard middleware stack.
@@ -115,6 +117,19 @@ func NewRouter(d Deps) http.Handler {
 	r.Get("/readyz", h.Readyz)
 	// /metrics is internal-only; restricted at the network layer (NetworkPolicy).
 	r.Get("/metrics", metrics.Handler().ServeHTTP)
+
+	// PR-PROD5: pprof CPU+memory profiling (ENVANTER_PPROF_ENABLED=true).
+	if d.PprofEnabled {
+		r.Route("/debug/pprof", func(pr chi.Router) {
+			pr.Get("/", pprof.Index)
+			pr.Get("/cmdline", pprof.Cmdline)
+			pr.Get("/profile", pprof.Profile)
+			pr.Get("/symbol", pprof.Symbol)
+			pr.Post("/symbol", pprof.Symbol)
+			pr.Get("/trace", pprof.Trace)
+			pr.Get("/{name}", pprof.Index)
+		})
+	}
 
 	// WebSocket routes.
 	// GET /ws must be mounted BEFORE timeout-wrapped groups; the long-lived
