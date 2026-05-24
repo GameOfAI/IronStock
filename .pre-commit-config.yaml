@@ -62,6 +62,18 @@ repos:
         args: ['--max-warnings=0']
         pass_filenames: true
 
+  # Tracking dosyaları kontrolü (PROGRESS.md + TODO.md zorunluluğu)
+  # Kural: her kod commit'inde tracking dosyaları da güncellenmeli (ADR-0012)
+  - repo: local
+    hooks:
+      - id: check-tracking-files
+        name: Tracking dosyaları kontrolü (PROGRESS.md + TODO.md)
+        entry: bash scripts/check-tracking-files.sh
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+
   # Secret scanning
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.18.0

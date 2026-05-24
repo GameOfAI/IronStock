@@ -20,6 +20,58 @@ permissions:
 # (e.g. docker job writes back image tags to kustomization.yaml).
 
 jobs:
+  # ---------------- Tracking dosyaları kontrolü ----------------
+  tracking-check:
+    name: Tracking Files (PROGRESS.md + TODO.md)
+    runs-on: ubuntu-latest
+    # Sadece pull_request'te çalışır — direkt main push'ta uygulanamaz (hook zaten yerel yakaladı)
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Tam geçmiş — base branch karşılaştırması için
+
+      - name: Kod dosyası değişikliği var mı?
+        id: code-changed
+        run: |
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+          changed=$(git diff --name-only "$base" "$head")
+          echo "Changed files:"
+          echo "$changed"
+
+          code_changed=false
+          while IFS= read -r f; do
+            case "$f" in
+              server/*|web/src/*|client/src/*|client/src-tauri/*|cli/*|e2e/tests/*|deploy/k8s/*|deploy/compose/*|.github/workflows/*)
+                code_changed=true
+                break
+                ;;
+            esac
+          done <<< "$changed"
+
+          echo "code_changed=$code_changed" >> "$GITHUB_OUTPUT"
+
+      - name: PROGRESS.md ve TODO.md güncellendi mi?
+        if: steps.code-changed.outputs.code_changed == 'true'
+        run: |
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+          changed=$(git diff --name-only "$base" "$head")
+
+          missing=()
+          echo "$changed" | grep -qx "PROGRESS.md" || missing+=("PROGRESS.md")
+          echo "$changed" | grep -qx "TODO.md"     || missing+=("TODO.md")
+
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Tracking kuralı ihlali: Kod değişikliği var ama şu dosyalar PR'da güncellenmemiş: ${missing[*]}"
+            echo ""
+            echo "Kural (RULES.md + ADR-0012):"
+            echo "Her PR, PROGRESS.md ve TODO.md güncellemelerini içermelidir."
+            exit 1
+          fi
+          echo "✅ PROGRESS.md ve TODO.md güncellendi."
+
   # ---------------- Server (Go) ----------------
   server:
     name: Server (Go ${{ matrix.go }} / ${{ matrix.os }})

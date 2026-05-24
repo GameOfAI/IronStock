@@ -72,13 +72,17 @@ Proje boyunca uyulacak konvensiyonlar ve kurallar. Yeni kural çıktıkça buray
 - `Claude-Chat\Envanter_App` **legacy** — Faz 0 sonu donmuş. Kaldırılması user kararına bırakıldı; çalışma kaynağı değildir.
 - Claude tüm dosya işlemlerini absolute path ile **Repos** altına yapar. Yeni session başlatılırken Claude session'ı **Repos dizininde** açılırsa working directory zaten doğru olur.
 
-### Push öncesi tracking dosyaları kontrolü (zorunlu)
+### Push öncesi tracking dosyaları kontrolü (zorunlu — otomatik zorlanır)
+
+> **Karar kaynağı:** ADR-0012 (docs/adr/0012-development-tracking-discipline.md)
+> **Otomasyon:** `scripts/check-tracking-files.sh` pre-commit hook ile zorlanır.
+> **Kurulum:** `pip install pre-commit && pre-commit install` (tek seferlik)
 
 Bir feature/fix/chore commit'i, ilgili tracking dosyalarını **aynı commit içinde** güncel tutmalıdır:
 
 | Dosya | Ne zaman güncellenir | Asgari zorunluluk |
 |-------|---------------------|-------------------|
-| `PROGRESS.md` | Her feature/fix tamamlanması | Günlük entry'sine en az 1 satır not |
+| `PROGRESS.md` | Her feature/fix tamamlanması | En az 1 satır: ne yapıldı, nerede duruldu |
 | `TODO.md` | Tamamlanan task / çıkan yeni task | Tamamlanan `[x]` işaretlenir, yeni task eklenir |
 | `CLAUDE.md` | Kalıcı karar değişti / yeni boyut eklendi | Sadece kalıcı bağlam değiştiyse |
 | `RULES.md` | Yeni kural ortaya çıktı | Yeni kural eklenir |
@@ -86,9 +90,14 @@ Bir feature/fix/chore commit'i, ilgili tracking dosyalarını **aynı commit iç
 | `docs/diagrams/er.mmd` | Şema değişikliği | Yeni tablo/kolon yansıtılır |
 | `shared/api/openapi.yaml` | API kontratı değişti | Spec güncellenir, code gen tetiklenir |
 
-**Kural:** Tracking güncellemesi **ayrı "docs" commit'i değil**, asıl iş commit'inin içinde olur. Ayrı tutmak iki ayrı PR review yükü demektir.
+**Kural:** Tracking güncellemesi **ayrı "docs" commit'i değil**, asıl iş commit'inin içinde olur.
 
 **İstisna:** Sadece typo / küçük doc düzeltmesi yapan commit'ler tracking güncellemesi yapmaz (örn: `docs: fix typo in README`).
+
+**Meşru bypass** (WIP / kısmi commit / format düzeltmesi):
+```bash
+SKIP_TRACKING_CHECK=1 git commit -m "wip: ..."
+```
 
 ## Claude Code ile Çalışma
 
