@@ -1,8 +1,8 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-05-24 — PR-PROD6 (Docs) tamamlandı ✅; PR-PROD1/2/3/4/5 tamamlandı ✅
-Tüm Faz 9 (PR-ANSIBLE/ALERT/SCIM/SIEM/SCAN) + Faz 10 (PR-CLI) + Faz 11 PR-PROD1/2/3/4/5/6 merged.
-Sonraki: PR-PROD7 (DR+Backup).
+Son güncelleme: 2026-05-24 — Faz 11 (Production Readiness) tamamlandı ✅
+Tüm Faz 9–11 merged. PR-PROD1/2/3/4/5/6/7 tamamlandı.
+Kalan: PR-TF (Terraform, ayrı repo), PR-BROWSER (Browser Extension, ayrı dizin).
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 

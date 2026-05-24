@@ -90,9 +90,8 @@ IronStock/
 
 ## Güncel Durum (2026-05-24)
 
-- **Tamamlanan:** 25/27 PR (%93) — Faz 6–10 tam, Faz 11 kısmi (PR-PROD1/2/3/4/5/6 done)
-- **Aktif:** PR-PROD7 (DR+Backup)
-- **Kalan:** PR-PROD7 (DR+Backup), PR-TF (ayrı repo), PR-BROWSER (ayrı dizin)
+- **Tamamlanan:** 25/27 PR (%93) — Faz 0–11 tamamlandı ✅
+- **Kalan:** PR-TF (Terraform ayrı repo), PR-BROWSER (Extension ayrı dizin)
 - **Migration:** En son `00060_pg_stat_statements.sql` → yeni migration eklerken `00061`'den başla
 
 ## Her Session'da Yapılacaklar
