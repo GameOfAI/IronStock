@@ -142,6 +142,7 @@ func run() error {
 			redisClient = rc
 			defer func() { _ = redisClient.Close() }()
 			logger.Info("redis: client ready", slog.String("url", cfg.RedisURL))
+			httpapi.SetOIDCStateRedis(rc)
 		}
 	} else {
 		logger.Info("redis not configured — single-pod WebSocket mode")
@@ -252,6 +253,7 @@ func run() error {
 		AppURL:           cfg.AppURL,
 		PasswordResetTTL: cfg.PasswordResetTTL,
 		WebAuthn:         waService,
+		Redis:            redisClient,
 	}
 
 	// --- Credential expiry scanner (PR-N1 + PR-N8) ---
@@ -596,6 +598,7 @@ func run() error {
 		APIToken:     apiTokenHandlers,      // PR-ANSIBLE
 		SCIM:         scimHandlers,          // PR-SCIM
 		Scan:         scanHandlers,          // PR-SCAN
+		CORSOrigins:  cfg.CORSOrigins,       // ENVANTER_CORS_ORIGINS
 		PprofEnabled: cfg.PprofEnabled,      // PR-PROD5
 	})
 
@@ -607,6 +610,9 @@ func run() error {
 		Addr:              cfg.Addr,
 		Handler:           router,
 		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       60 * time.Second,
+		WriteTimeout:      120 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	// --- Lifecycle ---

@@ -19,7 +19,7 @@ import (
 // --- Resource ---
 
 type itemResource struct {
-	client *ironstockClient
+	client *Client
 }
 
 type itemResourceModel struct {
@@ -73,7 +73,7 @@ func (r *itemResource) Configure(_ context.Context, req resource.ConfigureReques
 	if req.ProviderData == nil {
 		return
 	}
-	r.client = req.ProviderData.(*ironstockClient)
+	r.client = req.ProviderData.(*Client)
 }
 
 func (r *itemResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -96,7 +96,7 @@ func (r *itemResource) Create(ctx context.Context, req resource.CreateRequest, r
 	}
 
 	jsonBody, _ := json.Marshal(body)
-	httpResp, err := r.client.do("POST", "/api/v1/items", jsonBody)
+	httpResp, err := r.client.Do("POST", "/api/v1/items", jsonBody)
 	if err != nil {
 		resp.Diagnostics.AddError("Item oluşturulamadı", err.Error())
 		return
@@ -129,7 +129,7 @@ func (r *itemResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
-	httpResp, err := r.client.do("GET", fmt.Sprintf("/api/v1/items/%s", state.ID.ValueString()), nil)
+	httpResp, err := r.client.Do("GET", fmt.Sprintf("/api/v1/items/%s", state.ID.ValueString()), nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Item okunamadı", err.Error())
 		return
@@ -181,7 +181,7 @@ func (r *itemResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	}
 
 	jsonBody, _ := json.Marshal(body)
-	httpResp, err := r.client.do("PUT", fmt.Sprintf("/api/v1/items/%s", plan.ID.ValueString()), jsonBody)
+	httpResp, err := r.client.Do("PUT", fmt.Sprintf("/api/v1/items/%s", plan.ID.ValueString()), jsonBody)
 	if err != nil {
 		resp.Diagnostics.AddError("Item güncellenemedi", err.Error())
 		return
@@ -199,7 +199,7 @@ func (r *itemResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 		return
 	}
 
-	httpResp, err := r.client.do("DELETE", fmt.Sprintf("/api/v1/items/%s", state.ID.ValueString()), nil)
+	httpResp, err := r.client.Do("DELETE", fmt.Sprintf("/api/v1/items/%s", state.ID.ValueString()), nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Item silinemedi", err.Error())
 		return
@@ -210,7 +210,7 @@ func (r *itemResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 // --- Data Source ---
 
 type itemDataSource struct {
-	client *ironstockClient
+	client *Client
 }
 
 type itemDataSourceModel struct {
@@ -256,7 +256,7 @@ func (d *itemDataSource) Configure(_ context.Context, req datasource.ConfigureRe
 	if req.ProviderData == nil {
 		return
 	}
-	d.client = req.ProviderData.(*ironstockClient)
+	d.client = req.ProviderData.(*Client)
 }
 
 func (d *itemDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -267,7 +267,7 @@ func (d *itemDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		return
 	}
 
-	httpResp, err := d.client.do("GET", fmt.Sprintf("/api/v1/items/%s", config.ID.ValueString()), nil)
+	httpResp, err := d.client.Do("GET", fmt.Sprintf("/api/v1/items/%s", config.ID.ValueString()), nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Item okunamadı", err.Error())
 		return

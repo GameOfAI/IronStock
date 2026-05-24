@@ -4,9 +4,31 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"time"
 
 	"envanter.app/server/internal/auth"
 )
+
+// SessionChecker checks whether a session is still active (not revoked).
+// Returns nil if active, non-nil error if revoked or unknown.
+type SessionChecker func(ctx context.Context, sessionID string) error
+
+// NewDBSessionChecker returns a SessionChecker backed by the sessions table.
+func NewDBSessionChecker(db auth.DBExec) SessionChecker {
+	return func(ctx context.Context, sessionID string) error {
+		var revokedAt *time.Time
+		err := db.QueryRow(ctx,
+			`SELECT revoked_at FROM sessions WHERE id = $1::uuid`, sessionID,
+		).Scan(&revokedAt)
+		if err != nil {
+			return errors.New("session not found")
+		}
+		if revokedAt != nil {
+			return errors.New("session revoked")
+		}
+		return nil
+	}
+}
 
 // AuthContextKey is the type for keys we store on request context.
 //
@@ -24,9 +46,10 @@ const (
 // token in Authorization. On success it stows *auth.Claims under
 // CtxKeyClaims; on failure it writes 401 and stops the chain.
 //
-// Use this for endpoints that any authenticated user can reach. Add
-// role / permission checks on top in PR-7+.
-func RequireAccessToken(signer *auth.JWTSigner) func(http.Handler) http.Handler {
+// An optional SessionChecker verifies the session has not been revoked.
+// When provided, the JWT's JTI (session UUID) is checked against the
+// sessions table on every request.
+func RequireAccessToken(signer *auth.JWTSigner, check ...SessionChecker) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authz := r.Header.Get("Authorization")
@@ -40,6 +63,12 @@ func RequireAccessToken(signer *auth.JWTSigner) func(http.Handler) http.Handler 
 			if err != nil {
 				writeMiddlewareUnauthorized(w, err)
 				return
+			}
+			if len(check) > 0 && check[0] != nil && claims.ID != "" {
+				if err := check[0](r.Context(), claims.ID); err != nil {
+					writeMiddlewareUnauthorized(w, err)
+					return
+				}
 			}
 			ctx := context.WithValue(r.Context(), CtxKeyClaims, claims)
 			next.ServeHTTP(w, r.WithContext(ctx))

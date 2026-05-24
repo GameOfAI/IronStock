@@ -269,6 +269,7 @@ func (h *ScanHandlers) ScanContent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req scanContentRequest
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1 MiB cap
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, h.Logger, http.StatusBadRequest, ErrCodeBadRequest,
 			"Geçersiz istek gövdesi.", err)

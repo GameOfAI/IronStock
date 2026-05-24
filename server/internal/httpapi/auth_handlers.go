@@ -5,6 +5,7 @@ import (
 
 	"envanter.app/server/internal/audit"
 	"envanter.app/server/internal/auth"
+	"envanter.app/server/internal/cache"
 	"envanter.app/server/internal/email"
 	"envanter.app/server/internal/notify"
 	webauthnpkg "envanter.app/server/internal/webauthn"
@@ -33,4 +34,7 @@ type AuthHandlers struct {
 
 	// PR-SEC4: WebAuthn / FIDO2 / YubiKey support. nil if not configured.
 	WebAuthn *webauthnpkg.WAService
+
+	// Redis client for multi-pod OIDC state store. nil = in-memory fallback.
+	Redis *cache.Client
 }

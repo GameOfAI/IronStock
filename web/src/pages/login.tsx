@@ -45,6 +45,7 @@ import { ApiError, ErrCode } from '@/api/errors';
 import { usePublicSSOProvidersQuery } from '@/api/admin-sso';
 import type { SSOProviderInfo } from '@/api/types';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { APP_VERSION } from '@/version';
 
 // --- Password input with show/hide toggle ---
 
@@ -447,7 +448,7 @@ export default function LoginPage() {
           <div className="text-center">
             <h1 className="text-xl font-bold tracking-tight text-slate-100">IronStock</h1>
             <p className="mt-0.5 font-mono text-[11px] text-slate-500">
-              DevOps Credential Vault · v0.3
+              DevOps Credential Vault · v{APP_VERSION}
             </p>
           </div>
         </div>

@@ -15,7 +15,7 @@ import (
 )
 
 type groupResource struct {
-	client *ironstockClient
+	client *Client
 }
 
 type groupResourceModel struct {
@@ -54,7 +54,7 @@ func (r *groupResource) Configure(_ context.Context, req resource.ConfigureReque
 	if req.ProviderData == nil {
 		return
 	}
-	r.client = req.ProviderData.(*ironstockClient)
+	r.client = req.ProviderData.(*Client)
 }
 
 func (r *groupResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -67,7 +67,7 @@ func (r *groupResource) Create(ctx context.Context, req resource.CreateRequest, 
 
 	body := map[string]interface{}{"name": plan.Name.ValueString()}
 	jsonBody, _ := json.Marshal(body)
-	httpResp, err := r.client.do("POST", "/api/v1/groups", jsonBody)
+	httpResp, err := r.client.Do("POST", "/api/v1/groups", jsonBody)
 	if err != nil {
 		resp.Diagnostics.AddError("Grup oluşturulamadı", err.Error())
 		return
@@ -100,7 +100,7 @@ func (r *groupResource) Read(ctx context.Context, req resource.ReadRequest, resp
 		return
 	}
 
-	httpResp, err := r.client.do("GET", fmt.Sprintf("/api/v1/groups/%s", state.ID.ValueString()), nil)
+	httpResp, err := r.client.Do("GET", fmt.Sprintf("/api/v1/groups/%s", state.ID.ValueString()), nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Grup okunamadı", err.Error())
 		return
@@ -137,7 +137,7 @@ func (r *groupResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 		return
 	}
 
-	httpResp, err := r.client.do("DELETE", fmt.Sprintf("/api/v1/groups/%s", state.ID.ValueString()), nil)
+	httpResp, err := r.client.Do("DELETE", fmt.Sprintf("/api/v1/groups/%s", state.ID.ValueString()), nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Grup silinemedi", err.Error())
 		return

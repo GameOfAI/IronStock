@@ -1,7 +1,18 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-05-24 — PROJE TAMAMLANDI ✅ 27/27 PR merged.
-Tüm Faz 0–11 + PR-TF + PR-BROWSER tamamlandı. Kalan iş yok.
+Son güncelleme: 2026-05-24 — Güvenlik denetimi düzeltmeleri + test kapsamı genişletme tamamlandı.
+
+## ✅ Güvenlik Denetimi Düzeltmeleri (2026-05-24)
+
+- [x] H1: Session revocation middleware
+- [x] H3: OIDC JWKS signature verification
+- [x] H4: OIDC state → Redis store
+- [x] H5: K8s SSRF protection
+- [x] H6: Vault path traversal guard
+- [x] M1-M8: Medium-level düzeltmeler (CORS, timeout, CSP, NetworkPolicy, body limit, ErrorBoundary)
+- [x] Versiyon auto-increment sistemi
+- [x] Browser extension token refresh mutex
+- [x] Test kapsamı genişletme (179 web + 15 browser ext. + Go testleri)
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 

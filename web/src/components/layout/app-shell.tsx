@@ -61,6 +61,7 @@ import {
   useMarkAllReadMutation,
 } from '@/api/notifications';
 import { cn } from '@/lib/cn';
+import { APP_VERSION } from '@/version';
 
 // --- Theme toggle ---
 
@@ -480,7 +481,7 @@ export function AppShell() {
             <Key className="h-[13px] w-[13px] text-white" />
           </div>
           <span className="text-[14px] font-semibold tracking-tight text-slate-100">IronStock</span>
-          <span className="font-mono text-[10px] text-slate-500">v0.3</span>
+          <span className="font-mono text-[10px] text-slate-500">v{APP_VERSION}</span>
           <span className="mx-1.5 h-3 w-px bg-slate-800" />
           <span className="text-[13px] text-slate-400">{pageTitle}</span>
         </div>

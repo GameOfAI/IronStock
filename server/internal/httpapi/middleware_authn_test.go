@@ -1,6 +1,8 @@
 package httpapi
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -131,5 +133,64 @@ func TestRequireAccessToken_HappyPath(t *testing.T) {
 func TestClaimsFromContext_Empty(t *testing.T) {
 	if ClaimsFromContext(httptest.NewRequest(http.MethodGet, "/x", nil).Context()) != nil {
 		t.Error("expected nil from empty ctx")
+	}
+}
+
+func TestRequireAccessToken_SessionRevoked(t *testing.T) {
+	signer := newTestSigner(t)
+	tok, err := signer.IssueAccess("user-123", "session-revoked", []string{"write"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	revokedChecker := SessionChecker(func(_ context.Context, sessionID string) error {
+		if sessionID == "session-revoked" {
+			return errors.New("session revoked")
+		}
+		return nil
+	})
+
+	mw := RequireAccessToken(signer, revokedChecker)
+	called := false
+	h := mw(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) { called = true }))
+
+	req := httptest.NewRequest(http.MethodGet, "/x", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401 (revoked session)", w.Code)
+	}
+	if called {
+		t.Error("next handler ran with revoked session")
+	}
+}
+
+func TestRequireAccessToken_SessionActive(t *testing.T) {
+	signer := newTestSigner(t)
+	tok, err := signer.IssueAccess("user-123", "session-active", []string{"write"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	activeChecker := SessionChecker(func(_ context.Context, _ string) error {
+		return nil
+	})
+
+	mw := RequireAccessToken(signer, activeChecker)
+	called := false
+	h := mw(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) { called = true }))
+
+	req := httptest.NewRequest(http.MethodGet, "/x", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200", w.Code)
+	}
+	if !called {
+		t.Error("next handler was not called with active session")
 	}
 }

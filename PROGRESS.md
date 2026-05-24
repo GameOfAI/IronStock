@@ -1,6 +1,6 @@
 # İlerleyiş
 
-Son güncelleme: 2026-05-24 (PR-TF + PR-BROWSER tamamlandı — 27/27 PR tamamlandı ✅ PROJE TAMAMLANDI)
+Son güncelleme: 2026-05-24 (Güvenlik denetimi düzeltmeleri + test kapsamı genişletme)
 
 ## Mevcut Durum
 
@@ -27,7 +27,22 @@ Son güncelleme: 2026-05-24 (PR-TF + PR-BROWSER tamamlandı — 27/27 PR tamamla
 
 | Özellik | Durum | Notlar |
 |---------|-------|--------|
-| **`go mod tidy`** | ⚠️ Kullanıcı aksiyonu | server/ dizininde çalıştırılmalı (go-ldap/ldap/v3 + gopkg.in/yaml.v3 download + go.sum güncelleme) |
+| **`go mod tidy`** | ✅ Tamamlandı | server/ + terraform/ dizinlerinde çalıştırıldı |
+
+### Tamamlanan (bu session — 2026-05-24 güvenlik denetimi)
+
+| Kategori | Açıklama | Durum |
+|----------|----------|-------|
+| **H1: Session Revocation** | SessionChecker middleware, RequireAccessToken revoke kontrolü, tüm route'lara uygulandı | ✅ |
+| **H3: OIDC JWKS** | JWKS fetch + RSA imza doğrulama + issuer/audience validation + 1h cache | ✅ |
+| **H4: OIDC State → Redis** | Redis-backed OIDC state store, in-memory fallback, JSON serileştirme | ✅ |
+| **H5: K8s SSRF** | Loopback/link-local/metadata IP engelleme, 14 unit test | ✅ |
+| **H6: Vault Path Traversal** | `..`, `//`, leading `/`, backslash, control char engelleme, 10 test | ✅ |
+| **M-level düzeltmeler** | CORS config, server timeout, CSP meta tag, network policy, body size limit, ErrorBoundary | ✅ |
+| **Versiyon sistemi** | package.json → Vite define → APP_VERSION, otomatik artış | ✅ |
+| **Browser ext. token mutex** | Promise-based concurrent refresh deduplication | ✅ |
+| **Test kapsamı** | 15 browser ext. testi, render-level sayfa testleri, toplam 179 web testi | ✅ |
+| **Terraform go.sum + go.work** | go mod tidy, go.work workspace entegrasyonu | ✅ |
 
 ### Tamamlanan (bu session — 2026-05-22 devam)
 
