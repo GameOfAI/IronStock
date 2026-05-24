@@ -20,6 +20,7 @@ import { cn } from '@/lib/cn';
 import { apiFetch } from '@/api/client';
 import { useGenerateReportMutation } from '@/api/reports';
 import type { ItemListResponse, Item } from '@/api/types';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 // ─── Item search ──────────────────────────────────────────────────────────────
 
@@ -82,6 +83,7 @@ const DEFAULT_OPTIONS = {
 };
 
 export default function AdminReportsPage() {
+  useDocumentTitle('Raporlar');
   const { toast } = useToast();
   const generate = useGenerateReportMutation();
 

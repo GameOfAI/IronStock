@@ -38,6 +38,7 @@ import { useHealthReportQuery } from '@/api/health';
 import { useNotificationsQuery } from '@/api/notifications';
 import { RelativeTime } from '@/components/common/relative-time';
 import { cn } from '@/lib/cn';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 // --- Radial gauge SVG ---
 
@@ -157,6 +158,7 @@ function notifIcon(type: string) {
 // --- Dashboard ---
 
 export default function AdminDashboardPage() {
+  useDocumentTitle('Admin Paneli');
   // Fetch up to 500 users to compute stats (cache keeps it cheap)
   const usersQuery = useUsers({ limit: 500, offset: 0 });
   const auditQuery = useAuditLog({ limit: 5, offset: 0 });

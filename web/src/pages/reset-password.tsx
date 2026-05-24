@@ -30,10 +30,12 @@ import {
   randomKEKSalt,
   toBase64,
 } from '@/lib/crypto';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 type Phase = 'warn' | 'complete' | 'done';
 
 export default function ResetPasswordPage() {
+  useDocumentTitle('Şifre Sıfırlama');
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { toast } = useToast();

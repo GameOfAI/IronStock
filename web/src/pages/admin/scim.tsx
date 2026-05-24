@@ -31,11 +31,13 @@ import {
   useDeleteAPITokenMutation,
   type APIToken,
 } from '@/api/api-tokens';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 // SCIM base URL (same origin as the API).
 const scimBaseURL = `${window.location.origin}/scim/v2`;
 
 export default function AdminSCIMPage() {
+  useDocumentTitle('SCIM Provisioning');
   const { toast } = useToast();
   const { data, isLoading, refetch } = useAPITokensQuery();
   const createToken = useCreateAPITokenMutation();

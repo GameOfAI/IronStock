@@ -59,6 +59,7 @@ import type {
   SplunkConfig,
   ElasticConfig,
 } from '@envanter/shared/api/types';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -182,6 +183,7 @@ function formToConfig(form: FormState): SyslogConfig | SlackConfig | SplunkConfi
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function AdminLogForwardingPage() {
+  useDocumentTitle('Log Yönlendirme');
   const { toast } = useToast();
   const { data, isLoading } = useLogForwardingConfigsQuery();
   const deleteMutation = useDeleteLogForwardingMutation();

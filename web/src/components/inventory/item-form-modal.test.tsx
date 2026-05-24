@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 vi.mock('@/api/items', () => ({
   useCreateItemMutation: vi.fn(),
   useUpdateItemMutation: vi.fn(),
+  useItemDuplicatesQuery: vi.fn(() => ({ data: null, isLoading: false })),
 }));
 
 vi.mock('@/store/auth', () => ({

@@ -13,8 +13,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useForgotPasswordMutation } from '@/api/auth';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 export default function ForgotPasswordPage() {
+  useDocumentTitle('Şifremi Unuttum');
   const mutation = useForgotPasswordMutation();
   const [email, setEmail] = React.useState('');
   const [sent, setSent] = React.useState(false);

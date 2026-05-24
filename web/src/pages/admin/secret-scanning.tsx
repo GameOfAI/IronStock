@@ -34,6 +34,7 @@ import {
   useDeleteAPITokenMutation,
   type APIToken,
 } from '@/api/api-tokens';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 // ---------- Types ----------
 
@@ -73,6 +74,7 @@ function useAcknowledgeDetectionMutation() {
 const scanEndpointURL = `${window.location.origin}/api/v1/security/scan`;
 
 export default function AdminSecretScanningPage() {
+  useDocumentTitle('Sızıntı Taraması');
   const { toast } = useToast();
   const qc = useQueryClient();
 

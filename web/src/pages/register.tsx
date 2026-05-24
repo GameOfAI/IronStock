@@ -5,8 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 export default function RegisterPage() {
+  useDocumentTitle('Kayıt');
   const navigate = useNavigate();
   const { toast } = useToast();
   const [username, setUsername] = React.useState('');

@@ -29,10 +29,12 @@ import {
   randomKEKSalt,
   toBase64,
 } from '@/lib/crypto';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 type Phase = 'init' | 'warn' | 'complete' | 'codes';
 
 export default function RecoverPage() {
+  useDocumentTitle('Hesap Kurtarma');
   const navigate = useNavigate();
   const { toast } = useToast();
   const initMut = useRecoverInitMutation();

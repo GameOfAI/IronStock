@@ -56,6 +56,7 @@ import {
 import { useUsers } from '@/api/admin';
 import type { Group } from '@/api/types';
 import { Plus, Trash2, UserMinus, Users } from 'lucide-react';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 // --- Create Group Dialog ---
 
@@ -297,6 +298,7 @@ function GroupDetailPanel({ group, onDelete }: { group: Group; onDelete: () => v
 // --- Main Page ---
 
 export default function AdminGroupsPage() {
+  useDocumentTitle('Gruplar');
   const { data, isLoading } = useGroupsQuery();
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
 

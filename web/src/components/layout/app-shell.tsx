@@ -662,7 +662,7 @@ export function AppShell() {
         </aside>
 
         {/* Main content */}
-        <main className="relative flex-1 overflow-hidden bg-slate-950" role="main">
+        <main id="main-content" tabIndex={-1} className="relative flex-1 overflow-hidden bg-slate-950 outline-none" role="main">
           <Outlet />
         </main>
       </div>

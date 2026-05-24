@@ -38,6 +38,7 @@ import {
   type K8sCluster,
   type CreateK8sClusterRequest,
 } from '@/api/admin-k8s';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -358,6 +359,7 @@ function DeleteClusterDialog({
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function AdminK8sClustersPage() {
+  useDocumentTitle('K8s Kümeleri');
   const { toast } = useToast();
   const { data: clusters, isLoading } = useAdminK8sClustersQuery();
   const testMutation = useTestK8sClusterMutation();

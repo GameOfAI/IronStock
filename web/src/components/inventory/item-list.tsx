@@ -4,10 +4,11 @@
  * PR-UX6: Table → icon-row kart tasarımı, renkli tip ikonları.
  */
 
-import { AlertTriangle, Clock, Inbox, Loader2, PackageSearch } from 'lucide-react';
+import { AlertTriangle, Clock, Inbox, PackageSearch } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/cn';
+import { EmptyState } from '@/components/ui/empty-state';
 import type { Item, ItemType } from '@/api/types';
 import { PermissionBadge } from './permission-badge';
 import { RelativeTime } from '@/components/common/relative-time';
@@ -203,18 +204,16 @@ export function ItemList({
 
   if (!items || items.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-2 py-12 text-center text-muted-foreground">
-        {isLoading ? (
-          <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
-        ) : (
-          <Inbox className="h-6 w-6" aria-hidden />
-        )}
-        <span className="text-sm">
-          {searchQuery
+      <EmptyState
+        icon={searchQuery ? PackageSearch : Inbox}
+        title={searchQuery ? 'Sonuç bulunamadı' : 'Henüz item yok'}
+        description={
+          searchQuery
             ? `"${searchQuery}" araması ile eşleşen item yok.`
-            : 'Bu klasörde item yok.'}
-        </span>
-      </div>
+            : 'Bu klasörde henüz item bulunmuyor.'
+        }
+        size="sm"
+      />
     );
   }
 
