@@ -1,8 +1,8 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-05-24 — PR-PROD4 (UX Polish) tamamlandı ✅; PR-PROD1/2/3 tamamlandı ✅
-Tüm Faz 9 (PR-ANSIBLE/ALERT/SCIM/SIEM/SCAN) + Faz 10 (PR-CLI) + Faz 11 PR-PROD1/2/3/4 merged.
-Sonraki: PR-PROD5 (Perf+SLO), PR-PROD6 (Docs), PR-PROD7 (DR+Backup).
+Son güncelleme: 2026-05-24 — PR-PROD5 (Perf+SLO) tamamlandı ✅; PR-PROD1/2/3/4 tamamlandı ✅
+Tüm Faz 9 (PR-ANSIBLE/ALERT/SCIM/SIEM/SCAN) + Faz 10 (PR-CLI) + Faz 11 PR-PROD1/2/3/4/5 merged.
+Sonraki: PR-PROD6 (Docs), PR-PROD7 (DR+Backup).
 
 TodoWrite ile senkronize çalışır — aktif session'daki live task listesi TodoWrite'tadır, bu dosya kalıcı referanstır.
 
