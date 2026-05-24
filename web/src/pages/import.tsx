@@ -31,6 +31,7 @@ import { useRootFolders } from '@/api/folders';
 import { generateDEK, sealDEK, encryptField, toBase64, fromBase64 } from '@/lib/crypto';
 import { parseKdbx } from '@/lib/kdbx-parser';
 import type { BatchImportItem } from '@/api/types';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 type Step = 'select' | 'preview' | 'mapping' | 'importing' | 'done';
 
@@ -56,6 +57,7 @@ const FIELD_KEY_URL = 'url';
 const FIELD_KEY_NOTES = 'notes';
 
 export default function ImportPage() {
+  useDocumentTitle('Toplu İçe Aktarma');
   const [tab, setTab] = useState<'csv' | 'kdbx'>('csv');
   const [step, setStep] = useState<Step>('select');
   const [error, setError] = useState<string | null>(null);

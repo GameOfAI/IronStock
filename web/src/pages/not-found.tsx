@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 export default function NotFoundPage() {
+  useDocumentTitle('Sayfa Bulunamadı');
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-6">
       <Card className="w-full max-w-md">

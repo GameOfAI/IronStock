@@ -44,6 +44,7 @@ import type { KEKParams } from '@/lib/crypto';
 import { ApiError, ErrCode } from '@/api/errors';
 import { usePublicSSOProvidersQuery } from '@/api/admin-sso';
 import type { SSOProviderInfo } from '@/api/types';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 // --- Password input with show/hide toggle ---
 
@@ -219,6 +220,7 @@ function LDAPDialog({ provider, open, onClose }: LDAPDialogProps) {
 // ─── Main LoginPage ───
 
 export default function LoginPage() {
+  useDocumentTitle('Giriş');
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();

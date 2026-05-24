@@ -29,6 +29,7 @@ import {
 } from '@/api/access-requests';
 import type { AccessRequest } from '@/api/types';
 import { cn } from '@/lib/cn';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 // ---- Status badge ----
 
@@ -167,6 +168,7 @@ function DenyDialog({ request, onClose }: { request: AccessRequest; onClose: () 
 // ---- Main page ----
 
 export default function AccessRequestsPage() {
+  useDocumentTitle('Onay İstekleri');
   const isAdmin = useAuthStore(selectIsAdmin);
   const [statusFilter, setStatusFilter] = useState('');
   const [approving, setApproving] = useState<AccessRequest | null>(null);

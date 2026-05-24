@@ -25,6 +25,7 @@ import { useUsers, useRevokeRoleMutation } from '@/api/admin';
 import { ApiError } from '@/api/errors';
 import { RelativeTime } from '@/components/common/relative-time';
 import type { AdminUser } from '@/api/types';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 // ---------- Sabit rol tanımları (DB seed: migrations/00003_roles.sql) ----------
 
@@ -176,6 +177,7 @@ function RoleUserCard({ role, users, isLoading, onRefetch }: RoleUserCardProps) 
 // ---------- Sayfa ----------
 
 export default function AdminRolesPage() {
+  useDocumentTitle('Roller');
   const { toast } = useToast();
   const { data, isLoading, isFetching, refetch, error } = useUsers({ limit: 200, offset: 0 });
 

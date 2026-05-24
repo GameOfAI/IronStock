@@ -18,6 +18,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Key, Loader2, AlertTriangle } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import type { SessionUser } from '@/store/auth';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 function parseHash(): {
   accessToken: string;
@@ -52,6 +53,7 @@ function parseHash(): {
 }
 
 export default function SSOCallbackPage() {
+  useDocumentTitle('SSO Yönlendirme');
   const navigate = useNavigate();
   const setBootstrapSession = useAuthStore((s) => s.setBootstrapSession);
   const [error, setError] = React.useState<string | null>(null);

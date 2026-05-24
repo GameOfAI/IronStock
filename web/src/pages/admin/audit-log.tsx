@@ -32,6 +32,7 @@ import { AuditFilters, EMPTY_FILTERS } from '@/components/admin/audit-filters';
 import type { AuditFilterState } from '@/components/admin/audit-filters';
 import { AuditRow } from '@/components/admin/audit-row';
 import { Pagination } from '@/components/common/pagination';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 const DEFAULT_LIMIT = 50;
 const ALLOWED_LIMITS = [25, 50, 100];
@@ -58,6 +59,7 @@ function parseFilters(params: URLSearchParams): AuditFilterState & {
 }
 
 export function AdminAuditLogPage() {
+  useDocumentTitle('Audit Log');
   const [searchParams, setSearchParams] = useSearchParams();
   const filters = parseFilters(searchParams);
   const { toast } = useToast();

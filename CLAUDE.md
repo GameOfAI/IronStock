@@ -90,8 +90,8 @@ IronStock/
 
 ## Güncel Durum (2026-05-24)
 
-- **Tamamlanan:** 22/27 PR (%82) — Faz 6–10 tam, Faz 11 kısmi
-- **Aktif:** PR-PROD4 (UX Polish — bileşenler hazır, App.tsx/app-shell/sayfa entegrasyonu eksik)
+- **Tamamlanan:** 23/27 PR (%85) — Faz 6–10 tam, Faz 11 kısmi (PR-PROD1/2/3/4 done)
+- **Aktif:** PR-PROD5 (Perf+SLO)
 - **Kalan:** PR-PROD5 (Perf+SLO), PR-PROD6 (Docs), PR-PROD7 (DR+Backup), PR-TF (ayrı repo), PR-BROWSER (ayrı dizin)
 - **Migration:** En son `00059_secret_fingerprints.sql` → yeni migration eklerken `00060`'tan başla
 

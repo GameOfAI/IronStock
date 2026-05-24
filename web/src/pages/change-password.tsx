@@ -39,8 +39,10 @@ import {
   randomKEKSalt,
   toBase64,
 } from '@/lib/crypto';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 export default function ChangePasswordPage() {
+  useDocumentTitle('Şifre Değiştir');
   const navigate = useNavigate();
   const { toast } = useToast();
 

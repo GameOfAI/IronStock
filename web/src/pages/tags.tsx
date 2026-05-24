@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useTagsQuery, useCreateTagMutation, useDeleteTagMutation } from '@/api/tags';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 // ─── 64-color palette (8 hue families × 8 lightness steps) ──────────────────
 
@@ -146,6 +147,7 @@ function ColorPicker({ value, onChange }: ColorPickerProps) {
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function TagsPage() {
+  useDocumentTitle('Etiketlerim');
   const navigate = useNavigate();
   const { toast } = useToast();
   const { data, isLoading } = useTagsQuery();

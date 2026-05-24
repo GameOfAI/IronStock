@@ -29,6 +29,7 @@ import {
 import { useShareLinkViewQuery } from '@/api/share-links';
 import { ApiError } from '@/api/errors';
 import type { ShareLinkField } from '@/api/types';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -166,6 +167,7 @@ function DecryptedFieldRow({ field, dek }: DecryptedFieldRowProps) {
 // ── main page ─────────────────────────────────────────────────────────────────
 
 export default function SharePage() {
+  useDocumentTitle('Paylaşım Bağlantısı');
   const { token } = useParams<{ token: string }>();
   const [linkKey, setLinkKey] = useState<Uint8Array | null>(null);
   const [keyInitialized, setKeyInitialized] = useState(false);

@@ -88,6 +88,7 @@ import {
   Key,
   Pencil,
 } from 'lucide-react';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 // --- Recovery Codes Display ---
 
@@ -1091,6 +1092,7 @@ function SecurityKeysCard() {
 // --- Profile Page ---
 
 export default function ProfilePage() {
+  useDocumentTitle('Profil');
   const user = useAuthStore((s) => s.user);
 
   return (

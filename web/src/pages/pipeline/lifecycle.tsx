@@ -25,6 +25,7 @@ import { useGraphQuery } from '@/api/graph';
 import { useLifecycleStagesQuery, useSetItemLifecycleStagesMutation, lifecycleStagesKey } from '@/api/lifecycle';
 import { LifecycleLane, type LaneItem } from '@/components/pipeline/lifecycle-lane';
 import { PIPELINE_TYPE_LABELS } from '@/components/pipeline/pipeline-constants';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -108,6 +109,7 @@ function UnassignedChip({ item }: { item: LaneItem }) {
 // ---------------------------------------------------------------------------
 
 export default function LifecyclePage() {
+  useDocumentTitle('Lifecycle Lanes');
   const qc = useQueryClient();
   const graphQuery = useGraphQuery();
   const stagesQuery = useLifecycleStagesQuery();

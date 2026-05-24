@@ -28,6 +28,7 @@ import {
   useDeletePipelineDiagramMutation,
 } from '@/api/pipeline';
 import { cn } from '@/lib/cn';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 // --- Create Diagram Modal ────────────────────────────────────────────────────
 
@@ -175,6 +176,7 @@ function DiagramCard({ id, name, description, updatedAt, onDelete }: DiagramCard
 // --- Page ────────────────────────────────────────────────────────────────────
 
 export default function PipelineListPage() {
+  useDocumentTitle('Pipeline Diyagramları');
   const { data, isLoading, isError } = usePipelineDiagramsQuery();
   const deleteMut = useDeletePipelineDiagramMutation();
   const [createOpen, setCreateOpen] = React.useState(false);

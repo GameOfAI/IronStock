@@ -56,7 +56,7 @@ describe('ItemList', () => {
         itemTypes={sampleItemTypes}
       />,
     );
-    expect(screen.getByText(/"nope" araması ile eşleşen item yok/i)).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: /sonuç bulunamadı/i })).toBeInTheDocument();
   });
 
   it('shows generic empty state when folder has no items', () => {
@@ -72,7 +72,7 @@ describe('ItemList', () => {
         itemTypes={sampleItemTypes}
       />,
     );
-    expect(screen.getByText(/bu klasörde item yok/i)).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: /henüz item yok/i })).toBeInTheDocument();
   });
 
   it('calls onSelect when row clicked', async () => {

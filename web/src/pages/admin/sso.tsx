@@ -37,6 +37,7 @@ import {
   useDeleteSSOProviderMutation,
   useTestLDAPConnectionMutation,
 } from '@/api/admin-sso';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 // ─── Empty default for the form ───────────────────────────────────────────────
 
@@ -341,6 +342,7 @@ function ProviderFormDialog({
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function AdminSSOPage() {
+  useDocumentTitle('SSO / LDAP');
   const { data, isLoading, refetch } = useAdminSSOProvidersQuery();
   const providers = data?.providers ?? [];
 

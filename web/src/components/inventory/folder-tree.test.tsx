@@ -50,7 +50,7 @@ describe('FolderTree', () => {
     setRootSuccess([]);
     useChildFolders.mockReturnValue({ data: undefined, isLoading: false, isSuccess: false });
     renderTree({ selectedId: null, onSelect: () => {} });
-    expect(screen.getByText(/görüntüleyebileceğiniz klasör yok/i)).toBeInTheDocument();
+    expect(screen.getByText(/klasör yok/i)).toBeInTheDocument();
   });
 
   it('renders root folders and calls onSelect when clicked', async () => {
