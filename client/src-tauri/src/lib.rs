@@ -20,7 +20,7 @@ pub fn run() {
             // Ekran yakalama korumasını varsayılan olarak etkinleştir.
             // JS katmanı hydration sonrası kullanıcı tercihini uygulayarak override edebilir.
             if let Some(win) = app.get_webview_window("main") {
-                let _ = win.set_content_protected(true);
+                let _ = win.set_content_protected(false);
             }
 
             let handle = app.handle().clone();

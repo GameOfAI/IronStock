@@ -1,6 +1,6 @@
 # İlerleyiş
 
-Son güncelleme: 2026-05-25 (Production deploy + migration fix + Tauri build)
+Son güncelleme: 2026-05-25 (Tauri UX + error sanitization + sidebar grouping + security hardening)
 
 ## Mevcut Durum
 

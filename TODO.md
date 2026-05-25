@@ -1,6 +1,17 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-05-25 — Production deploy + migration fix + Tauri build.
+Son güncelleme: 2026-05-25 — Tauri UX + error sanitization + sidebar grouping + security hardening.
+
+## ✅ Post-Deploy Fixes (2026-05-25)
+
+- [x] Tauri: set_content_protected(false) for VNC compat, window center/visible, icon.icns
+- [x] CSP: wasm-unsafe-eval for Argon2 WebAssembly
+- [x] Error sanitization: userFriendlyError() across ~30 files — no technical leaks to end user
+- [x] Remove /admin-login route (security vulnerability)
+- [x] Bootstrap disabled (BOOTSTRAP_ENABLED=false)
+- [x] Fix keypair 404: chi sub-router shadowing /users/me/keypair → moved into /users/me route group
+- [x] Sidebar: collapsible nav groups (Görselleştirme, Kullanıcı & Erişim, Güvenlik & İzleme, Altyapı)
+- [x] Access-requests page error handling
 
 ## ✅ Production Deploy & Migration Fix (2026-05-25)
 
