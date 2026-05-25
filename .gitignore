@@ -79,3 +79,4 @@ coverage/
 # Plaintext secret manifests (use Sealed Secrets / External Secrets in production)
 deploy/k8s/secret.yaml
 deploy/k8s/*-secret.yaml
+.env.prod

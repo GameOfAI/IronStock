@@ -2,6 +2,7 @@ use crate::inactivity::InactivityState;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
+use tauri::Manager;
 
 const KEYRING_SERVICE: &str = "app.envanter.client";
 
@@ -188,7 +189,7 @@ pub fn set_content_protection(app: tauri::AppHandle, enabled: bool) -> Result<()
         .get_webview_window("main")
         .ok_or_else(|| "Ana pencere bulunamadı".to_string())?;
     window
-        .set_content_protection(enabled)
+        .set_content_protected(enabled)
         .map_err(|e| e.to_string())
 }
 

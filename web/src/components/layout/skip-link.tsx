@@ -19,8 +19,6 @@
  *   <main id="main-content" tabIndex={-1}>…</main>
  */
 
-import * as React from 'react';
-
 export function SkipLink() {
   return (
     <a

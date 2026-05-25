@@ -920,6 +920,8 @@ export interface ExternalSourceVault {
   kv_version?: 1 | 2;
   /** Maps field_definition.key → vault data key */
   key_mapping: Record<string, string>;
+  dynamic?: boolean;
+  ttl?: number;
 }
 
 /**
@@ -1114,4 +1116,3 @@ export interface LDAPTestResult {
   message?: string;
   error?: string;
 }
-

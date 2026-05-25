@@ -13,7 +13,7 @@
 CREATE TABLE secret_fingerprints (
     id              uuid         PRIMARY KEY DEFAULT gen_random_uuid(),
     item_id         uuid         NOT NULL REFERENCES items(id) ON DELETE CASCADE,
-    field_def_id    uuid         REFERENCES field_definitions(id) ON DELETE CASCADE,
+    field_def_id    bigint       REFERENCES field_definitions(id) ON DELETE CASCADE,
     fingerprint     bytea        NOT NULL,   -- SHA-256(plain_value), 32 bytes
     scan_enabled    boolean      NOT NULL DEFAULT true,
     created_at      timestamptz  NOT NULL DEFAULT now(),

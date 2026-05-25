@@ -1,6 +1,6 @@
 # İlerleyiş
 
-Son güncelleme: 2026-05-24 (Güvenlik denetimi düzeltmeleri + test kapsamı genişletme)
+Son güncelleme: 2026-05-25 (Production deploy + migration fix + Tauri build)
 
 ## Mevcut Durum
 

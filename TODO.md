@@ -1,6 +1,15 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-05-24 — Güvenlik denetimi düzeltmeleri + test kapsamı genişletme tamamlandı.
+Son güncelleme: 2026-05-25 — Production deploy + migration fix + Tauri build.
+
+## ✅ Production Deploy & Migration Fix (2026-05-25)
+
+- [x] Docker Compose production deploy (Caddy + server + web + postgres + redis + minio)
+- [x] Migration fix: uuid_generate_v7→gen_random_uuid, field_def_id type mismatch, goose annotations
+- [x] Caddy reverse proxy: API-only external, Web UI local-only (localhost:3080)
+- [x] Let's Encrypt SSL for haslaman.tplinkdns.com
+- [x] Tauri API compat fixes (Manager import, set_content_protected)
+- [x] Tauri macOS build (IronStock_1.0.0_aarch64.dmg)
 
 ## ✅ Güvenlik Denetimi Düzeltmeleri (2026-05-24)
 
