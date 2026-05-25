@@ -47,6 +47,7 @@ import { useUsers } from '@/api/admin';
 import { useGroupsQuery, useGroupMembersQuery } from '@/api/groups';
 import { useAuthStore } from '@/store/auth';
 import { fromBase64, toBase64, openDEKWithKEK, sealDEK } from '@/lib/crypto';
+import { userFriendlyError } from '@/lib/user-error';
 
 interface Props {
   open: boolean;
@@ -169,7 +170,7 @@ export function ItemShareModal({ open, onOpenChange, item }: Props) {
       });
       handleClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Paylaşım sırasında hata oluştu.');
+      setError(userFriendlyError(err));
     }
   }
 
@@ -233,7 +234,7 @@ export function ItemShareModal({ open, onOpenChange, item }: Props) {
       });
       handleClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Grup paylaşımı sırasında hata oluştu.');
+      setError(userFriendlyError(err));
     }
   }
 

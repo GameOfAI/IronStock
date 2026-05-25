@@ -36,6 +36,7 @@ import {
 } from '@/components/pipeline/pipeline-constants';
 import type { Item } from '@/api/types';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { userFriendlyError } from '@/lib/user-error';
 
 type FolderModal = 'create-root' | 'create-sub' | 'rename' | 'delete' | null;
 type ItemModal = 'create' | 'edit' | 'delete' | 'share' | null;
@@ -199,7 +200,7 @@ export default function InventoryPage() {
     } catch (err) {
       toast({
         title: 'Kopyalanamadı',
-        description: err instanceof Error ? err.message : 'Şifre çözme başarısız.',
+        description: userFriendlyError(err),
         variant: 'destructive',
       });
     }

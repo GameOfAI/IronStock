@@ -9,6 +9,7 @@ import {
   useDeleteAttachmentMutation,
 } from '@/api/attachments';
 import type { Attachment } from '@/api/attachments';
+import { userFriendlyError } from '@/lib/user-error';
 
 interface ItemAttachmentPanelProps {
   itemId: string;
@@ -112,7 +113,7 @@ export function ItemAttachmentPanel({ itemId, canWrite }: ItemAttachmentPanelPro
 
       await confirmUpload.mutateAsync(attachment_id);
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : 'Yükleme başarısız.');
+      setUploadError(userFriendlyError(err));
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';

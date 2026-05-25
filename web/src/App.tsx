@@ -35,7 +35,6 @@ import PipelineListPage from '@/pages/pipeline/index';
 import DiagramPage from '@/pages/pipeline/diagram';
 import LifecyclePage from '@/pages/pipeline/lifecycle';
 import AdminSetupPage from '@/pages/admin-setup';
-import AdminLoginPage from '@/pages/admin-login';
 import ChangePasswordPage from '@/pages/change-password';
 import ProfilePage from '@/pages/profile';
 import SharePage from '@/pages/share';
@@ -105,7 +104,6 @@ export default function App() {
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             {/* Bootstrap admin panel — TOTP-free, ADR-0010 */}
             <Route path="/admin-setup" element={<AdminSetupPage />} />
-            <Route path="/admin-login" element={<AdminLoginPage />} />
             {/* PR-N5: Public one-time share link — no auth required */}
             <Route path="/share/:token" element={<SharePage />} />
             {/* PR-LDAP: OIDC callback landing — sets auth store from hash fragment */}

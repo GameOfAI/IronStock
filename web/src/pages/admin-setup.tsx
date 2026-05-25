@@ -24,6 +24,7 @@ import { useToast } from '@/hooks/use-toast';
 import { bootstrapStatus, bootstrapSetup } from '@/api/bootstrap';
 import { useAuthStore } from '@/store/auth';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { userFriendlyError } from '@/lib/user-error';
 
 export default function AdminSetupPage() {
   useDocumentTitle('Admin Kurulumu');
@@ -42,7 +43,7 @@ export default function AdminSetupPage() {
     bootstrapStatus()
       .then(({ setup_complete }) => {
         if (setup_complete) {
-          navigate('/admin-login', { replace: true });
+          navigate('/login', { replace: true });
         } else {
           setChecking(false);
         }
@@ -84,7 +85,7 @@ export default function AdminSetupPage() {
       toast({ title: 'Admin hesabı oluşturuldu', description: 'Hoş geldiniz!' });
       navigate('/admin/users', { replace: true });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Hesap oluşturulamadı.';
+      const msg = userFriendlyError(err);
       toast({ title: 'Hata', description: msg, variant: 'destructive' });
     } finally {
       setLoading(false);

@@ -57,6 +57,7 @@ import { useUsers } from '@/api/admin';
 import type { Group } from '@/api/types';
 import { Plus, Trash2, UserMinus, Users } from 'lucide-react';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { userFriendlyError } from '@/lib/user-error';
 
 // --- Create Group Dialog ---
 
@@ -78,7 +79,7 @@ function CreateGroupDialog() {
     } catch (err) {
       toast({
         title: 'Grup oluşturulamadı',
-        description: err instanceof Error ? err.message : 'Bilinmeyen hata.',
+        description: userFriendlyError(err),
         variant: 'destructive',
       });
     }
@@ -151,7 +152,7 @@ function GroupMembersPanel({ group }: { group: Group }) {
     } catch (err) {
       toast({
         title: 'Üye eklenemedi',
-        description: err instanceof Error ? err.message : 'Hata.',
+        description: userFriendlyError(err),
         variant: 'destructive',
       });
     }
@@ -164,7 +165,7 @@ function GroupMembersPanel({ group }: { group: Group }) {
     } catch (err) {
       toast({
         title: 'Üye çıkarılamadı',
-        description: err instanceof Error ? err.message : 'Hata.',
+        description: userFriendlyError(err),
         variant: 'destructive',
       });
     }
@@ -234,7 +235,7 @@ function GroupDetailPanel({ group, onDelete }: { group: Group; onDelete: () => v
     } catch (err) {
       toast({
         title: 'Grup silinemedi',
-        description: err instanceof Error ? err.message : 'Hata.',
+        description: userFriendlyError(err),
         variant: 'destructive',
       });
     }

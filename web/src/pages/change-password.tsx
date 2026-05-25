@@ -40,6 +40,7 @@ import {
   toBase64,
 } from '@/lib/crypto';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { userFriendlyError } from '@/lib/user-error';
 
 export default function ChangePasswordPage() {
   useDocumentTitle('Şifre Değiştir');
@@ -141,7 +142,7 @@ export default function ChangePasswordPage() {
     } catch (err) {
       toast({
         title: 'Parola değiştirilemedi',
-        description: err instanceof Error ? err.message : 'Bilinmeyen hata.',
+        description: userFriendlyError(err),
         variant: 'destructive',
       });
       setBusy(false);

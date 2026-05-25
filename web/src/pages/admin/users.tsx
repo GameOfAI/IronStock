@@ -25,6 +25,7 @@ import { UserTable } from '@/components/admin/user-table';
 import { Pagination } from '@/components/common/pagination';
 import { CreateUserModal } from '@/components/admin/create-user-modal';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { userFriendlyError } from '@/lib/user-error';
 
 // Lazy-load groups and roles tabs
 const AdminGroupsTab = lazy(() => import('./groups'));
@@ -58,7 +59,7 @@ function UsersTabContent() {
     if (error instanceof ApiError) {
       toast({
         title: 'Kullanıcı listesi alınamadı',
-        description: error.message,
+        description: userFriendlyError(error),
         variant: 'destructive',
       });
     }

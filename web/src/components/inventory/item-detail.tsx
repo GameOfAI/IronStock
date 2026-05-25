@@ -75,6 +75,7 @@ import {
   PIPELINE_TYPE_LABELS,
   REL_LABELS,
 } from '@/components/pipeline/pipeline-constants';
+import { userFriendlyError } from '@/lib/user-error';
 
 // --- Types ---
 
@@ -181,7 +182,7 @@ export function ItemDetail({ itemId, fieldDefinitions, itemTypes: _itemTypes }: 
       onError: (err) => {
         toast({
           title: 'Vault fetch başarısız',
-          description: err instanceof Error ? err.message : 'Sunucu hatası.',
+          description: userFriendlyError(err),
           variant: 'destructive',
         });
       },
@@ -223,7 +224,7 @@ export function ItemDetail({ itemId, fieldDefinitions, itemTypes: _itemTypes }: 
       onError: (err) => {
         toast({
           title: 'Dinamik credential alınamadı',
-          description: err instanceof Error ? err.message : 'Vault hatası.',
+          description: userFriendlyError(err),
           variant: 'destructive',
         });
       },
@@ -287,7 +288,7 @@ export function ItemDetail({ itemId, fieldDefinitions, itemTypes: _itemTypes }: 
         if (!cancelled) {
           setDecryption({
             status: 'error',
-            message: err instanceof Error ? err.message : 'Şifre çözme başarısız.',
+            message: userFriendlyError(err),
           });
         }
       }

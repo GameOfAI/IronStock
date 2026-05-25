@@ -68,13 +68,11 @@ import {
   ShieldCheck,
   Trash2,
 } from 'lucide-react';
-import { ApiError } from '@/api/errors';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { userFriendlyError } from '@/lib/user-error';
 
 function describeError(err: unknown): string {
-  if (err instanceof ApiError) return err.message;
-  if (err instanceof Error) return err.message;
-  return 'Beklenmeyen bir hata oluştu.';
+  return userFriendlyError(err);
 }
 
 // ---------- CA Tab ----------

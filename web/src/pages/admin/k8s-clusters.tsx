@@ -39,6 +39,7 @@ import {
   type CreateK8sClusterRequest,
 } from '@/api/admin-k8s';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { userFriendlyError } from '@/lib/user-error';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -170,7 +171,7 @@ function ClusterFormDialog({
         onClose();
       })
       .catch((e: Error) => {
-        toast({ title: 'Hata', description: e.message, variant: 'destructive' });
+        toast({ title: 'Hata', description: userFriendlyError(e), variant: 'destructive' });
       });
   };
 
@@ -344,7 +345,7 @@ function DeleteClusterDialog({
             onClick={() => {
               del.mutate(target.id, {
                 onSuccess: () => { toast({ title: 'Cluster silindi.' }); onClose(); },
-                onError: (e) => toast({ title: 'Hata', description: e.message, variant: 'destructive' }),
+                onError: (e) => toast({ title: 'Hata', description: userFriendlyError(e), variant: 'destructive' }),
               });
             }}
           >
@@ -381,7 +382,7 @@ export default function AdminK8sClustersPage() {
         toast({ title: `✅ ${c.name} bağlandı`, description: `Versiyon: ${ver}` });
       },
       onError: (e) => {
-        toast({ title: `❌ ${c.name} bağlanamadı`, description: e.message, variant: 'destructive' });
+        toast({ title: `❌ ${c.name} bağlanamadı`, description: userFriendlyError(e), variant: 'destructive' });
       },
       onSettled: () => setTestingId(null),
     });

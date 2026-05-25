@@ -24,6 +24,7 @@ import { useAuthStore } from '@/store/auth';
 import { generateDEK, encryptField, toBase64, fromBase64, openDEKWithKEK, decryptField } from '@/lib/crypto';
 import type { ExternalSourceVault, FieldDefinition, Item, ItemType } from '@/api/types';
 import { useVaultPathsQuery } from '@/api/vault';
+import { userFriendlyError } from '@/lib/user-error';
 
 interface Props {
   open: boolean;
@@ -325,7 +326,7 @@ export function ItemFormModal({
       }
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Bir hata oluştu');
+      setError(userFriendlyError(err));
     }
   }
 

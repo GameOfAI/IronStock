@@ -33,38 +33,38 @@ type DBPinger interface {
 // Auth, Folder, Item, WS are optional: when nil their routes are not mounted
 // (useful for foundation tests that don't exercise those flows).
 type Deps struct {
-	Logger       *slog.Logger
-	DB           DBPinger
-	Auth         *AuthHandlers
-	Folder       *FolderHandlers
-	Item         *ItemHandlers
-	Attachment   *AttachmentHandlers
-	Admin        *AdminHandlers
-	ClientCert   *ClientCertHandlers // PR-SEC3: mTLS client certificate management
-	SSO          *SSOHandlers        // PR-LDAP: SSO/LDAP provider admin CRUD
-	Group        *GroupHandlers
-	Catalog      *CatalogHandlers
-	WS           *WSHandlers
-	Tag          *TagHandlers
-	Export       *ExportHandlers
-	Notification *NotificationHandlers
-	Graph        *GraphHandlers
-	ShareLink    *ShareLinkHandlers
-	Lifecycle      *LifecycleHandlers
-	Pipeline       *PipelineHandlers
-	LogForwarding  *LogForwardingHandlers // PR-LOG1: audit log forwarding to syslog/slack
-	Vault          *VaultHandlers         // PR-VAULT: HashiCorp Vault proxy (ADR-0007)
-	K8sCluster     *K8sClusterHandlers    // PR-K8S: Kubernetes cluster admin CRUD
-	K8s            *K8sHandlers           // PR-K8S: Per-item live K8s data proxy
-	Report         *ReportHandlers        // PR-K8S: HTML inventory report generation
-	Template       *TemplateHandlers      // PR-TPL: User-defined item templates
-	AISuggestion   *AISuggestionHandlers     // PR-AI: AI tag/relationship suggestions
-	Ansible        *AnsibleInventoryHandlers // PR-ANSIBLE: Ansible dynamic inventory
-	APIToken       *APITokenHandlers         // PR-ANSIBLE: API token management
-	SCIM           *SCIMHandlers             // PR-SCIM: SCIM 2.0 user provisioning
-	Scan           *ScanHandlers             // PR-SCAN: Secret fingerprint scanning
-	CORSOrigins    []string                   // ENVANTER_CORS_ORIGINS
-	PprofEnabled   bool                      // PR-PROD5: pprof debug endpoints
+	Logger        *slog.Logger
+	DB            DBPinger
+	Auth          *AuthHandlers
+	Folder        *FolderHandlers
+	Item          *ItemHandlers
+	Attachment    *AttachmentHandlers
+	Admin         *AdminHandlers
+	ClientCert    *ClientCertHandlers // PR-SEC3: mTLS client certificate management
+	SSO           *SSOHandlers        // PR-LDAP: SSO/LDAP provider admin CRUD
+	Group         *GroupHandlers
+	Catalog       *CatalogHandlers
+	WS            *WSHandlers
+	Tag           *TagHandlers
+	Export        *ExportHandlers
+	Notification  *NotificationHandlers
+	Graph         *GraphHandlers
+	ShareLink     *ShareLinkHandlers
+	Lifecycle     *LifecycleHandlers
+	Pipeline      *PipelineHandlers
+	LogForwarding *LogForwardingHandlers    // PR-LOG1: audit log forwarding to syslog/slack
+	Vault         *VaultHandlers            // PR-VAULT: HashiCorp Vault proxy (ADR-0007)
+	K8sCluster    *K8sClusterHandlers       // PR-K8S: Kubernetes cluster admin CRUD
+	K8s           *K8sHandlers              // PR-K8S: Per-item live K8s data proxy
+	Report        *ReportHandlers           // PR-K8S: HTML inventory report generation
+	Template      *TemplateHandlers         // PR-TPL: User-defined item templates
+	AISuggestion  *AISuggestionHandlers     // PR-AI: AI tag/relationship suggestions
+	Ansible       *AnsibleInventoryHandlers // PR-ANSIBLE: Ansible dynamic inventory
+	APIToken      *APITokenHandlers         // PR-ANSIBLE: API token management
+	SCIM          *SCIMHandlers             // PR-SCIM: SCIM 2.0 user provisioning
+	Scan          *ScanHandlers             // PR-SCAN: Secret fingerprint scanning
+	CORSOrigins   []string                  // ENVANTER_CORS_ORIGINS
+	PprofEnabled  bool                      // PR-PROD5: pprof debug endpoints
 }
 
 // NewRouter builds a chi router with the standard middleware stack.
@@ -77,7 +77,7 @@ func NewRouter(d Deps) http.Handler {
 	//    any auth middleware can reject them. Allows Tauri desktop client
 	//    (tauri://localhost, http://localhost:1420 dev) and same-origin web UI.
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins: d.CORSOrigins,
+		AllowedOrigins:   d.CORSOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Authorization", "Content-Type", "X-Request-Id"},
 		ExposedHeaders:   []string{"X-Request-Id"},
@@ -258,14 +258,14 @@ func NewRouter(d Deps) http.Handler {
 			ir.Use(timeoutMW)
 			ir.Use(requireAuth)
 			ir.Get("/", d.Item.List)
-			ir.Get("/search", d.Item.Search)              // PR-SEARCH: cross-folder substring search
-			ir.Get("/duplicates", d.Item.CheckDuplicates)  // PR-DUP: duplicate name detection
+			ir.Get("/search", d.Item.Search)                 // PR-SEARCH: cross-folder substring search
+			ir.Get("/duplicates", d.Item.CheckDuplicates)    // PR-DUP: duplicate name detection
 			ir.Get("/health-report", d.Item.GetHealthReport) // PR-HEALTH: admin health report
 			ir.Post("/", d.Item.Create)
 			ir.Get("/{id}", d.Item.Get)
 			ir.Put("/{id}", d.Item.Update)
 			ir.Delete("/{id}", d.Item.Delete)
-			ir.Get("/{id}/shares", d.Item.ListShares)                                // PR-GROUP-SHARE
+			ir.Get("/{id}/shares", d.Item.ListShares) // PR-GROUP-SHARE
 			ir.Post("/{id}/shares", d.Item.Share)
 			ir.Delete("/{id}/shares/{user_id}", d.Item.Unshare)
 			ir.Post("/{id}/group-shares", d.Item.ShareGroup)                         // PR-GROUP-SHARE
@@ -274,7 +274,7 @@ func NewRouter(d Deps) http.Handler {
 			ir.Get("/{id}/fields/{field_def_id}/versions", d.Item.ListFieldVersions) // PR-N2
 			ir.Get("/{id}/links", d.Item.ListLinks)                                  // PR-LINK
 			ir.Post("/{id}/links", d.Item.CreateLink)                                // PR-LINK
-			ir.Delete("/{id}/links/{link_id}", d.Item.DeleteLink)                   // PR-LINK
+			ir.Delete("/{id}/links/{link_id}", d.Item.DeleteLink)                    // PR-LINK
 			ir.Get("/{id}/health", d.Item.GetHealth)                                 // PR-HEALTH
 
 			// PR-N7 tag + favorite routes under /items/{id}
@@ -495,6 +495,12 @@ func NewRouter(d Deps) http.Handler {
 			mr.Post("/channels", d.Notification.AddExternalChannel)
 			mr.Delete("/channels/{channel_id}", d.Notification.DeleteExternalChannel)
 			mr.Post("/channels/{channel_id}/test", d.Notification.TestExternalChannel)
+			// E2E keypair endpoint — must live here because r.Route("/api/v1/users/me")
+			// captures the prefix; a separate r.Get("/api/v1/users/me/keypair") outside
+			// this block would 404 due to chi's sub-router isolation.
+			if d.Catalog != nil {
+				mr.Get("/keypair", d.Catalog.GetMyKeypair)
+			}
 		})
 	}
 
@@ -515,16 +521,15 @@ func NewRouter(d Deps) http.Handler {
 		r.With(timeoutMW).Get("/api/v1/share/{token}", d.ShareLink.ViewShareLink)
 	}
 
-	// Catalog routes — read-only lookup tables for the form/share flows
-	// + /users/me/keypair (caller's own E2E material for KEK derive).
-	// Any authenticated user may read these.
+	// Catalog routes — read-only lookup tables for the form/share flows.
+	// Note: /users/me/keypair moved into the /api/v1/users/me sub-router above
+	// to avoid chi route shadowing (sub-router captures the prefix).
 	if d.Catalog != nil && d.Auth != nil {
 		r.Route("/api/v1", func(cr chi.Router) {
 			cr.Use(timeoutMW)
 			cr.Use(requireAuth)
 			cr.Get("/field-definitions", d.Catalog.ListFieldDefinitions)
 			cr.Get("/item-types", d.Catalog.ListItemTypes)
-			cr.Get("/users/me/keypair", d.Catalog.GetMyKeypair)
 			cr.Get("/users/{id}/public-key", d.Catalog.GetUserPublicKey)
 		})
 	}

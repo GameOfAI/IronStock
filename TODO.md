@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-05-25 — Sidebar grouping + error sanitization + security hardening.
+Son güncelleme: 2026-05-25 — Error sanitization + security hardening + keypair route fix.
 
 ## ✅ Post-Deploy Fixes (2026-05-25)
 

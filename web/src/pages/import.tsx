@@ -32,6 +32,7 @@ import { generateDEK, sealDEK, encryptField, toBase64, fromBase64 } from '@/lib/
 import { parseKdbx } from '@/lib/kdbx-parser';
 import type { BatchImportItem } from '@/api/types';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { userFriendlyError } from '@/lib/user-error';
 
 type Step = 'select' | 'preview' | 'mapping' | 'importing' | 'done';
 
@@ -115,7 +116,7 @@ export default function ImportPage() {
       });
       setStep('preview');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'CSV önizleme hatası.');
+      setError(userFriendlyError(err));
     }
   }
 
@@ -131,11 +132,9 @@ export default function ImportPage() {
       setStep('preview');
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message.includes('Invalid credentials')
-            ? 'Hatalı KeePass şifresi.'
-            : err.message
-          : 'KeePass dosyası açılamadı.',
+        err instanceof Error && err.message.includes('Invalid credentials')
+          ? 'Hatalı KeePass şifresi.'
+          : userFriendlyError(err),
       );
     }
   }
@@ -172,7 +171,7 @@ export default function ImportPage() {
       setImportResult(result);
       setStep('done');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Import hatası.');
+      setError(userFriendlyError(err));
       setStep('mapping');
     }
   }

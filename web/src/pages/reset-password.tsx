@@ -31,6 +31,7 @@ import {
   toBase64,
 } from '@/lib/crypto';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { userFriendlyError } from '@/lib/user-error';
 
 type Phase = 'warn' | 'complete' | 'done';
 
@@ -118,10 +119,7 @@ export default function ResetPasswordPage() {
     } catch (err) {
       toast({
         title: 'Şifre sıfırlanamadı',
-        description:
-          err instanceof Error
-            ? err.message
-            : 'Token geçersiz veya süresi dolmuş olabilir.',
+        description: userFriendlyError(err),
         variant: 'destructive',
       });
     } finally {

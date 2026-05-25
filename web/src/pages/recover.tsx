@@ -30,6 +30,7 @@ import {
   toBase64,
 } from '@/lib/crypto';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { userFriendlyError } from '@/lib/user-error';
 
 type Phase = 'init' | 'warn' | 'complete' | 'codes';
 
@@ -121,7 +122,7 @@ export default function RecoverPage() {
     } catch (err) {
       toast({
         title: 'Kurtarma tamamlanamadı',
-        description: err instanceof Error ? err.message : 'Bilinmeyen hata.',
+        description: userFriendlyError(err),
         variant: 'destructive',
       });
     } finally {

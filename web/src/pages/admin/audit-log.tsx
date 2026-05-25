@@ -33,6 +33,7 @@ import type { AuditFilterState } from '@/components/admin/audit-filters';
 import { AuditRow } from '@/components/admin/audit-row';
 import { Pagination } from '@/components/common/pagination';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { userFriendlyError } from '@/lib/user-error';
 
 const DEFAULT_LIMIT = 50;
 const ALLOWED_LIMITS = [25, 50, 100];
@@ -78,7 +79,7 @@ export function AdminAuditLogPage() {
     if (error instanceof ApiError) {
       toast({
         title: 'Audit log alınamadı',
-        description: error.message,
+        description: userFriendlyError(error),
         variant: 'destructive',
       });
     }

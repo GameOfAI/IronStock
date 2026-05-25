@@ -46,6 +46,7 @@ import { usePublicSSOProvidersQuery } from '@/api/admin-sso';
 import type { SSOProviderInfo } from '@/api/types';
 import { useDocumentTitle } from '@/hooks/use-document-title';
 import { APP_VERSION } from '@/version';
+import { userFriendlyError } from '@/lib/user-error';
 
 // --- Password input with show/hide toggle ---
 
@@ -153,7 +154,7 @@ function LDAPDialog({ provider, open, onClose }: LDAPDialogProps) {
     } catch (err) {
       toast({
         title: 'LDAP girişi başarısız',
-        description: err instanceof Error ? err.message : 'Bilinmeyen hata.',
+        description: userFriendlyError(err),
         variant: 'destructive',
       });
       setBusy(false);
@@ -270,18 +271,21 @@ export default function LoginPage() {
       remember_device: opts.remember || undefined,
     });
 
-    setSubstep('fetching_keypair');
-    const keypair = await fetchMyKeypair(loginRes.access_token);
-
     const sessionUser: SessionUser = {
       id: loginRes.user_id,
       username,
       roles: loginRes.roles,
     };
 
-    const kekParams = keypair.kek_params as unknown as KEKParams & { alg?: string };
+    setSubstep('fetching_keypair');
+    let keypair: Awaited<ReturnType<typeof fetchMyKeypair>> | null = null;
+    try {
+      keypair = await fetchMyKeypair(loginRes.access_token);
+    } catch {
+      // Bootstrap admin or first-run: no keypair yet → bootstrap session.
+    }
 
-    if (kekParams?.alg === 'none') {
+    if (!keypair || (keypair.kek_params as Record<string, unknown>)?.alg === 'none') {
       setBootstrapSession({
         user: sessionUser,
         accessToken: loginRes.access_token,
@@ -290,6 +294,7 @@ export default function LoginPage() {
         mustSetupTOTP: loginRes.must_setup_totp,
       });
     } else {
+      const kekParams = keypair.kek_params as unknown as KEKParams & { alg?: string };
       setSubstep('deriving_key');
       const kekSalt = fromBase64(keypair.kek_salt);
       const kek = await deriveKEK(password, kekSalt, kekParams);
@@ -335,7 +340,7 @@ export default function LoginPage() {
       });
       navigate(fromPath ?? '/inventory', { replace: true });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Bilinmeyen hata.';
+      const msg = userFriendlyError(err);
       if (!msg.includes('NotAllowed') && !msg.includes('abort') && !msg.includes('cancelled')) {
         toast({
           title: 'Güvenlik anahtarı ile giriş başarısız',
@@ -370,15 +375,9 @@ export default function LoginPage() {
         setTotpDialogOpen(true);
         return;
       }
-      const msg =
-        err instanceof ApiError
-          ? err.message
-          : err instanceof Error
-            ? err.message
-            : 'Giriş başarısız.';
       toast({
         title: 'Giriş başarısız',
-        description: msg,
+        description: userFriendlyError(err),
         variant: 'destructive',
       });
     }
@@ -402,15 +401,9 @@ export default function LoginPage() {
       // Success → dialog closes automatically via navigation
     } catch (err) {
       setSubstep('idle');
-      const msg =
-        err instanceof ApiError
-          ? err.message
-          : err instanceof Error
-            ? err.message
-            : 'Doğrulama başarısız.';
       toast({
         title: 'Doğrulama başarısız',
-        description: msg,
+        description: userFriendlyError(err),
         variant: 'destructive',
       });
     }

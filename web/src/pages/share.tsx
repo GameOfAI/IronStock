@@ -30,6 +30,7 @@ import { useShareLinkViewQuery } from '@/api/share-links';
 import { ApiError } from '@/api/errors';
 import type { ShareLinkField } from '@/api/types';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { userFriendlyError } from '@/lib/user-error';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -197,7 +198,7 @@ export default function SharePage() {
       } catch (err) {
         if (!cancelled) {
           setDekError(
-            err instanceof Error ? err.message : 'DEK çözülemedi',
+            userFriendlyError(err),
           );
         }
       }
