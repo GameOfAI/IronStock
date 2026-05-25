@@ -1,0 +1,41 @@
+{
+	email burak.haslaman@gmail.com
+}
+
+# Public — only API, WebSocket, SCIM (for Tauri desktop app)
+haslaman.tplinkdns.com {
+	handle /api/* {
+		reverse_proxy server:8080
+	}
+
+	handle /ws {
+		reverse_proxy server:8080
+	}
+
+	handle /scim/* {
+		reverse_proxy server:8080
+	}
+
+	handle /metrics {
+		respond "Forbidden" 403
+	}
+
+	handle {
+		respond "IronStock API" 200
+	}
+}
+
+# Local — Web UI + API (http only, no SSL)
+:3080 {
+	handle /api/* {
+		reverse_proxy server:8080
+	}
+
+	handle /ws {
+		reverse_proxy server:8080
+	}
+
+	handle {
+		reverse_proxy web:80
+	}
+}

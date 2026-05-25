@@ -1,0 +1,156 @@
+# IronStock — Production deployment with Caddy (auto-SSL).
+#
+# Usage:
+#   cd deploy/compose
+#   cp .env.prod.example .env.prod
+#   # Edit .env.prod with your secrets
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+#
+# First run creates admin via bootstrap endpoint:
+#   curl -X POST https://haslaman.tplinkdns.com/api/v1/auth/bootstrap \
+#     -H 'Content-Type: application/json' \
+#     -d '{"username":"admin","password":"YourSecurePassword"}'
+
+name: ironstock-prod
+
+services:
+  # ── Reverse Proxy (Caddy — auto Let's Encrypt) ──────────────
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"  # HTTP/3
+      - "3080:3080"    # Local web UI
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+      - server
+    networks:
+      - frontend
+
+  # ── Go API Server ───────────────────────────────────────────
+  server:
+    build:
+      context: ../..
+      dockerfile: server/Dockerfile.prod
+    restart: unless-stopped
+    expose:
+      - "8080"
+    environment:
+      ENVANTER_ADDR: ":8080"
+      ENVANTER_LOG_LEVEL: "info"
+      ENVANTER_DB_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable"
+      ENVANTER_MASTER_KEY: "${MASTER_KEY}"
+      ENVANTER_JWT_SECRET: "${JWT_SECRET}"
+      ENVANTER_CORS_ORIGINS: "https://${DOMAIN},http://localhost:3080,tauri://localhost,https://tauri.localhost"
+      ENVANTER_MINIO_ENDPOINT: "minio:9000"
+      ENVANTER_MINIO_BUCKET: "ironstock"
+      ENVANTER_MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY}"
+      ENVANTER_MINIO_SECRET_KEY: "${MINIO_SECRET_KEY}"
+      ENVANTER_MINIO_SECURE: "false"
+      ENVANTER_REDIS_URL: "redis://redis:6379"
+      ENVANTER_SMTP_HOST: "${SMTP_HOST:-}"
+      ENVANTER_SMTP_PORT: "${SMTP_PORT:-587}"
+      ENVANTER_BOOTSTRAP_ENABLED: "${BOOTSTRAP_ENABLED:-false}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - frontend
+      - backend
+
+  # ── Web Frontend (nginx serving built React) ────────────────
+  web:
+    build:
+      context: ../..
+      dockerfile: web/Dockerfile.prod
+    restart: unless-stopped
+    expose:
+      - "80"
+    networks:
+      - frontend
+
+  # ── Database Migration (run once, then exit) ────────────────
+  migrate:
+    build:
+      context: ../..
+      dockerfile: server/Dockerfile.prod
+    entrypoint: ["/goose", "-dir", "/migrations", "postgres", "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable", "up"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - backend
+
+  # ── PostgreSQL ──────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_DB: "${POSTGRES_DB}"
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
+  # ── Redis ───────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - backend
+
+  # ── MinIO (S3-compatible storage) ───────────────────────────
+  minio:
+    image: minio/minio:RELEASE.2024-03-15T01-07-19Z
+    restart: unless-stopped
+    command: server /data --console-address :9001
+    environment:
+      MINIO_ROOT_USER: "${MINIO_ACCESS_KEY}"
+      MINIO_ROOT_PASSWORD: "${MINIO_SECRET_KEY}"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend
+
+networks:
+  frontend:
+  backend:
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  caddy_data:
+  caddy_config:

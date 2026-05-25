@@ -1,0 +1,19 @@
+# Production Dockerfile — build context is repo root (../../)
+FROM --platform=$BUILDPLATFORM golang:alpine AS builder
+ARG TARGETARCH
+WORKDIR /app
+COPY server/go.mod server/go.sum ./
+RUN go mod download
+COPY server/ .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -o /envanter-api ./cmd/api
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
+    go install github.com/pressly/goose/v3/cmd/goose@v3.22.0 && \
+    find /go/bin -name goose -exec cp {} /goose \;
+
+FROM alpine:3.19
+RUN apk --no-cache add ca-certificates
+COPY --from=builder /envanter-api /envanter-api
+COPY --from=builder /goose /goose
+COPY server/migrations /migrations
+EXPOSE 8080
+ENTRYPOINT ["/envanter-api"]
