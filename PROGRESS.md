@@ -1,6 +1,6 @@
 # İlerleyiş
 
-Son güncelleme: 2026-05-25 (Tauri UX + error sanitization + sidebar grouping + security hardening)
+Son güncelleme: 2026-05-25 (Sidebar grouping + error sanitization + security hardening)
 
 ## Mevcut Durum
 

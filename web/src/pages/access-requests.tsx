@@ -174,7 +174,7 @@ export default function AccessRequestsPage() {
   const [approving, setApproving] = useState<AccessRequest | null>(null);
   const [denying, setDenying] = useState<AccessRequest | null>(null);
 
-  const { data, isLoading, refetch } = useAccessRequestsQuery({ status: statusFilter || undefined });
+  const { data, isLoading, error, refetch } = useAccessRequestsQuery({ status: statusFilter || undefined });
   const requests = data?.requests ?? [];
 
   const pending = requests.filter((r) => r.status === 'pending');
@@ -228,7 +228,14 @@ export default function AccessRequestsPage() {
         </div>
       </div>
 
-      {isLoading ? (
+      {error ? (
+        <div className="text-center py-16 space-y-3">
+          <p className="text-destructive text-sm">Onay istekleri yüklenirken bir hata oluştu.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
+            <RefreshCw className="mr-2 h-4 w-4" />Tekrar Dene
+          </Button>
+        </div>
+      ) : isLoading ? (
         <div className="flex justify-center py-16">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
