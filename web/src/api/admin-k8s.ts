@@ -61,7 +61,7 @@ export function useCreateK8sClusterMutation() {
     mutationFn: (req: CreateK8sClusterRequest) =>
       apiFetch<{ id: string }>('/api/v1/admin/k8s/clusters', {
         method: 'POST',
-        body: JSON.stringify(req),
+        body: req,
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: [QK] });
@@ -75,7 +75,7 @@ export function useUpdateK8sClusterMutation() {
     mutationFn: ({ id, ...req }: UpdateK8sClusterRequest & { id: string }) =>
       apiFetch<void>(`/api/v1/admin/k8s/clusters/${id}`, {
         method: 'PUT',
-        body: JSON.stringify(req),
+        body: req,
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: [QK] });
