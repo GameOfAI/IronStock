@@ -1,6 +1,17 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-05-25 — Error sanitization + security hardening + keypair route fix.
+Son güncelleme: 2026-06-02 — QA bug-fix turu (7 bug + CI temizliği).
+
+## ✅ QA Bug-Fix Turu (2026-06-02) — branch: fix/ux-and-dev-build
+
+- [x] Toolbar yanlış item'a Sil/Düzenle (veri kaybı riski) — activeItem temizleme + URL itemId önceliği
+- [x] Onay İstekleri + Import sayfa çökmeleri — `<Select.Item value="">` → sentinel
+- [x] Log-forwarding / K8s cluster / API token / K8s-bind oluşturma kırık — apiFetch çift-encode → `body: req`
+- [x] Docker build kırık — `golang:1.22` → `1.25` (go.mod 1.25 ister)
+- [x] WebAuthn login UX — config'siz sunucuda 501'de nazik gizleme
+- [x] DOM nesting (group detail) — `<Badge>` `<p>` içinden çıkarıldı
+- [x] CI yeşillendirme — pre-existing gofmt (server) + eslint (web/client) düzeltildi
+- [x] PROGRESS.md + TODO.md tracking güncellendi
 
 ## ✅ Post-Deploy Fixes (2026-05-25)
 

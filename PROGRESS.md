@@ -1,6 +1,18 @@
 # İlerleyiş
 
-Son güncelleme: 2026-05-25 (Error sanitization + security hardening + keypair route fix)
+Son güncelleme: 2026-06-02 (QA bug-fix turu: 7 gerçek bug + pre-existing CI debt)
+
+### 2026-06-02 — QA Bug-Fix Turu (branch: fix/ux-and-dev-build)
+
+Manuel + AI-perspektifi test sırasında bulunan 7 gerçek bug düzeltildi:
+
+- **Toolbar yanlış item'a işlem** (`inventory/index.tsx`): bir item'ı düzenleyip başka item seçince Sil/Düzenle eski item'a gidiyordu → veri kaybı riski. `activeItem` seçimde temizleniyor + URL itemId önceliği.
+- **2 sayfa çökmesi** (`access-requests.tsx`, `import.tsx`): Radix `<Select.Item value="">` crash → `'all'` / `'__none__'` sentinel.
+- **4 oluştur/güncelle kırık** (`admin-log-forwarding`, `admin-k8s`, `api-tokens`, `reports`): `apiFetch` + `body: JSON.stringify(req)` çift-encode → 400. `body: req`.
+- **Dockerfile Go sürümü** (`server/Dockerfile`, `Dockerfile.dev`): go.mod 1.25 ister, base 1.22 → build kırık. `golang:1.25-alpine`.
+- **WebAuthn login UX** (`login.tsx`): config'siz sunucuda kırmızı hata → 501'de bölüm gizlenir.
+- **DOM nesting** (`admin/groups.tsx`): `<Badge>` (`<div>`) `<p>` içinde → `<div>`.
+- **CI temizliği**: pre-existing gofmt (server geneli) + eslint (`linked-items-tab`, `kdbx-parser`, `onboarding-tour`, client `App`/`item-detail`) düzeltildi.
 
 ## Mevcut Durum
 

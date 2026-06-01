@@ -42,11 +42,11 @@ type ElasticConfig struct {
 
 // ecsEvent is the ECS-mapped audit event for Elasticsearch.
 type ecsEvent struct {
-	Timestamp string            `json:"@timestamp"`
-	Event     ecsEventFields    `json:"event"`
-	User      *ecsUser          `json:"user,omitempty"`
-	Log       ecsLog            `json:"log"`
-	IronStock map[string]any    `json:"ironstock,omitempty"`
+	Timestamp string         `json:"@timestamp"`
+	Event     ecsEventFields `json:"event"`
+	User      *ecsUser       `json:"user,omitempty"`
+	Log       ecsLog         `json:"log"`
+	IronStock map[string]any `json:"ironstock,omitempty"`
 }
 
 type ecsEventFields struct {

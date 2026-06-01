@@ -51,7 +51,7 @@ func TestDuplicateCheckNameRequired(t *testing.T) {
 		wantValid bool
 	}{
 		{"", false},
-		{" ", false},         // trimmed to empty
+		{" ", false}, // trimmed to empty
 		{"a", true},
 		{"hostname", true},
 	}

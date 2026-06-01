@@ -94,7 +94,7 @@ type reportK8sData struct {
 	Pods        []k8s.Pod
 	Deployments []k8s.Deployment
 	Services    []k8s.Service
-	Events      []k8s.Event      // Warning events only, capped at 20
+	Events      []k8s.Event // Warning events only, capped at 20
 	Metrics     []k8s.PodMetrics
 	FetchError  string
 }

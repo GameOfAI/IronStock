@@ -119,15 +119,15 @@ type EventSource struct {
 
 // Event is a K8s Event resource.
 type Event struct {
-	Metadata        ObjectMeta  `json:"metadata"`
-	InvolvedObject  ObjectMeta  `json:"involvedObject"`
-	Reason          string      `json:"reason"`
-	Message         string      `json:"message"`
-	Type            string      `json:"type"` // Normal | Warning
-	Count           int32       `json:"count"`
-	FirstTimestamp  string      `json:"firstTimestamp,omitempty"`
-	LastTimestamp   string      `json:"lastTimestamp,omitempty"`
-	Source          EventSource `json:"source,omitempty"`
+	Metadata       ObjectMeta  `json:"metadata"`
+	InvolvedObject ObjectMeta  `json:"involvedObject"`
+	Reason         string      `json:"reason"`
+	Message        string      `json:"message"`
+	Type           string      `json:"type"` // Normal | Warning
+	Count          int32       `json:"count"`
+	FirstTimestamp string      `json:"firstTimestamp,omitempty"`
+	LastTimestamp  string      `json:"lastTimestamp,omitempty"`
+	Source         EventSource `json:"source,omitempty"`
 }
 
 // EventList is the list response for Events.

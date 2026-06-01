@@ -52,8 +52,8 @@ import (
 // It expires after 10 minutes — enough for a user to authenticate
 // and have the provider redirect back.
 type oidcStateEntry struct {
-	ProviderID   string `json:"provider_id"`
-	PKCEVerifier string `json:"pkce_verifier"`
+	ProviderID   string    `json:"provider_id"`
+	PKCEVerifier string    `json:"pkce_verifier"`
 	ExpiresAt    time.Time `json:"expires_at"`
 }
 
