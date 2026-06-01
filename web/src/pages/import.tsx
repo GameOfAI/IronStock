@@ -342,14 +342,20 @@ export default function ImportPage() {
                   <div key={key} className="space-y-1">
                     <Label className="text-xs">{label}</Label>
                     <Select
-                      value={mapping[key]}
-                      onValueChange={(v) => setMapping((m) => ({ ...m, [key]: v }))}
+                      // Radix <Select.Item> forbids value="". Keep the internal
+                      // mapping value as "" for "unmapped" (the rest of the code
+                      // relies on that), but expose a "__none__" sentinel to the
+                      // Select so the item is valid.
+                      value={mapping[key] || '__none__'}
+                      onValueChange={(v) =>
+                        setMapping((m) => ({ ...m, [key]: v === '__none__' ? '' : v }))
+                      }
                     >
                       <SelectTrigger className="h-8 text-xs">
                         <SelectValue placeholder="— kolon seç —" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">— yok —</SelectItem>
+                        <SelectItem value="__none__">— yok —</SelectItem>
                         {csvHeaders.map((h) => (
                           <SelectItem key={h} value={h}>{h}</SelectItem>
                         ))}
