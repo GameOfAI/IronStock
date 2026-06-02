@@ -12,6 +12,7 @@ import { AuthGate, MustChangePasswordGate, MustSetupTOTPGate, RoleGate } from '@
 import { WsProvider } from '@/components/ws-provider';
 import { SkipLink } from '@/components/layout/skip-link';
 import { OnboardingTour, useOnboardingTour } from '@/components/onboarding/onboarding-tour';
+import { EntityPageRegistryProvider } from '@/lib/entity-page-registry';
 
 import LoginPage from '@/pages/login';
 import RegisterPage from '@/pages/register';
@@ -90,6 +91,7 @@ function OnboardingTourBridge() {
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
+      <EntityPageRegistryProvider>
       <ThemeProvider>
         <BrowserRouter>
           <SkipLink />
@@ -166,6 +168,7 @@ export default function App() {
           <Toaster />
         </BrowserRouter>
       </ThemeProvider>
+      </EntityPageRegistryProvider>
       {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
     </QueryClientProvider>
   );
