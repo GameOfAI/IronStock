@@ -1,19 +1,19 @@
 # İlerleyiş
 
-Son güncelleme: 2026-06-02 (Developer Portal dönüşümü başladı — PR-DP01)
+Son güncelleme: 2026-06-02 (PR-DP02 tamamlandı — kind_key + EntityEnvelope)
 
 ## Mevcut Durum
 
 - **Önceki Fazlar (Faz 0–11):** 27/27 PR tamamlandı ✅
-- **Developer Portal Dönüşümü (DP Fazı):** 1/15 PR tamamlandı
-- **Son tamamlanan:** PR-DP01 (item_annotations tablosu + CRUD API)
+- **Developer Portal Dönüşümü (DP Fazı):** 2/15 PR tamamlandı
+- **Son tamamlanan:** PR-DP02 (kind_key migration + EntityEnvelope kind/owner_ref)
 
 ## Developer Portal PR'ları (DP Fazı)
 
 | PR | Açıklama | Durum |
 |----|----------|-------|
 | PR-DP01 | item_annotations tablosu + CRUD API (migration 00061) | ✅ |
-| PR-DP02 | kind_key + EntityEnvelope (kind, owner_ref) | ⏳ |
+| PR-DP02 | kind_key + EntityEnvelope (kind, owner_ref) (migration 00062) | ✅ |
 | PR-DP03 | Relation type Backstage alias'ları | ⏳ |
 | PR-DP04 | Catalog Browser sayfası (web) | ⏳ |
 | PR-DP05 | Backend kind filter (search endpoint) | ⏳ |

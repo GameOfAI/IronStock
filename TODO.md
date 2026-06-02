@@ -1,11 +1,11 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-06-02 — Developer Portal dönüşümü başladı (PR-DP01 tamamlandı).
+Son güncelleme: 2026-06-02 — PR-DP02 tamamlandı (kind_key + EntityEnvelope).
 
 ## 🔄 Developer Portal Dönüşümü (Aktif)
 
 - [x] PR-DP01: item_annotations tablosu + CRUD API
-- [ ] PR-DP02: kind_key + EntityEnvelope (kind, owner_ref)
+- [x] PR-DP02: kind_key + EntityEnvelope (kind, owner_ref)
 - [ ] PR-DP03: Relation type Backstage alias'ları
 - [ ] PR-DP04: Catalog Browser sayfası (web)
 - [ ] PR-DP05: Backend kind filter (search endpoint)

@@ -212,6 +212,12 @@ export interface ItemUpdateRequest {
   owner_wrap_nonce?: string;
 }
 
+/** PR-DP02: Backstage-style owner reference {kind, name}. */
+export interface OwnerRef {
+  kind: string;
+  name: string;
+}
+
 export interface Item {
   id: string;
   folder_id: string;
@@ -236,6 +242,10 @@ export interface Item {
   requires_approval?: boolean;
   /** PR-N3: Present when requires_approval=true and caller has no active approved request. */
   my_access_request?: AccessRequestInfo | null;
+  /** PR-DP02: Backstage entity kind (e.g. "Server", "Database"). From item_types.kind_key. */
+  kind?: string;
+  /** PR-DP02: Entity creator as Backstage-style owner reference. */
+  owner_ref?: OwnerRef;
 }
 
 export interface ItemListResponse {
@@ -424,6 +434,8 @@ export interface ItemType {
   id: number;
   key: string;
   label: string;
+  /** PR-DP02: Backstage entity kind key (e.g. "Server", "Database"). */
+  kind_key?: string | null;
   icon?: string | null;
   suggested_fields: string[];
   default_launchers: unknown[];

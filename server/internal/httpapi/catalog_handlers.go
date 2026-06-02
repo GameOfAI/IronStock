@@ -96,6 +96,7 @@ type itemType struct {
 	ID               int16           `json:"id"`
 	Key              string          `json:"key"`
 	Label            string          `json:"label"`
+	KindKey          *string         `json:"kind_key,omitempty"` // PR-DP02: Backstage entity kind
 	Icon             *string         `json:"icon,omitempty"`
 	SuggestedFields  json.RawMessage `json:"suggested_fields,omitempty"`
 	DefaultLaunchers json.RawMessage `json:"default_launchers,omitempty"`
@@ -119,13 +120,14 @@ func (h *CatalogHandlers) ListItemTypes(w http.ResponseWriter, r *http.Request) 
 		    COALESCE(array_agg(COALESCE(icon, '')              ORDER BY id), '{}'),
 		    COALESCE(array_agg(suggested_fields::text          ORDER BY id), '{}'),
 		    COALESCE(array_agg(default_launchers::text         ORDER BY id), '{}'),
-		    COALESCE(array_agg(field_groups::text              ORDER BY id), '{}')
+		    COALESCE(array_agg(field_groups::text              ORDER BY id), '{}'),
+		    COALESCE(array_agg(COALESCE(kind_key, '')          ORDER BY id), '{}')
 		FROM item_types
 	`
 	var ids []int16
-	var keys, labels, icons, suggested, launchers, groups []string
+	var keys, labels, icons, suggested, launchers, groups, kindKeys []string
 	if err := h.Service.DB.QueryRow(r.Context(), sqlText).Scan(
-		&ids, &keys, &labels, &icons, &suggested, &launchers, &groups,
+		&ids, &keys, &labels, &icons, &suggested, &launchers, &groups, &kindKeys,
 	); err != nil {
 		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
 			"Item tipleri okunamadı.", err)
@@ -138,6 +140,7 @@ func (h *CatalogHandlers) ListItemTypes(w http.ResponseWriter, r *http.Request) 
 			ID:               ids[i],
 			Key:              keys[i],
 			Label:            labels[i],
+			KindKey:          emptyToNil(kindKeys[i]),
 			Icon:             emptyToNil(icons[i]),
 			SuggestedFields:  json.RawMessage(suggested[i]),
 			DefaultLaunchers: json.RawMessage(launchers[i]),
