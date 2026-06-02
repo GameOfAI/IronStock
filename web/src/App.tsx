@@ -45,6 +45,7 @@ import AccessRequestsPage from '@/pages/access-requests';
 import CatalogPage from '@/pages/catalog';
 import EntityDetailPage from '@/pages/catalog/entity-detail';
 import CreatePage from '@/pages/create';
+import PortalHomePage from '@/pages/portal-home';
 import NotFoundPage from '@/pages/not-found';
 
 /**
@@ -132,7 +133,7 @@ export default function App() {
                 <Route element={<MustSetupTOTPGate />}>
                   <Route element={<WsProvider><Outlet /></WsProvider>}>
                   <Route element={<><OnboardingTourBridge /><AppShell /></>}>
-                    <Route index element={<Navigate to="/inventory" replace />} />
+                    <Route index element={<PortalHomePage />} />
                     <Route path="/inventory/*" element={<InventoryPage />} />
                     <Route path="/tags" element={<TagsPage />} />
                     <Route path="/graph" element={<GraphPage />} />

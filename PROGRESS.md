@@ -1,12 +1,12 @@
 # İlerleyiş
 
-Son güncelleme: 2026-06-03 (PR-DP12 tamamlandı — Shared types + Tauri sync)
+Son güncelleme: 2026-06-03 (PR-DP13 tamamlandı — Portal Home Dashboard)
 
 ## Mevcut Durum
 
 - **Önceki Fazlar (Faz 0–11):** 27/27 PR tamamlandı ✅
-- **Developer Portal Dönüşümü (DP Fazı):** 12/15 PR tamamlandı
-- **Son tamamlanan:** PR-DP12 (client/api/types.ts re-exports, item-list kind badge, item-detail kind badge)
+- **Developer Portal Dönüşümü (DP Fazı):** 13/15 PR tamamlandı
+- **Son tamamlanan:** PR-DP13 (portal-home page, usePortalStatsQuery, App.tsx root route, logo link)
 
 ## Developer Portal PR'ları (DP Fazı)
 
@@ -24,7 +24,7 @@ Son güncelleme: 2026-06-03 (PR-DP12 tamamlandı — Shared types + Tauri sync)
 | PR-DP10 | Golden Path Template Wizard (5-step) | ✅ |
 | PR-DP11 | portal_templates tablosu + API | ✅ |
 | PR-DP12 | Shared types + Tauri sync | ✅ |
-| PR-DP13 | Portal Home Dashboard | ⏳ |
+| PR-DP13 | Portal Home Dashboard | ✅ |
 | PR-DP14 | MCP server portal catalog tools | ⏳ |
 | PR-DP15 | ADR-0013 + PROGRESS/TODO sync | ⏳ |
 

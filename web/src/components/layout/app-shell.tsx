@@ -14,7 +14,7 @@
  */
 
 import * as React from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Folder,
   Shield,
@@ -551,15 +551,15 @@ export function AppShell() {
         </button>
 
         {/* Logo + branding */}
-        <div className="flex items-center gap-2">
+        <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
           <div className="grid h-6 w-6 place-items-center rounded-md bg-blue-600">
             <Key className="h-[13px] w-[13px] text-white" />
           </div>
           <span className="text-[14px] font-semibold tracking-tight text-slate-100">IronStock</span>
           <span className="font-mono text-[10px] text-slate-500">v{APP_VERSION}</span>
-          <span className="mx-1.5 h-3 w-px bg-slate-800" />
-          <span className="text-[13px] text-slate-400">{pageTitle}</span>
-        </div>
+        </Link>
+        <span className="mx-1.5 h-3 w-px bg-slate-800" />
+        <span className="text-[13px] text-slate-400">{pageTitle}</span>
 
         {/* Right side actions */}
         <div className="ml-auto flex items-center gap-1">

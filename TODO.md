@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-06-03 — PR-DP12 tamamlandı (Shared types + Tauri sync).
+Son güncelleme: 2026-06-03 — PR-DP13 tamamlandı (Portal Home Dashboard).
 
 ## 🔄 Developer Portal Dönüşümü (Aktif)
 
@@ -16,7 +16,7 @@ Son güncelleme: 2026-06-03 — PR-DP12 tamamlandı (Shared types + Tauri sync).
 - [x] PR-DP10: Golden Path Template Wizard (5-step)
 - [x] PR-DP11: portal_templates tablosu + API
 - [x] PR-DP12: Shared types + Tauri sync
-- [ ] PR-DP13: Portal Home Dashboard
+- [x] PR-DP13: Portal Home Dashboard
 - [ ] PR-DP14: MCP server portal catalog tools
 - [ ] PR-DP15: ADR-0013 + PROGRESS/TODO sync
 
