@@ -8,7 +8,7 @@ Son güncelleme: 2026-06-03 — PR-DP04 tamamlandı (Catalog Browser sayfası).
 - [x] PR-DP02: kind_key + EntityEnvelope (kind, owner_ref)
 - [x] PR-DP03: Relation type Backstage alias'ları
 - [x] PR-DP04: Catalog Browser sayfası (web)
-- [ ] PR-DP05: Backend kind filter (search endpoint)
+- [x] PR-DP05: Backend kind filter (search endpoint)
 - [ ] PR-DP06: Entity Detail URL routing
 - [ ] PR-DP07: EntityPageRegistry + Plugin Slot mimarisi
 - [ ] PR-DP08: Kind-specific overview card'ları

@@ -505,7 +505,7 @@ func (h *ItemHandlers) List(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, itemListResponse{Items: out})
 }
 
-// Search implements GET /api/v1/items/search?q=term[&type_id=N][&limit=N][&fuzzy=true].
+// Search implements GET /api/v1/items/search?q=term[&type_id=N][&limit=N][&fuzzy=true][&kind=Server,Database].
 //
 // Cross-folder substring search across all folders the user can read.
 // Results include folder_id so the client can navigate to the item.
@@ -515,6 +515,9 @@ func (h *ItemHandlers) List(w http.ResponseWriter, r *http.Request) {
 // ILIKE substring matching. Results are ordered by similarity score descending
 // (typo-tolerant search). Requires migration 00052 (GIN indexes + pg_trgm).
 // Field values are E2E encrypted and CANNOT be searched by design (ADR-0004).
+//
+// PR-DP05: kind= accepts comma-separated kind_key values (e.g. "Server,Database").
+// Filters via item_types.kind_key (already LEFT-JOINed from PR-DP02).
 func (h *ItemHandlers) Search(w http.ResponseWriter, r *http.Request) {
 	claims := ClaimsFromContext(r.Context())
 	if claims == nil {
@@ -532,6 +535,16 @@ func (h *ItemHandlers) Search(w http.ResponseWriter, r *http.Request) {
 	limit := parseIntDefault(r.URL.Query().Get("limit"), 50, 1, 100)
 	typeIDStr := r.URL.Query().Get("type_id")
 	fuzzy := r.URL.Query().Get("fuzzy") == "true"
+
+	// PR-DP05: parse comma-separated kind filter.
+	var kindKeys []string
+	if kindStr := strings.TrimSpace(r.URL.Query().Get("kind")); kindStr != "" {
+		for _, k := range strings.Split(kindStr, ",") {
+			if k = strings.TrimSpace(k); k != "" {
+				kindKeys = append(kindKeys, k)
+			}
+		}
+	}
 
 	ctx := r.Context()
 
@@ -581,6 +594,10 @@ func (h *ItemHandlers) Search(w http.ResponseWriter, r *http.Request) {
 			args = append(args, typeIDStr)
 			qb.WriteString(` AND i.item_type_id = $` + fmt.Sprint(len(args)))
 		}
+		if len(kindKeys) > 0 {
+			args = append(args, kindKeys)
+			qb.WriteString(` AND it.kind_key = ANY($` + fmt.Sprint(len(args)) + `::text[])`)
+		}
 		qb.WriteString(` ORDER BY ` + order + ` LIMIT $2`)
 		r2, e := h.Service.DB.Query(ctx, qb.String(), args...)
 		if e != nil {
@@ -614,6 +631,10 @@ func (h *ItemHandlers) Search(w http.ResponseWriter, r *http.Request) {
 		if typeIDStr != "" {
 			args = append(args, typeIDStr)
 			qb.WriteString(` AND i.item_type_id = $` + fmt.Sprint(len(args)))
+		}
+		if len(kindKeys) > 0 {
+			args = append(args, kindKeys)
+			qb.WriteString(` AND it.kind_key = ANY($` + fmt.Sprint(len(args)) + `::text[])`)
 		}
 		qb.WriteString(` ORDER BY ` + order + ` LIMIT $3`)
 		r2, e := h.Service.DB.Query(ctx, qb.String(), args...)

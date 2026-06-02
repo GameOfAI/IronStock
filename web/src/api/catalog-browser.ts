@@ -17,21 +17,16 @@ export interface CatalogFilters {
 export function useCatalogQuery(filters: CatalogFilters) {
   const trimmed = filters.q.trim();
   return useQuery({
-    queryKey: ['catalog-browser', trimmed, filters.fuzzy ?? false],
+    queryKey: ['catalog-browser', trimmed, filters.kind ?? null, filters.fuzzy ?? false],
     queryFn: () =>
       apiFetch<ItemListResponse>('/api/v1/items/search', {
         query: {
           q: trimmed,
+          ...(filters.kind ? { kind: filters.kind } : {}),
           ...(filters.fuzzy ? { fuzzy: 'true' } : {}),
         },
       }),
     enabled: trimmed.length >= 2,
     staleTime: 15_000,
-    select: (data) => {
-      if (!filters.kind) return data;
-      return {
-        items: data.items.filter((item) => item.kind === filters.kind),
-      };
-    },
   });
 }
