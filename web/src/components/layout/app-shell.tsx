@@ -48,6 +48,8 @@ import {
   Eye,
   Server,
   BookOpen,
+  PlusCircle,
+  Wrench,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -456,6 +458,7 @@ function NotificationBell() {
 // Page title map for TopBar
 const NAV_LABELS: Record<string, string> = {
   '/catalog': 'Catalog',
+  '/create': 'Entity Oluştur',
   '/inventory': 'Envanter',
   '/tags': 'Etiketlerim',
   '/graph': 'İlişki Haritası',
@@ -624,47 +627,33 @@ export function AppShell() {
           aria-label="Ana navigasyon"
         >
           <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2" role="navigation">
-            {/* ── Genel ── */}
-            <NavItem
-              to="/catalog"
+            {/* ── Catalog ── */}
+            <NavGroup
               icon={BookOpen}
               label="Catalog"
               collapsed={sidebarCollapsed && !mobileOpen}
-            />
-            <NavItem
-              to="/inventory"
-              icon={Folder}
-              label="Envanter"
-              collapsed={sidebarCollapsed && !mobileOpen}
-            />
-            <NavItem
-              to="/tags"
-              icon={Tag}
-              label="Etiketlerim"
-              collapsed={sidebarCollapsed && !mobileOpen}
-            />
-            <NavItem
-              to="/import"
-              icon={Upload}
-              label="Toplu Aktarma"
-              collapsed={sidebarCollapsed && !mobileOpen}
-            />
-            <NavItem
-              to="/access-requests"
-              icon={ClipboardCheck}
-              label="Onay İstekleri"
-              collapsed={sidebarCollapsed && !mobileOpen}
-            />
+              prefixes={['/catalog']}
+            >
+              <NavItem
+                to="/catalog"
+                icon={BookOpen}
+                label="Tüm Entityler"
+                collapsed={sidebarCollapsed && !mobileOpen}
+              />
+              <NavItem
+                to="/inventory"
+                icon={Folder}
+                label="Envanter"
+                collapsed={sidebarCollapsed && !mobileOpen}
+              />
+            </NavGroup>
 
-            {/* ── Görselleştirme ── */}
-            {!(sidebarCollapsed && !mobileOpen) && (
-              <div className="my-1.5 h-px bg-slate-800" />
-            )}
+            {/* ── Explore ── */}
             <NavGroup
               icon={Eye}
-              label="Görselleştirme"
+              label="Explore"
               collapsed={sidebarCollapsed && !mobileOpen}
-              prefixes={[]}
+              prefixes={['/graph', '/pipeline']}
             >
               <NavItem
                 to="/graph"
@@ -675,13 +664,62 @@ export function AppShell() {
               <NavItem
                 to="/pipeline"
                 icon={Network}
-                label="Pipeline Diyagramları"
+                label="Pipeline"
                 collapsed={sidebarCollapsed && !mobileOpen}
               />
               <NavItem
                 to="/pipeline/lifecycle"
                 icon={Layers}
                 label="Lifecycle Lanes"
+                collapsed={sidebarCollapsed && !mobileOpen}
+              />
+            </NavGroup>
+
+            {/* ── Create — disabled until PR-DP10 ── */}
+            {!(sidebarCollapsed && !mobileOpen) ? (
+              <button
+                type="button"
+                disabled
+                title="Yakında — PR-DP10'da aktif olacak"
+                className="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[13px] cursor-not-allowed opacity-40 text-slate-400"
+              >
+                <PlusCircle className="h-[15px] w-[15px] shrink-0" />
+                <span className="truncate">Create</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled
+                title="Create (Yakında)"
+                className="flex justify-center rounded-md px-2 py-2 cursor-not-allowed opacity-40 text-slate-400"
+              >
+                <PlusCircle className="h-[15px] w-[15px] shrink-0" />
+              </button>
+            )}
+
+            {/* ── Araçlar ── */}
+            <NavGroup
+              icon={Wrench}
+              label="Araçlar"
+              collapsed={sidebarCollapsed && !mobileOpen}
+              prefixes={['/access-requests', '/import', '/tags']}
+            >
+              <NavItem
+                to="/access-requests"
+                icon={ClipboardCheck}
+                label="Onay İstekleri"
+                collapsed={sidebarCollapsed && !mobileOpen}
+              />
+              <NavItem
+                to="/import"
+                icon={Upload}
+                label="Toplu Aktarma"
+                collapsed={sidebarCollapsed && !mobileOpen}
+              />
+              <NavItem
+                to="/tags"
+                icon={Tag}
+                label="Etiketlerim"
                 collapsed={sidebarCollapsed && !mobileOpen}
               />
             </NavGroup>

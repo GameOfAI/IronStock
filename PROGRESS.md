@@ -1,12 +1,12 @@
 # İlerleyiş
 
-Son güncelleme: 2026-06-03 (PR-DP08 tamamlandı — Kind-specific overview card'ları)
+Son güncelleme: 2026-06-03 (PR-DP09 tamamlandı — Navigation yeniden yapılandırma)
 
 ## Mevcut Durum
 
 - **Önceki Fazlar (Faz 0–11):** 27/27 PR tamamlandı ✅
-- **Developer Portal Dönüşümü (DP Fazı):** 8/15 PR tamamlandı
-- **Son tamamlanan:** PR-DP08 (Server/Database/Service/Certificate Genel Bakış sekmeleri, DefaultTabsRegistrar)
+- **Developer Portal Dönüşümü (DP Fazı):** 9/15 PR tamamlandı
+- **Son tamamlanan:** PR-DP09 (Backstage-style sidebar — Catalog/Explore/Create(disabled)/Araçlar/Admin grupları)
 
 ## Developer Portal PR'ları (DP Fazı)
 
@@ -20,7 +20,7 @@ Son güncelleme: 2026-06-03 (PR-DP08 tamamlandı — Kind-specific overview card
 | PR-DP06 | Entity Detail URL routing — /catalog/:kind/:namespace/:name | ✅ |
 | PR-DP07 | EntityPageRegistry + Plugin Slot mimarisi | ✅ |
 | PR-DP08 | Kind-specific overview card'ları | ✅ |
-| PR-DP09 | Navigation yeniden yapılandırma | ⏳ |
+| PR-DP09 | Navigation yeniden yapılandırma | ✅ |
 | PR-DP10 | Golden Path Template Wizard (5-step) | ⏳ |
 | PR-DP11 | portal_templates tablosu + API | ⏳ |
 | PR-DP12 | Shared types + Tauri sync | ⏳ |

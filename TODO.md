@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-06-03 — PR-DP08 tamamlandı (Kind-specific overview card'ları).
+Son güncelleme: 2026-06-03 — PR-DP09 tamamlandı (Navigation yeniden yapılandırma).
 
 ## 🔄 Developer Portal Dönüşümü (Aktif)
 
@@ -12,7 +12,7 @@ Son güncelleme: 2026-06-03 — PR-DP08 tamamlandı (Kind-specific overview card
 - [x] PR-DP06: Entity Detail URL routing
 - [x] PR-DP07: EntityPageRegistry + Plugin Slot mimarisi
 - [x] PR-DP08: Kind-specific overview card'ları
-- [ ] PR-DP09: Navigation yeniden yapılandırma
+- [x] PR-DP09: Navigation yeniden yapılandırma
 - [ ] PR-DP10: Golden Path Template Wizard (5-step)
 - [ ] PR-DP11: portal_templates tablosu + API
 - [ ] PR-DP12: Shared types + Tauri sync
