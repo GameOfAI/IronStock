@@ -47,6 +47,7 @@ import {
   ChevronRight,
   Eye,
   Server,
+  BookOpen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -454,6 +455,7 @@ function NotificationBell() {
 
 // Page title map for TopBar
 const NAV_LABELS: Record<string, string> = {
+  '/catalog': 'Catalog',
   '/inventory': 'Envanter',
   '/tags': 'Etiketlerim',
   '/graph': 'İlişki Haritası',
@@ -623,6 +625,12 @@ export function AppShell() {
         >
           <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2" role="navigation">
             {/* ── Genel ── */}
+            <NavItem
+              to="/catalog"
+              icon={BookOpen}
+              label="Catalog"
+              collapsed={sidebarCollapsed && !mobileOpen}
+            />
             <NavItem
               to="/inventory"
               icon={Folder}

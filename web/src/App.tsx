@@ -40,6 +40,7 @@ import ProfilePage from '@/pages/profile';
 import SharePage from '@/pages/share';
 import ImportPage from '@/pages/import';
 import AccessRequestsPage from '@/pages/access-requests';
+import CatalogPage from '@/pages/catalog';
 import NotFoundPage from '@/pages/not-found';
 
 /**
@@ -135,6 +136,7 @@ export default function App() {
                     <Route path="/profile" element={<ProfilePage />} />
                     <Route path="/import" element={<ImportPage />} />
                     <Route path="/access-requests" element={<AccessRequestsPage />} />
+                    <Route path="/catalog" element={<CatalogPage />} />
 
                     {/* Admin */}
                     <Route element={<RoleGate role="admin" />}>
