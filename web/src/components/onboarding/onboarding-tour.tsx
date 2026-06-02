@@ -35,6 +35,9 @@ import { cn } from '@/lib/cn';
 
 const LS_KEY = 'ironstock_onboarding_dismissed';
 
+// This file intentionally co-exports a hook + the tour component; the
+// Fast-Refresh-only-components rule doesn't apply to this pairing.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useOnboardingTour() {
   const [open, setOpen] = React.useState(() => {
     try {

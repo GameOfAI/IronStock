@@ -104,12 +104,11 @@ func (ts *TicketStore) Consume(token string) (userID string, ok bool) {
 		if err == nil {
 			return val, true
 		}
-		if !errors.Is(err, redis.Nil) {
-			// Redis error — fall through to in-memory
-		} else {
+		if errors.Is(err, redis.Nil) {
 			// Ticket not found in Redis (already consumed or expired)
 			return "", false
 		}
+		// Redis error — fall through to in-memory
 	}
 
 	ts.mu.Lock()

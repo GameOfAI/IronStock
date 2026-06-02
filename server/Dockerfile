@@ -1,5 +1,8 @@
 # Build on native platform (no QEMU) and cross-compile for target arch.
-FROM --platform=$BUILDPLATFORM golang:1.22-alpine AS builder
+# Base image must satisfy server/go.mod's `go 1.25.0` directive — the official
+# golang images pin GOTOOLCHAIN=local, so an older base fails the build even
+# though CI/local (GOTOOLCHAIN=auto) would auto-download the toolchain.
+FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS builder
 ARG TARGETARCH
 WORKDIR /app
 COPY go.mod ./

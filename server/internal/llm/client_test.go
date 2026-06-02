@@ -1,6 +1,7 @@
 package llm_test
 
 import (
+	"errors"
 	"testing"
 
 	"envanter.app/server/internal/llm"
@@ -8,7 +9,7 @@ import (
 
 func TestNewErrNotConfigured(t *testing.T) {
 	_, err := llm.New("", "key", "", "")
-	if err != llm.ErrNotConfigured {
+	if !errors.Is(err, llm.ErrNotConfigured) {
 		t.Errorf("empty provider: err = %v, want ErrNotConfigured", err)
 	}
 }

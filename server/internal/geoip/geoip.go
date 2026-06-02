@@ -6,8 +6,9 @@
 //   - On lookup failure the restriction is skipped (fail-open for availability).
 //
 // Tor exit detection: downloads the Tor exit list from check.torproject.org
-//   daily and caches it in-memory. On download failure the last known list is
-//   kept. First call initialises from zero (empty list — fail-open).
+//
+//	daily and caches it in-memory. On download failure the last known list is
+//	kept. First call initializes from zero (empty list — fail-open).
 //
 // Production note: for higher volume, set ENVANTER_GEOIP_PROVIDER=maxmind
 // and provide a MaxMind GeoLite2-Country.mmdb via ENVANTER_GEOIP_MMDB_PATH.
@@ -97,7 +98,7 @@ func (l *ipapiLookup) lookup(ctx context.Context, ip string) (string, error) {
 	return code, nil
 }
 
-func (l *ipapiLookup) fetchFromAPI(ctx context.Context, ip string) (string, error) {
+func (*ipapiLookup) fetchFromAPI(ctx context.Context, ip string) (string, error) {
 	url := fmt.Sprintf("http://ip-api.com/json/%s?fields=status,countryCode", ip)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -132,9 +133,9 @@ func (l *ipapiLookup) fetchFromAPI(ctx context.Context, ip string) (string, erro
 const torExitURL = "https://check.torproject.org/torbulkexitlist"
 
 type torExitSet struct {
-	mu      sync.RWMutex
-	exits   map[string]struct{}
-	lastOK  time.Time
+	mu     sync.RWMutex
+	exits  map[string]struct{}
+	lastOK time.Time
 }
 
 var defaultTor = &torExitSet{

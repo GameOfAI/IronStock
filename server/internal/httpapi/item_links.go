@@ -33,10 +33,10 @@ import (
 // --- Request / response types ---
 
 type createLinkRequest struct {
-	TargetItemID      string `json:"target_item_id"`
-	SourceFieldDefID  string `json:"source_field_def_id"`
-	TargetFieldDefID  string `json:"target_field_def_id"`
-	LinkType          string `json:"link_type"` // "mirror" | "reference"
+	TargetItemID     string `json:"target_item_id"`
+	SourceFieldDefID string `json:"source_field_def_id"`
+	TargetFieldDefID string `json:"target_field_def_id"`
+	LinkType         string `json:"link_type"` // "mirror" | "reference"
 }
 
 type itemLinkEntry struct {
@@ -44,7 +44,7 @@ type itemLinkEntry struct {
 	SourceItemID       string    `json:"source_item_id"`
 	SourceFieldDefID   string    `json:"source_field_def_id"`
 	TargetItemID       string    `json:"target_item_id"`
-	TargetItemName     string    `json:"target_item_name"`  // decrypted server-side name_plain
+	TargetItemName     string    `json:"target_item_name"` // decrypted server-side name_plain
 	TargetFieldDefID   string    `json:"target_field_def_id"`
 	TargetFieldDefName string    `json:"target_field_def_name"`
 	LinkType           string    `json:"link_type"`
@@ -328,4 +328,3 @@ func queryMirrorLinkIDs(ctx context.Context, db *pgxpool.Pool, itemID string) []
 	}
 	return ids
 }
-

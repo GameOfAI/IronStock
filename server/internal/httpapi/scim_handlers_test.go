@@ -10,11 +10,9 @@ import (
 
 // TestSCIMHandlers_NotNil is a compile guard: the SCIMHandlers type must exist
 // and be constructable with zero-value fields.
-func TestSCIMHandlers_NotNil(t *testing.T) {
-	h := &httpapi.SCIMHandlers{}
-	if h == nil {
-		t.Fatal("SCIMHandlers is nil")
-	}
+func TestSCIMHandlers_NotNil(_ *testing.T) {
+	// Compile guard: the type must exist and be constructable with zero values.
+	_ = &httpapi.SCIMHandlers{}
 }
 
 // TestSCIMParseFilter_Empty verifies an empty filter returns "true" (no WHERE clause).

@@ -165,7 +165,7 @@ function OfflineCacheManager() {
     // Uygulama açılışında disk cache'ini yükle.
     void loadCacheFromDisk(queryClient);
     return unsubscribe;
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // Oturum kapatıldığında disk cache'ini ve pending op kuyruğunu temizle.
   const prevUser = React.useRef(user);

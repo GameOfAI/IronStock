@@ -29,7 +29,7 @@ func NewSlackForwarder(configID string, cfg SlackConfig) *SlackForwarder {
 func (f *SlackForwarder) ConfigID() string { return f.id }
 
 // Close implements Forwarder (no-op for HTTP client).
-func (f *SlackForwarder) Close() error { return nil }
+func (*SlackForwarder) Close() error { return nil }
 
 type slackPayload struct {
 	Username    string            `json:"username,omitempty"`

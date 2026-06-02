@@ -53,10 +53,10 @@ func (c Config) Configured() bool {
 //
 // The server never stores or logs secret values, only this metadata.
 type ExternalSourceVault struct {
-	Type      string            `json:"type"`        // must be "vault"
-	Mount     string            `json:"mount"`       // KV secrets engine mount, e.g. "secret"
-	Path      string            `json:"path"`        // KV path relative to mount, e.g. "prod/db/postgres"
-	KVVersion int               `json:"kv_version"`  // 1 or 2 (default 2)
+	Type       string            `json:"type"`        // must be "vault"
+	Mount      string            `json:"mount"`       // KV secrets engine mount, e.g. "secret"
+	Path       string            `json:"path"`        // KV path relative to mount, e.g. "prod/db/postgres"
+	KVVersion  int               `json:"kv_version"`  // 1 or 2 (default 2)
 	KeyMapping map[string]string `json:"key_mapping"` // field_definition.key → vault data key
 
 	// PR-VAULT-DYN: Dynamic secret fields.

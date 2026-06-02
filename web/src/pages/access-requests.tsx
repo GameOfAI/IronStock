@@ -170,11 +170,15 @@ function DenyDialog({ request, onClose }: { request: AccessRequest; onClose: () 
 export default function AccessRequestsPage() {
   useDocumentTitle('Onay İstekleri');
   const isAdmin = useAuthStore(selectIsAdmin);
-  const [statusFilter, setStatusFilter] = useState('');
+  // 'all' = no status filter. Radix <Select.Item> forbids value="" so we use
+  // an explicit sentinel and map it to `undefined` for the query.
+  const [statusFilter, setStatusFilter] = useState('all');
   const [approving, setApproving] = useState<AccessRequest | null>(null);
   const [denying, setDenying] = useState<AccessRequest | null>(null);
 
-  const { data, isLoading, error, refetch } = useAccessRequestsQuery({ status: statusFilter || undefined });
+  const { data, isLoading, error, refetch } = useAccessRequestsQuery({
+    status: statusFilter === 'all' ? undefined : statusFilter,
+  });
   const requests = data?.requests ?? [];
 
   const pending = requests.filter((r) => r.status === 'pending');
@@ -214,7 +218,7 @@ export default function AccessRequestsPage() {
               <SelectValue placeholder="Tüm durumlar" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Tüm durumlar</SelectItem>
+              <SelectItem value="all">Tüm durumlar</SelectItem>
               <SelectItem value="pending">Bekliyor</SelectItem>
               <SelectItem value="approved">Onaylandı</SelectItem>
               <SelectItem value="denied">Reddedildi</SelectItem>
@@ -246,7 +250,7 @@ export default function AccessRequestsPage() {
       ) : (
         <div className="space-y-6">
           {/* Pending section */}
-          {pending.length > 0 && !statusFilter && (
+          {pending.length > 0 && statusFilter === 'all' && (
             <div className="space-y-2">
               <h2 className="text-sm font-semibold text-amber-600 uppercase tracking-wide">
                 Bekleyen İstekler ({pending.length})
@@ -268,15 +272,15 @@ export default function AccessRequestsPage() {
           )}
 
           {/* History section */}
-          {(other.length > 0 || statusFilter) && (
+          {(other.length > 0 || statusFilter !== 'all') && (
             <div className="space-y-2">
-              {!statusFilter && (
+              {statusFilter === 'all' && (
                 <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                   Geçmiş
                 </h2>
               )}
               <div className="rounded-md border divide-y">
-                {(statusFilter ? requests : other).map((req) => (
+                {(statusFilter !== 'all' ? requests : other).map((req) => (
                   <RequestRow
                     key={req.id}
                     req={req}

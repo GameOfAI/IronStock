@@ -31,10 +31,10 @@ type adminUserRow struct {
 	Roles              []string `json:"roles"`
 	LastLoginAt        *string  `json:"last_login_at,omitempty"`
 	CreatedAt          string   `json:"created_at"`
-	IsBreakGlass       bool     `json:"is_break_glass"`        // PR-N4
-	TOTPRequired        bool     `json:"totp_required"`          // PR-SEC1 — per-user TOTP enforcement
-	RequiresClientCert  bool     `json:"requires_client_cert"`   // PR-SEC3 — mTLS client cert enforcement
-	WebAuthnRequired    bool     `json:"webauthn_required"`      // PR-SEC4 — WebAuthn/FIDO2 enforcement
+	IsBreakGlass       bool     `json:"is_break_glass"`       // PR-N4
+	TOTPRequired       bool     `json:"totp_required"`        // PR-SEC1 — per-user TOTP enforcement
+	RequiresClientCert bool     `json:"requires_client_cert"` // PR-SEC3 — mTLS client cert enforcement
+	WebAuthnRequired   bool     `json:"webauthn_required"`    // PR-SEC4 — WebAuthn/FIDO2 enforcement
 }
 
 type adminUsersResponse struct {
@@ -114,7 +114,7 @@ func (h *AdminHandlers) ListUsers(w http.ResponseWriter, r *http.Request) {
 			lastLogin = &ll
 		}
 		breakGlass := i < len(isBreakGlassFlags) && isBreakGlassFlags[i]
-		totpReq := i >= len(totpRequiredFlags) || totpRequiredFlags[i]  // default true if missing
+		totpReq := i >= len(totpRequiredFlags) || totpRequiredFlags[i] // default true if missing
 		requiresCert := i < len(requiresCertFlags) && requiresCertFlags[i]
 		webauthnReq := i < len(webauthnRequiredFlags) && webauthnRequiredFlags[i]
 		out = append(out, adminUserRow{
@@ -418,12 +418,12 @@ func validRoleName(name string) bool {
 // PR-SEC1: totp_required varsayılan true. Admin checkbox'ı kaldırırsa false gönderir.
 func (h *AdminHandlers) CreateUser(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Username            string   `json:"username"`
-		Email               string   `json:"email"`
-		Password            string   `json:"password"`
-		Roles               []string `json:"roles"`
-		TOTPRequired        *bool    `json:"totp_required"`         // nil → default true
-		RequiresClientCert  *bool    `json:"requires_client_cert"`  // nil → default false (PR-SEC3)
+		Username           string   `json:"username"`
+		Email              string   `json:"email"`
+		Password           string   `json:"password"`
+		Roles              []string `json:"roles"`
+		TOTPRequired       *bool    `json:"totp_required"`        // nil → default true
+		RequiresClientCert *bool    `json:"requires_client_cert"` // nil → default false (PR-SEC3)
 	}
 	if !decodeJSON(w, r, h.Logger, &req) {
 		return
@@ -664,7 +664,9 @@ func (h *AdminHandlers) AdminResetTOTP(w http.ResponseWriter, r *http.Request) {
 // admin kendi TOTP zorunluluğunu kapatamaz (self-lockdown protection).
 //
 // false → kullanıcı bir sonraki girişte sadece şifreyle giriş yapabilir
-//         (varolan TOTP secret'ı korunur ama login akışı atlatır)
+//
+//	(varolan TOTP secret'ı korunur ama login akışı atlatır)
+//
 // true  → kullanıcı login için TOTP kurmak zorunda
 func (h *AdminHandlers) SetTOTPRequired(w http.ResponseWriter, r *http.Request) {
 	claims := ClaimsFromContext(r.Context())

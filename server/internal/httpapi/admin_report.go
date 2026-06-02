@@ -94,7 +94,7 @@ type reportK8sData struct {
 	Pods        []k8s.Pod
 	Deployments []k8s.Deployment
 	Services    []k8s.Service
-	Events      []k8s.Event      // Warning events only, capped at 20
+	Events      []k8s.Event // Warning events only, capped at 20
 	Metrics     []k8s.PodMetrics
 	FetchError  string
 }
@@ -168,7 +168,7 @@ func (h *ReportHandlers) Generate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 5. Audit — no payload or field values.
-	h.Audit.Write(ctx, audit.Entry{
+	_ = h.Audit.Write(ctx, audit.Entry{
 		ActorUserID: claims.Subject,
 		Action:      audit.ActionAdminReportGenerated,
 		Details: map[string]any{

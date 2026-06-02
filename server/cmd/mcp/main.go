@@ -84,9 +84,9 @@ type rpcRequest struct {
 }
 
 type rpcResponse struct {
-	JSONRPC string `json:"jsonrpc"`
-	ID      any    `json:"id,omitempty"`
-	Result  any    `json:"result,omitempty"`
+	JSONRPC string    `json:"jsonrpc"`
+	ID      any       `json:"id,omitempty"`
+	Result  any       `json:"result,omitempty"`
 	Error   *rpcError `json:"error,omitempty"`
 }
 
@@ -168,7 +168,7 @@ func (s *mcpServer) handle(req rpcRequest) rpcResponse {
 	return base
 }
 
-func (s *mcpServer) toolList() []map[string]any {
+func (*mcpServer) toolList() []map[string]any {
 	return []map[string]any{
 		{
 			"name":        "inventory_search",
