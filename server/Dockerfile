@@ -15,7 +15,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
     go install github.com/pressly/goose/v3/cmd/goose@v3.22.0 && \
     find /go/bin -name goose -exec cp {} /goose \;
 
-FROM alpine:3.19
+FROM alpine:3.23
 RUN apk --no-cache add ca-certificates
 COPY --from=builder /envanter-api /envanter-api
 COPY --from=builder /goose /goose
