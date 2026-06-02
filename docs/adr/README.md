@@ -54,3 +54,5 @@ Küçük refactoring'ler veya kod içi kararlar için ADR yazılmaz — commit m
 | [0009](0009-web-state-management.md) | Web client state management: Zustand + TanStack Query + Tailwind 4 + shadcn/ui | 2026-04-27 | Accepted |
 | [0010](0010-bootstrap-admin-panel.md) | Bootstrap admin panel: acil yönetici erişimi (break-glass) | 2026-05-15 | Proposed |
 | [0011](0011-item-search-model.md) | Item arama: name_plain + ILIKE substring search (ADR-0004 HMAC search'ü geçersiz kılar) | 2026-05-22 | Implemented ✅ 2026-05-22 |
+| [0012](0012-development-tracking-discipline.md) | Geliştirme takip disiplini: PROGRESS.md + TODO.md pre-commit hook | 2026-05-24 | Accepted |
+| [0013](0013-developer-portal.md) | Developer Portal: Backstage prensiplerini IronStock üzerine uygulamak | 2026-06-03 | Accepted |

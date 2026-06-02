@@ -1,8 +1,8 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-06-03 — PR-DP14 tamamlandı (MCP server portal catalog tools).
+Son güncelleme: 2026-06-03 — PR-DP15 tamamlandı. TÜM DP FAZLARI TAMAMLANDI (15/15) ✅
 
-## 🔄 Developer Portal Dönüşümü (Aktif)
+## ✅ Developer Portal Dönüşümü (Tamamlandı — 2026-06-03)
 
 - [x] PR-DP01: item_annotations tablosu + CRUD API
 - [x] PR-DP02: kind_key + EntityEnvelope (kind, owner_ref)
@@ -18,7 +18,15 @@ Son güncelleme: 2026-06-03 — PR-DP14 tamamlandı (MCP server portal catalog t
 - [x] PR-DP12: Shared types + Tauri sync
 - [x] PR-DP13: Portal Home Dashboard
 - [x] PR-DP14: MCP server portal catalog tools
-- [ ] PR-DP15: ADR-0013 + PROGRESS/TODO sync
+- [x] PR-DP15: ADR-0013 + PROGRESS/TODO sync
+
+## 🔮 Sonraki Adımlar (Developer Portal — Gelecek)
+
+- [ ] Admin UI: portal template yönetimi (builtin olmayan template'ler için CRUD)
+- [ ] OpenAPI spec güncellemesi (tüm DP endpoint'leri)
+- [ ] Tauri'ye /catalog route (şu an 3-panel inventory görünümü kullanıyor)
+- [ ] Backstage YAML import/export (entity manifest desteği)
+- [ ] `/api/v1/catalog/:kind/:name` doğrudan endpoint (MCP catalog_get_entity 3 çağrıyı birleştirsin)
 
 ## ✅ Post-Deploy Fixes (2026-05-25)
 
