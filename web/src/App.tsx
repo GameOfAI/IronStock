@@ -44,6 +44,7 @@ import ImportPage from '@/pages/import';
 import AccessRequestsPage from '@/pages/access-requests';
 import CatalogPage from '@/pages/catalog';
 import EntityDetailPage from '@/pages/catalog/entity-detail';
+import CreatePage from '@/pages/create';
 import NotFoundPage from '@/pages/not-found';
 
 /**
@@ -143,6 +144,7 @@ export default function App() {
                     <Route path="/access-requests" element={<AccessRequestsPage />} />
                     <Route path="/catalog" element={<CatalogPage />} />
                     <Route path="/catalog/:kind/:namespace/:name" element={<EntityDetailPage />} />
+                    <Route path="/create" element={<CreatePage />} />
 
                     {/* Admin */}
                     <Route element={<RoleGate role="admin" />}>

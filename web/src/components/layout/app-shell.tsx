@@ -675,27 +675,13 @@ export function AppShell() {
               />
             </NavGroup>
 
-            {/* ── Create — disabled until PR-DP10 ── */}
-            {!(sidebarCollapsed && !mobileOpen) ? (
-              <button
-                type="button"
-                disabled
-                title="Yakında — PR-DP10'da aktif olacak"
-                className="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[13px] cursor-not-allowed opacity-40 text-slate-400"
-              >
-                <PlusCircle className="h-[15px] w-[15px] shrink-0" />
-                <span className="truncate">Create</span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                disabled
-                title="Create (Yakında)"
-                className="flex justify-center rounded-md px-2 py-2 cursor-not-allowed opacity-40 text-slate-400"
-              >
-                <PlusCircle className="h-[15px] w-[15px] shrink-0" />
-              </button>
-            )}
+            {/* ── Create ── */}
+            <NavItem
+              to="/create"
+              icon={PlusCircle}
+              label="Create"
+              collapsed={sidebarCollapsed && !mobileOpen}
+            />
 
             {/* ── Araçlar ── */}
             <NavGroup

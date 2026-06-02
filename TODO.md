@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-06-03 — PR-DP09 tamamlandı (Navigation yeniden yapılandırma).
+Son güncelleme: 2026-06-03 — PR-DP10 tamamlandı (Golden Path Template Wizard).
 
 ## 🔄 Developer Portal Dönüşümü (Aktif)
 
@@ -13,7 +13,7 @@ Son güncelleme: 2026-06-03 — PR-DP09 tamamlandı (Navigation yeniden yapılan
 - [x] PR-DP07: EntityPageRegistry + Plugin Slot mimarisi
 - [x] PR-DP08: Kind-specific overview card'ları
 - [x] PR-DP09: Navigation yeniden yapılandırma
-- [ ] PR-DP10: Golden Path Template Wizard (5-step)
+- [x] PR-DP10: Golden Path Template Wizard (5-step)
 - [ ] PR-DP11: portal_templates tablosu + API
 - [ ] PR-DP12: Shared types + Tauri sync
 - [ ] PR-DP13: Portal Home Dashboard
