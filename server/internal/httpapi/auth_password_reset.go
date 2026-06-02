@@ -25,7 +25,7 @@ type forgotPasswordRequest struct {
 
 // resetPasswordRequest, POST /api/v1/auth/reset-password body.
 type resetPasswordRequest struct {
-	Token         string         `json:"token"`           // 32-byte hex token (URL'den gelen plain token)
+	Token         string         `json:"token"` // 32-byte hex token (URL'den gelen plain token)
 	NewPassword   string         `json:"new_password"`
 	PublicKey     []byte         `json:"public_key"`      // yeni E2E keypair (X25519, 32 byte)
 	PrivateKeyEnc []byte         `json:"private_key_enc"` // yeni KEK ile şifreli private key
@@ -51,7 +51,7 @@ func (s *AuthHandlers) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 	go s.processForgotPassword(req.Email, r.RemoteAddr, r.UserAgent())
 }
 
-func (s *AuthHandlers) processForgotPassword(email_, remoteAddr, userAgent string) {
+func (s *AuthHandlers) processForgotPassword(emailAddr, remoteAddr, userAgent string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -62,7 +62,7 @@ func (s *AuthHandlers) processForgotPassword(email_, remoteAddr, userAgent strin
 		LIMIT 1
 	`
 	var userID, username string
-	err := s.Service.DB.QueryRow(ctx, findSQL, email_).Scan(&userID, &username)
+	err := s.Service.DB.QueryRow(ctx, findSQL, emailAddr).Scan(&userID, &username)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return // Sessizce çık — enumeration koruması
@@ -133,7 +133,7 @@ func (s *AuthHandlers) processForgotPassword(email_, remoteAddr, userAgent strin
 
 	appURL := s.AppURL
 	resetURL := fmt.Sprintf("%s/reset-password?token=%s", appURL, tokenHex)
-	s.EmailClient.SendTemplateAsync(email_, "password_reset", email.TemplateData{
+	s.EmailClient.SendTemplateAsync(emailAddr, "password_reset", email.TemplateData{
 		Username:    username,
 		ResetURL:    resetURL,
 		ExpiresIn:   fmt.Sprintf("%d dakika", ttlMin),

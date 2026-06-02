@@ -52,8 +52,8 @@ import (
 // It expires after 10 minutes — enough for a user to authenticate
 // and have the provider redirect back.
 type oidcStateEntry struct {
-	ProviderID   string `json:"provider_id"`
-	PKCEVerifier string `json:"pkce_verifier"`
+	ProviderID   string    `json:"provider_id"`
+	PKCEVerifier string    `json:"pkce_verifier"`
 	ExpiresAt    time.Time `json:"expires_at"`
 }
 
@@ -645,7 +645,7 @@ func (s *AuthHandlers) OIDCCallback(w http.ResponseWriter, r *http.Request) {
 
 	code := r.URL.Query().Get("code")
 	if code == "" {
-		// Provider may have sent an error (e.g., user cancelled).
+		// Provider may have sent an error (e.g., user canceled).
 		providerErr := r.URL.Query().Get("error")
 		http.Error(w, "Yetkilendirme kodu eksik: "+providerErr, http.StatusBadRequest)
 		return
@@ -829,7 +829,6 @@ type idTokenClaims struct {
 // returns the raw id_token JWT string.
 func exchangeOIDCCode(ctx context.Context, tokenEndpoint, clientID, clientSecret,
 	code, redirectURI, codeVerifier string) (string, error) {
-
 	vals := url.Values{
 		"grant_type":    {"authorization_code"},
 		"code":          {code},

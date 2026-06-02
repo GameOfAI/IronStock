@@ -29,8 +29,8 @@ import (
 
 // csvPreviewRow is one parsed CSV row returned to the client for review.
 type csvPreviewRow struct {
-	Index    int               `json:"index"`    // 0-based row number (after header)
-	RawData  map[string]string `json:"raw_data"` // header → value
+	Index   int               `json:"index"`    // 0-based row number (after header)
+	RawData map[string]string `json:"raw_data"` // header → value
 }
 
 type csvPreviewResponse struct {

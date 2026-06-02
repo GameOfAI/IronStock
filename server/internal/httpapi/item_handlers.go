@@ -550,7 +550,7 @@ func (h *ItemHandlers) Search(w http.ResponseWriter, r *http.Request) {
 
 	// Build WHERE and ORDER based on fuzzy mode.
 	// Fuzzy: trigram similarity (requires pg_trgm + GIN indexes from migration 00052).
-	// Exact: ILIKE substring match (legacy behaviour).
+	// Exact: ILIKE substring match (legacy behavior).
 	var (
 		whereExpr string
 		orderExpr string
@@ -599,6 +599,7 @@ func (h *ItemHandlers) Search(w http.ResponseWriter, r *http.Request) {
 			qb.WriteString(` AND it.kind_key = ANY($` + fmt.Sprint(len(args)) + `::text[])`)
 		}
 		qb.WriteString(` ORDER BY ` + order + ` LIMIT $2`)
+		//nolint:sqlclosecheck // rows closed via defer (*rows).Close() below
 		r2, e := h.Service.DB.Query(ctx, qb.String(), args...)
 		if e != nil {
 			writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal, "Arama hatası.", e)
@@ -637,6 +638,7 @@ func (h *ItemHandlers) Search(w http.ResponseWriter, r *http.Request) {
 			qb.WriteString(` AND it.kind_key = ANY($` + fmt.Sprint(len(args)) + `::text[])`)
 		}
 		qb.WriteString(` ORDER BY ` + order + ` LIMIT $3`)
+		//nolint:sqlclosecheck // rows closed via defer (*rows).Close() below
 		r2, e := h.Service.DB.Query(ctx, qb.String(), args...)
 		rows = &r2
 		err = e
@@ -1267,7 +1269,7 @@ func decryptItemName(svc *auth.Service, itemID string, dekWrapped, nameEnc []byt
 
 // RunItemNameBackfill fills name_plain for existing items where it is NULL.
 // Should be called once at startup as a goroutine. Exits when all rows are
-// backfilled or context is cancelled.
+// backfilled or context is canceled.
 func RunItemNameBackfill(ctx context.Context, svc *auth.Service, logger *slog.Logger) {
 	const batchSize = 200
 	total := 0
@@ -1404,7 +1406,7 @@ func looksLikeUUID(s string) bool {
 				return false
 			}
 		default:
-			if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+			if (c < '0' || c > '9') && (c < 'a' || c > 'f') && (c < 'A' || c > 'F') {
 				return false
 			}
 		}

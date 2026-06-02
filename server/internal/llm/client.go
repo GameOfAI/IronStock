@@ -25,13 +25,13 @@ var ErrNotConfigured = errors.New("llm: no provider configured (set ENVANTER_LLM
 
 // SuggestionResult holds parsed suggestions from the LLM.
 type SuggestionResult struct {
-	Tags          []string          // suggested tag labels
-	Relationships []RelSuggestion   // suggested relationship targets
+	Tags          []string        // suggested tag labels
+	Relationships []RelSuggestion // suggested relationship targets
 }
 
 // RelSuggestion is a suggested relationship to another item.
 type RelSuggestion struct {
-	TargetName      string `json:"target_name"`
+	TargetName       string `json:"target_name"`
 	RelationshipType string `json:"relationship_type"`
 }
 
@@ -139,7 +139,7 @@ func parseResponse(raw string) *SuggestionResult {
 	}
 
 	var parsed struct {
-		Tags          []string       `json:"tags"`
+		Tags          []string        `json:"tags"`
 		Relationships []RelSuggestion `json:"relationships"`
 	}
 	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {

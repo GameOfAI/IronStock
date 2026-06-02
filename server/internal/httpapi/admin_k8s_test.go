@@ -3,7 +3,7 @@ package httpapi_test
 // admin_k8s_test.go — PR-PROD2: Tests for K8s cluster admin handlers.
 //
 // Strategy: compile-guard tests confirm the exported handler types satisfy
-// their method contracts. Behavioural smoke tests exercise pure-Go helper
+// their method contracts. Behavioral smoke tests exercise pure-Go helper
 // logic that is not wired to DB or a real cluster.
 
 import (

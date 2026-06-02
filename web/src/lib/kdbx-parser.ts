@@ -48,14 +48,14 @@ export async function parseKdbx(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function walkGroup(group: any, path: string) {
     // Enumerate sub-groups recursively.
-    for (const child of (group as any).groups ?? []) {
+    for (const child of group.groups ?? []) {
       walkGroup(child, path ? `${path}/${child.name}` : child.name);
     }
     // Enumerate entries in this group.
-    for (const entry of (group as any).entries ?? []) {
+    for (const entry of group.entries ?? []) {
       const fields: Map<string, string | InstanceType<typeof ProtectedValue>> = entry.fields;
 
-      function getField(key: string): string {
+      const getField = (key: string): string => {
         const v = fields.get(key);
         if (!v) return '';
         if (typeof v === 'string') return v;
@@ -87,6 +87,6 @@ export async function parseKdbx(
 
   return {
     entries,
-    dbName: (db.meta as any).name ?? 'KeePass Database',
+    dbName: db.meta.name ?? 'KeePass Database',
   };
 }

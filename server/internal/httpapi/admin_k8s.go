@@ -33,17 +33,17 @@ type K8sClusterHandlers struct {
 
 // k8sClusterPublic is the API representation of a cluster (credentials omitted).
 type k8sClusterPublic struct {
-	ID             string    `json:"id"`
-	Name           string    `json:"name"`
-	ServerURL      string    `json:"server_url"`
-	AuthMode       string    `json:"auth_mode"`
-	HasToken       bool      `json:"has_token"`
-	HasKubeconfig  bool      `json:"has_kubeconfig"`
-	CACertPEM      string    `json:"ca_cert_pem,omitempty"`
-	SkipTLSVerify  bool      `json:"skip_tls_verify"`
-	Enabled        bool      `json:"enabled"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	ID            string    `json:"id"`
+	Name          string    `json:"name"`
+	ServerURL     string    `json:"server_url"`
+	AuthMode      string    `json:"auth_mode"`
+	HasToken      bool      `json:"has_token"`
+	HasKubeconfig bool      `json:"has_kubeconfig"`
+	CACertPEM     string    `json:"ca_cert_pem,omitempty"`
+	SkipTLSVerify bool      `json:"skip_tls_verify"`
+	Enabled       bool      `json:"enabled"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 // createK8sClusterRequest is the body for POST /api/v1/admin/k8s/clusters.
@@ -51,7 +51,7 @@ type createK8sClusterRequest struct {
 	Name           string `json:"name"`
 	ServerURL      string `json:"server_url"`
 	AuthMode       string `json:"auth_mode"`
-	Token          string `json:"token,omitempty"`      // plaintext SA token — never persisted
+	Token          string `json:"token,omitempty"`           // plaintext SA token — never persisted
 	KubeconfigYAML string `json:"kubeconfig_yaml,omitempty"` // plaintext YAML — never persisted
 	CACertPEM      string `json:"ca_cert_pem,omitempty"`
 	SkipTLSVerify  bool   `json:"skip_tls_verify"`
@@ -172,7 +172,7 @@ func (h *K8sClusterHandlers) CreateCluster(w http.ResponseWriter, r *http.Reques
 		h.Logger.Warn("k8s cluster credential encryption failed", slog.String("id", newID), slog.String("error", err.Error()))
 	}
 
-	h.Audit.Write(ctx, audit.Entry{
+	_ = h.Audit.Write(ctx, audit.Entry{
 		ActorUserID: claims.Subject,
 		Action:      audit.ActionAdminK8sClusterCreated,
 		Details:     map[string]any{"cluster_id": newID, "name": req.Name, "auth_mode": req.AuthMode},
@@ -237,7 +237,7 @@ func (h *K8sClusterHandlers) UpdateCluster(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	h.Audit.Write(ctx, audit.Entry{
+	_ = h.Audit.Write(ctx, audit.Entry{
 		ActorUserID: claims.Subject,
 		Action:      audit.ActionAdminK8sClusterUpdated,
 		Details:     map[string]any{"cluster_id": clusterID, "name": req.Name},
@@ -261,7 +261,7 @@ func (h *K8sClusterHandlers) DeleteCluster(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	h.Audit.Write(ctx, audit.Entry{
+	_ = h.Audit.Write(ctx, audit.Entry{
 		ActorUserID: claims.Subject,
 		Action:      audit.ActionAdminK8sClusterDeleted,
 		Details:     map[string]any{"cluster_id": clusterID},
@@ -290,7 +290,7 @@ func (h *K8sClusterHandlers) TestCluster(w http.ResponseWriter, r *http.Request)
 	}
 
 	version, err := client.GetServerVersion(ctx)
-	h.Audit.Write(ctx, audit.Entry{
+	_ = h.Audit.Write(ctx, audit.Entry{
 		ActorUserID: claims.Subject,
 		Action:      audit.ActionAdminK8sClusterTested,
 		Details:     map[string]any{"cluster_id": clusterID, "success": err == nil},

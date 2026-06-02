@@ -37,7 +37,7 @@ export function useCreateAPITokenMutation() {
     mutationFn: (req: CreateTokenRequest) =>
       apiFetch<APIToken>('/api/v1/users/me/api-tokens', {
         method: 'POST',
-        body: JSON.stringify(req),
+        body: req,
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['api-tokens'] }),
   });

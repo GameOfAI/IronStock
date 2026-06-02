@@ -33,7 +33,7 @@ func TestTemplateScopeValues(t *testing.T) {
 // TestTemplateDefaultScope verifies that an empty scope defaults to "public".
 func TestTemplateDefaultScope(t *testing.T) {
 	// The List handler defaults to "public" when scope param is empty.
-	// Documented here so API consumers know the default behaviour.
+	// Documented here so API consumers know the default behavior.
 	const emptyInput = ""
 	scope := emptyInput
 	if scope == "" {
@@ -54,7 +54,7 @@ func TestCreateTemplateRequiredFields(t *testing.T) {
 	}
 	cases := []req{
 		{"My Template", 1, true},
-		{"", 1, false},          // missing name
+		{"", 1, false},            // missing name
 		{"My Template", 0, false}, // missing item_type_id
 	}
 	for _, tc := range cases {

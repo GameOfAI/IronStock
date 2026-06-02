@@ -47,61 +47,61 @@ type encryptedExportRequest struct {
 
 // encryptedManifest is written as manifest.json inside the ZIP.
 type encryptedManifest struct {
-	Version         string `json:"version"`
-	ExportedAt      string `json:"exported_at"`
-	Scope           string `json:"scope"`
-	ItemCount       int    `json:"item_count"`
-	ShareCount      int    `json:"share_count"`
-	KeypairCount    int    `json:"keypair_count"`
-	IronStockBuild  string `json:"ironstock_build"`
+	Version        string `json:"version"`
+	ExportedAt     string `json:"exported_at"`
+	Scope          string `json:"scope"`
+	ItemCount      int    `json:"item_count"`
+	ShareCount     int    `json:"share_count"`
+	KeypairCount   int    `json:"keypair_count"`
+	IronStockBuild string `json:"ironstock_build"`
 }
 
 // exportEncryptedItem is a single item entry in items.json.
 // All values are base64-encoded bytes from the database (AES-GCM ciphertext).
 type exportEncryptedItem struct {
-	ID               string                    `json:"id"`
-	ItemTypeID       int16                     `json:"item_type_id"`
-	FolderID         string                    `json:"folder_id"`
-	NameEnc          string                    `json:"name_enc"`          // base64
-	NameNonce        string                    `json:"name_nonce"`        // base64
-	ServerDEKWrapped string                    `json:"server_dek_wrapped"` // base64
-	Description      *string                   `json:"description,omitempty"`
-	Tags             []string                  `json:"tags"`
-	ExpiresAt        *string                   `json:"expires_at,omitempty"`
-	CreatedAt        string                    `json:"created_at"`
-	UpdatedAt        string                    `json:"updated_at"`
-	Fields           []exportEncryptedField    `json:"fields"`
+	ID               string                 `json:"id"`
+	ItemTypeID       int16                  `json:"item_type_id"`
+	FolderID         string                 `json:"folder_id"`
+	NameEnc          string                 `json:"name_enc"`           // base64
+	NameNonce        string                 `json:"name_nonce"`         // base64
+	ServerDEKWrapped string                 `json:"server_dek_wrapped"` // base64
+	Description      *string                `json:"description,omitempty"`
+	Tags             []string               `json:"tags"`
+	ExpiresAt        *string                `json:"expires_at,omitempty"`
+	CreatedAt        string                 `json:"created_at"`
+	UpdatedAt        string                 `json:"updated_at"`
+	Fields           []exportEncryptedField `json:"fields"`
 }
 
 // exportEncryptedField is one field_value entry per item.
 type exportEncryptedField struct {
-	FieldDefID  int64  `json:"field_def_id"`
-	ValueEnc    string `json:"value_enc,omitempty"`   // base64 AES-GCM ciphertext
-	ValueNonce  string `json:"value_nonce,omitempty"` // base64 12-byte nonce
-	IsSecret    bool   `json:"is_secret"`
+	FieldDefID int64  `json:"field_def_id"`
+	ValueEnc   string `json:"value_enc,omitempty"`   // base64 AES-GCM ciphertext
+	ValueNonce string `json:"value_nonce,omitempty"` // base64 12-byte nonce
+	IsSecret   bool   `json:"is_secret"`
 }
 
 // exportEncryptedShare is one item_share entry in shares.json.
 type exportEncryptedShare struct {
-	ID             string `json:"id"`
-	ItemID         string `json:"item_id"`
-	UserID         string `json:"user_id"`
-	E2EDEKWrapped  string `json:"e2e_dek_wrapped"` // base64
-	WrapNonce      string `json:"wrap_nonce"`      // base64
-	Permission     string `json:"permission"`
-	GrantedBy      string `json:"granted_by"`
-	GrantedAt      string `json:"granted_at"`
+	ID            string `json:"id"`
+	ItemID        string `json:"item_id"`
+	UserID        string `json:"user_id"`
+	E2EDEKWrapped string `json:"e2e_dek_wrapped"` // base64
+	WrapNonce     string `json:"wrap_nonce"`      // base64
+	Permission    string `json:"permission"`
+	GrantedBy     string `json:"granted_by"`
+	GrantedAt     string `json:"granted_at"`
 }
 
 // exportEncryptedKeypair is one user_keypairs entry in keypairs.json.
 type exportEncryptedKeypair struct {
-	UserID         string          `json:"user_id"`
-	Version        int16           `json:"version"`
-	PublicKey      string          `json:"public_key"`       // base64 32-byte X25519
-	PrivateKeyEnc  string          `json:"private_key_enc"`  // base64 AES-GCM enc private key
-	KEKSalt        string          `json:"kek_salt"`         // base64
-	KEKParams      json.RawMessage `json:"kek_params"`       // Argon2id params JSON
-	CreatedAt      string          `json:"created_at"`
+	UserID        string          `json:"user_id"`
+	Version       int16           `json:"version"`
+	PublicKey     string          `json:"public_key"`      // base64 32-byte X25519
+	PrivateKeyEnc string          `json:"private_key_enc"` // base64 AES-GCM enc private key
+	KEKSalt       string          `json:"kek_salt"`        // base64
+	KEKParams     json.RawMessage `json:"kek_params"`      // Argon2id params JSON
+	CreatedAt     string          `json:"created_at"`
 }
 
 // ExportEncrypted implements POST /api/v1/admin/export/encrypted.
@@ -373,10 +373,10 @@ func (h *ExportHandlers) ExportEncrypted(w http.ResponseWriter, r *http.Request)
 	encKeypairs := make([]exportEncryptedKeypair, 0, 16)
 	for keypairRows.Next() {
 		var (
-			ek           exportEncryptedKeypair
-			pubKeyBytes  []byte
-			privKeyEnc   []byte
-			kekSalt      []byte
+			ek          exportEncryptedKeypair
+			pubKeyBytes []byte
+			privKeyEnc  []byte
+			kekSalt     []byte
 		)
 		if err := keypairRows.Scan(
 			&ek.UserID, &ek.Version,

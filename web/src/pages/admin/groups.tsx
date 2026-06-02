@@ -249,9 +249,9 @@ function GroupDetailPanel({ group, onDelete }: { group: Group; onDelete: () => v
           {group.description && (
             <p className="text-sm text-muted-foreground mt-0.5">{group.description}</p>
           )}
-          <p className="text-xs text-muted-foreground mt-1">
+          <div className="text-xs text-muted-foreground mt-1">
             <Badge variant="secondary">{group.member_count} üye</Badge>
-          </p>
+          </div>
         </div>
         <AlertDialog>
           <AlertDialogTrigger asChild>

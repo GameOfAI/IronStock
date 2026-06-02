@@ -39,8 +39,8 @@ type kubeconfigClusterInline struct {
 }
 
 type kubeconfigUser struct {
-	Name string                `yaml:"name"`
-	User kubeconfigUserInline  `yaml:"user"`
+	Name string               `yaml:"name"`
+	User kubeconfigUserInline `yaml:"user"`
 }
 
 type kubeconfigUserInline struct {
@@ -54,8 +54,8 @@ type kubeconfigUserInline struct {
 }
 
 type kubeconfigContext struct {
-	Name    string                   `yaml:"name"`
-	Context kubeconfigContextInline  `yaml:"context"`
+	Name    string                  `yaml:"name"`
+	Context kubeconfigContextInline `yaml:"context"`
 }
 
 type kubeconfigContextInline struct {

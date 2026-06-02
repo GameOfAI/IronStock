@@ -2,6 +2,44 @@
 
 Son güncelleme: 2026-06-03 (PR-DP15 tamamlandı — ADR-0013 + final sync — TÜM DP FAZLARI TAMAMLANDI ✅)
 
+### 2026-06-02 — golangci-lint v1→v2 CI Migrasyonu (branch: fix/ux-and-dev-build)
+
+`go.mod`/`go.work` `go 1.25.0` istiyor (go-webauthn v0.17.4 transitively go ≥1.25);
+ama CI golangci-lint **v1.62.2** (Go 1.23 toolchain) pinliydi → Server + Pre-commit
+job'ları `package requires newer Go version go1.25 (typecheck)` ile kırılıyordu (main'den
+gelen pre-existing debt).
+
+- **golangci-lint v1 → v2.12.2**: `server/.golangci.yml` v2 formatına migrate edildi
+  (`golangci-lint migrate`). Standart exclusion preset'leri (comments,
+  std-error-handling, common-false-positives) eklendi → v2'nin yeni linter
+  sürümlerinin sürdüğü pre-existing stil/std-lib gürültüsü baseline'a çekildi.
+- **gosec golangci'den çıkarıldı**: ayrı "Go SAST (gosec)" job'u zaten kapsıyor (duplikasyon).
+- **33 gerçek bulgu kodda düzeltildi**: sqlclosecheck FP (nolint), unused dead-code (3),
+  unconvert, redis `SetEx`→`Set`, De Morgan, early-return, receiver/parametre isimleri,
+  errcheck `_ =` (audit fire-and-forget), test SA4031/SA9003.
+- **CI**: `ci.yml` setup-go 1.23→1.25 (3 job), golangci-lint-action v6→v7 (v2.12.2),
+  Pre-commit job'a Node + web deps kuruldu (eslint-web hook için).
+- **Pre-existing whitespace**: 5 SVG asset trailing-whitespace/EOF düzeltildi.
+- **eslint-web pre-commit hook**: npm workspaces'te eslint binary root'a hoist
+  olduğu için `web/node_modules/.bin/eslint` yolu yoktu → hook `npm run lint`
+  çağıracak şekilde düzeltildi (CI Web job ile aynı).
+- **Integration test (stale assertion)**: `migrations_integration_test.go`
+  item_types beklenen sayı 8→9 (00045 `k8s_namespace` tipini ekliyor). Server
+  job go1.25'te kırık olduğundan integration job atlanıyordu, regresyon gizliydi.
+- Lint **0 issue**, `go build`/`go vet`/`go test` (cache, ws, httpapi, health, metrics) ✅.
+
+### 2026-06-02 — QA Bug-Fix Turu (branch: fix/ux-and-dev-build)
+
+Manuel + AI-perspektifi test sırasında bulunan 7 gerçek bug düzeltildi:
+
+- **Toolbar yanlış item'a işlem** (`inventory/index.tsx`): bir item'ı düzenleyip başka item seçince Sil/Düzenle eski item'a gidiyordu → veri kaybı riski. `activeItem` seçimde temizleniyor + URL itemId önceliği.
+- **2 sayfa çökmesi** (`access-requests.tsx`, `import.tsx`): Radix `<Select.Item value="">` crash → `'all'` / `'__none__'` sentinel.
+- **4 oluştur/güncelle kırık** (`admin-log-forwarding`, `admin-k8s`, `api-tokens`, `reports`): `apiFetch` + `body: JSON.stringify(req)` çift-encode → 400. `body: req`.
+- **Dockerfile Go sürümü** (`server/Dockerfile`, `Dockerfile.dev`): go.mod 1.25 ister, base 1.22 → build kırık. `golang:1.25-alpine`.
+- **WebAuthn login UX** (`login.tsx`): config'siz sunucuda kırmızı hata → 501'de bölüm gizlenir.
+- **DOM nesting** (`admin/groups.tsx`): `<Badge>` (`<div>`) `<p>` içinde → `<div>`.
+- **CI temizliği**: pre-existing gofmt (server geneli) + eslint (`linked-items-tab`, `kdbx-parser`, `onboarding-tour`, client `App`/`item-detail`) düzeltildi.
+
 ## Mevcut Durum
 
 - **Önceki Fazlar (Faz 0–11):** 27/27 PR tamamlandı ✅
