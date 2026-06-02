@@ -30,6 +30,7 @@ import AdminSCIMPage from '@/pages/admin/scim';
 import AdminSecretScanningPage from '@/pages/admin/secret-scanning';
 import AdminK8sClustersPage from '@/pages/admin/k8s-clusters';
 import AdminReportsPage from '@/pages/admin/reports';
+import AdminPortalTemplatesPage from '@/pages/admin/portal-templates';
 import SSOCallbackPage from '@/pages/sso-callback';
 import TagsPage from '@/pages/tags';
 import { GraphPage } from '@/pages/graph';
@@ -161,6 +162,7 @@ export default function App() {
                       <Route path="/admin/secret-scanning" element={<AdminSecretScanningPage />} />
                       <Route path="/admin/k8s-clusters" element={<AdminK8sClustersPage />} />
                       <Route path="/admin/reports" element={<AdminReportsPage />} />
+                      <Route path="/admin/portal-templates" element={<AdminPortalTemplatesPage />} />
                     </Route>
                   </Route>
                   </Route>

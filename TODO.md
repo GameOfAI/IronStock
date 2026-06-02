@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-06-03 — PR-DP15 tamamlandı. TÜM DP FAZLARI TAMAMLANDI (15/15) ✅
+Son güncelleme: 2026-06-03 — DP-E1~E7 tamamlandı. TÜM DP + Enhancement FAZLARI TAMAMLANDI ✅
 
 ## ✅ golangci-lint v1→v2 CI Migrasyonu (2026-06-02) — branch: fix/ux-and-dev-build
 
@@ -44,13 +44,19 @@ Son güncelleme: 2026-06-03 — PR-DP15 tamamlandı. TÜM DP FAZLARI TAMAMLANDI 
 - [x] PR-DP14: MCP server portal catalog tools
 - [x] PR-DP15: ADR-0013 + PROGRESS/TODO sync
 
+## ✅ Developer Portal Enhancement (DP-E Fazı — Tamamlandı 2026-06-03)
+
+- [x] DP-E1: Direct catalog entity endpoint (`GET /api/v1/catalog/{kind}/{name}`)
+- [x] DP-E2: Admin portal template management UI + backend `?all=true` param
+- [x] DP-E3: Annotation edit panel in item detail (EntityPageRegistry tab)
+- [x] DP-E4: Kind-specific form fields in golden path wizard
+- [x] DP-E5: Health summary widget on portal home (admin-only)
+- [x] DP-E6: Tauri client catalog page + entity detail
+- [x] DP-E7: OpenAPI spec update for all DP endpoints
+
 ## 🔮 Sonraki Adımlar (Developer Portal — Gelecek)
 
-- [ ] Admin UI: portal template yönetimi (builtin olmayan template'ler için CRUD)
-- [ ] OpenAPI spec güncellemesi (tüm DP endpoint'leri)
-- [ ] Tauri'ye /catalog route (şu an 3-panel inventory görünümü kullanıyor)
 - [ ] Backstage YAML import/export (entity manifest desteği)
-- [ ] `/api/v1/catalog/:kind/:name` doğrudan endpoint (MCP catalog_get_entity 3 çağrıyı birleştirsin)
 
 ## ✅ Post-Deploy Fixes (2026-05-25)
 

@@ -10,6 +10,7 @@ import { ServerOverviewTab } from '@/components/catalog/kind-overviews/server-ov
 import { DatabaseOverviewTab } from '@/components/catalog/kind-overviews/database-overview';
 import { ServiceOverviewTab } from '@/components/catalog/kind-overviews/service-overview';
 import { CertificateOverviewTab } from '@/components/catalog/kind-overviews/certificate-overview';
+import { AnnotationsPanel } from '@/components/inventory/annotations-panel';
 
 /** Tab IDs already rendered by ItemDetail — do not re-register via EntityPageRegistry. */
 export const BUILTIN_TAB_IDS = [
@@ -56,6 +57,12 @@ export function DefaultTabsRegistrar() {
       label: 'Genel Bakış',
       order: 0,
       component: CertificateOverviewTab,
+    });
+    registerTab('*', {
+      id: 'annotations',
+      label: 'Açıklamalar',
+      order: 25,
+      component: AnnotationsPanel,
     });
   }, [registerTab]);
 

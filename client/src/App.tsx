@@ -35,6 +35,8 @@ import NotFoundPage from '@/pages/not-found';
 import AdminUsersPage from '@/pages/admin/users';
 import AdminAuditLogPage from '@/pages/admin/audit-log';
 import AdminClientCertsPage from '@/pages/admin/client-certs';
+import CatalogPage from '@/pages/catalog';
+import EntityDetailPage from '@/pages/catalog/entity-detail';
 
 /**
  * auth:logout custom event'i dinler — api/client.ts refresh başarısız olduğunda
@@ -225,6 +227,8 @@ export default function App() {
                   <Route element={<WsProvider><AppShell /></WsProvider>}>
                     <Route index element={<Navigate to="/inventory" replace />} />
                     <Route path="/inventory/*" element={<InventoryPage />} />
+                    <Route path="/catalog" element={<CatalogPage />} />
+                    <Route path="/catalog/:kind/:namespace/:name" element={<EntityDetailPage />} />
                     {/* Admin routes — AdminGate /inventory'e yönlendirir (non-admin) */}
                     <Route element={<AdminGate />}>
                       <Route path="/admin" element={<AdminUsersPage />} />

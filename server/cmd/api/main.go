@@ -578,6 +578,12 @@ func run() error {
 		Logger: logger,
 	}
 
+	// --- Catalog entity handler (PR-DP-E1) ---
+	catalogEntityHandlers := &httpapi.CatalogEntityHandlers{
+		Service: authSvc,
+		Logger:  logger,
+	}
+
 	// --- HTTP layer ---
 	router := httpapi.NewRouter(httpapi.Deps{
 		Logger:         logger,
@@ -612,6 +618,7 @@ func run() error {
 		Scan:           scanHandlers,           // PR-SCAN
 		Annotation:     annotationHandlers,     // PR-DP01
 		PortalTemplate: portalTemplateHandlers, // PR-DP11
+		CatalogEntity:  catalogEntityHandlers,  // PR-DP-E1
 		CORSOrigins:    cfg.CORSOrigins,        // ENVANTER_CORS_ORIGINS
 		PprofEnabled:   cfg.PprofEnabled,       // PR-PROD5
 	})

@@ -40,11 +40,24 @@ Manuel + AI-perspektifi test sırasında bulunan 7 gerçek bug düzeltildi:
 - **DOM nesting** (`admin/groups.tsx`): `<Badge>` (`<div>`) `<p>` içinde → `<div>`.
 - **CI temizliği**: pre-existing gofmt (server geneli) + eslint (`linked-items-tab`, `kdbx-parser`, `onboarding-tour`, client `App`/`item-detail`) düzeltildi.
 
+### 2026-06-03 — Developer Portal Enhancement PRs (DP-E1 through DP-E7)
+
+Portal'ı olgunlaştıran 7 iyileştirme PR'ı tek batch'te uygulandı:
+
+- **DP-E1**: `GET /api/v1/catalog/{kind}/{name}` — tek çağrıda entity detay + annotations + relationships + health. `server/internal/httpapi/catalog_entity.go` (yeni handler), router.go + main.go wiring, web `useCatalogEntityQuery` hook, shared types.
+- **DP-E2**: Admin portal template yönetim UI'ı — `web/src/pages/admin/portal-templates.tsx` (CRUD dialog, kind/active filtreleme), `useUpdatePortalTemplateMutation` hook, backend `?all=true` param (admin inactive görsün), App.tsx route + app-shell nav.
+- **DP-E3**: Annotation düzenleme paneli — `web/src/components/inventory/annotations-panel.tsx` (inline edit, add/delete), `default-entity-tabs.tsx`'te `'*'` kind ile order:25 tab kaydı.
+- **DP-E4**: Wizard'da kind'a özel form alanları — `entity-form-step.tsx`'e `KIND_FIELD_SCHEMAS` map (Server/Database/Service/Certificate/SSHKey/CloudCredential), `CreatePage`'de `kindFields` state + annotation olarak kaydetme.
+- **DP-E5**: Portal Home admin health widget — `HealthSummaryCard` component (useHealthReportQuery, severity badge'ler, admin-only).
+- **DP-E6**: Tauri client catalog sayfası — `client/src/api/catalog-browser.ts` (hooks), `client/src/pages/catalog/` (CatalogPage + EntityDetailPage + EntityCard), App.tsx route + app-shell nav.
+- **DP-E7**: OpenAPI spec güncelleme — annotations, portal-templates, catalog entity, search, health endpoints + component schemas.
+
 ## Mevcut Durum
 
 - **Önceki Fazlar (Faz 0–11):** 27/27 PR tamamlandı ✅
 - **Developer Portal Dönüşümü (DP Fazı):** 15/15 PR tamamlandı ✅ **TAMAMLANDI**
-- **Son tamamlanan:** PR-DP15 (ADR-0013 developer portal mimarisi, ADR README güncelleme, final tracking sync)
+- **Developer Portal Enhancement (DP-E Fazı):** 7/7 PR tamamlandı ✅ **TAMAMLANDI**
+- **Son tamamlanan:** DP-E1–E7 (catalog endpoint, admin template UI, annotation panel, kind fields, health widget, Tauri catalog, OpenAPI spec)
 
 ## Developer Portal PR'ları (DP Fazı)
 
