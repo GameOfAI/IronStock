@@ -11,6 +11,8 @@ Son güncelleme: 2026-06-02 — QA bug-fix turu + golangci-lint v2 CI migrasyonu
 - [x] `ci.yml`: setup-go 1.23→1.25 (server/integration/pre-commit), golangci-action v6→v7
 - [x] Pre-commit job'a Node + web deps (eslint-web hook) eklendi
 - [x] 5 SVG pre-existing trailing-whitespace/EOF düzeltildi
+- [x] eslint-web pre-commit hook workspace-aware (`npm run lint`) yapıldı
+- [x] Integration test stale assertion düzeltildi (item_types 8→9, 00045 k8s_namespace)
 - [x] Lint 0 issue, build/vet/test ✅
 
 ## ✅ QA Bug-Fix Turu (2026-06-02) — branch: fix/ux-and-dev-build

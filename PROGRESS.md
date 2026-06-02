@@ -20,6 +20,12 @@ gelen pre-existing debt).
 - **CI**: `ci.yml` setup-go 1.23→1.25 (3 job), golangci-lint-action v6→v7 (v2.12.2),
   Pre-commit job'a Node + web deps kuruldu (eslint-web hook için).
 - **Pre-existing whitespace**: 5 SVG asset trailing-whitespace/EOF düzeltildi.
+- **eslint-web pre-commit hook**: npm workspaces'te eslint binary root'a hoist
+  olduğu için `web/node_modules/.bin/eslint` yolu yoktu → hook `npm run lint`
+  çağıracak şekilde düzeltildi (CI Web job ile aynı).
+- **Integration test (stale assertion)**: `migrations_integration_test.go`
+  item_types beklenen sayı 8→9 (00045 `k8s_namespace` tipini ekliyor). Server
+  job go1.25'te kırık olduğundan integration job atlanıyordu, regresyon gizliydi.
 - Lint **0 issue**, `go build`/`go vet`/`go test` (cache, ws, httpapi, health, metrics) ✅.
 
 ### 2026-06-02 — QA Bug-Fix Turu (branch: fix/ux-and-dev-build)
