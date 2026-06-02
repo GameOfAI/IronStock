@@ -1,6 +1,24 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-05-25 — Error sanitization + security hardening + keypair route fix.
+Son güncelleme: 2026-06-02 — Developer Portal dönüşümü başladı (PR-DP01 tamamlandı).
+
+## 🔄 Developer Portal Dönüşümü (Aktif)
+
+- [x] PR-DP01: item_annotations tablosu + CRUD API
+- [ ] PR-DP02: kind_key + EntityEnvelope (kind, owner_ref)
+- [ ] PR-DP03: Relation type Backstage alias'ları
+- [ ] PR-DP04: Catalog Browser sayfası (web)
+- [ ] PR-DP05: Backend kind filter (search endpoint)
+- [ ] PR-DP06: Entity Detail URL routing
+- [ ] PR-DP07: EntityPageRegistry + Plugin Slot mimarisi
+- [ ] PR-DP08: Kind-specific overview card'ları
+- [ ] PR-DP09: Navigation yeniden yapılandırma
+- [ ] PR-DP10: Golden Path Template Wizard (5-step)
+- [ ] PR-DP11: portal_templates tablosu + API
+- [ ] PR-DP12: Shared types + Tauri sync
+- [ ] PR-DP13: Portal Home Dashboard
+- [ ] PR-DP14: MCP server portal catalog tools
+- [ ] PR-DP15: ADR-0013 + PROGRESS/TODO sync
 
 ## ✅ Post-Deploy Fixes (2026-05-25)
 

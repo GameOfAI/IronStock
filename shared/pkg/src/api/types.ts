@@ -242,6 +242,24 @@ export interface ItemListResponse {
   items: Item[];
 }
 
+// --- Item Annotations (PR-DP01) ---
+// Backstage metadata.annotations karşılığı: freeform key-value metadata.
+// Örnekler: "grafana/dashboard-url", "github.com/project-slug"
+
+export interface ItemAnnotation {
+  key: string;
+  value: string;
+  created_at: string; // RFC 3339
+}
+
+export interface ItemAnnotationsResponse {
+  annotations: ItemAnnotation[];
+}
+
+export interface UpsertAnnotationRequest {
+  value: string;
+}
+
 /** One snapshot of a field's encrypted value (PR-N2). Server stores opaque blobs. */
 export interface FieldVersionOutput {
   version_number: number;

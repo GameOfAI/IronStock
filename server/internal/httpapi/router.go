@@ -63,6 +63,7 @@ type Deps struct {
 	APIToken      *APITokenHandlers         // PR-ANSIBLE: API token management
 	SCIM          *SCIMHandlers             // PR-SCIM: SCIM 2.0 user provisioning
 	Scan          *ScanHandlers             // PR-SCAN: Secret fingerprint scanning
+	Annotation    *AnnotationHandlers       // PR-DP01: Backstage-style item annotations
 	CORSOrigins   []string                  // ENVANTER_CORS_ORIGINS
 	PprofEnabled  bool                      // PR-PROD5: pprof debug endpoints
 }
@@ -402,6 +403,16 @@ func NewRouter(d Deps) http.Handler {
 			fr.Use(requireAuth)
 			fr.Get("/", d.Tag.ListFavorites)
 		})
+	}
+
+	// Annotation routes (PR-DP01) — Backstage-style item metadata annotations.
+	if d.Annotation != nil && d.Item != nil && d.Auth != nil {
+		r.With(timeoutMW, requireAuth).
+			Get("/api/v1/items/{id}/annotations", d.Annotation.ListAnnotations)
+		r.With(timeoutMW, requireAuth).
+			Put("/api/v1/items/{id}/annotations/{key}", d.Annotation.UpsertAnnotation)
+		r.With(timeoutMW, requireAuth).
+			Delete("/api/v1/items/{id}/annotations/{key}", d.Annotation.DeleteAnnotation)
 	}
 
 	// Graph routes (PR-F5a) — pipeline relationship map.
