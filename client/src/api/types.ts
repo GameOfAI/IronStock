@@ -95,6 +95,15 @@ export type {
   ApproveAccessRequestRequest,
   DenyAccessRequestRequest,
   ToggleApprovalRequiredRequest,
+  // Developer Portal types (PR-DP01–DP11)
+  OwnerRef,
+  ItemAnnotation,
+  ItemAnnotationsResponse,
+  UpsertAnnotationRequest,
+  BackstageRelationType,
+  PortalTemplate,
+  PortalTemplateListResponse,
+  CreatePortalTemplateRequest,
   // SSO/LDAP (PR-LDAP)
   SSOProviderType,
   SSOProviderInfo,
