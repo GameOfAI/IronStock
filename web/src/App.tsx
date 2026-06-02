@@ -13,6 +13,7 @@ import { WsProvider } from '@/components/ws-provider';
 import { SkipLink } from '@/components/layout/skip-link';
 import { OnboardingTour, useOnboardingTour } from '@/components/onboarding/onboarding-tour';
 import { EntityPageRegistryProvider } from '@/lib/entity-page-registry';
+import { DefaultTabsRegistrar } from '@/lib/default-entity-tabs';
 
 import LoginPage from '@/pages/login';
 import RegisterPage from '@/pages/register';
@@ -92,6 +93,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <EntityPageRegistryProvider>
+      <DefaultTabsRegistrar />
       <ThemeProvider>
         <BrowserRouter>
           <SkipLink />

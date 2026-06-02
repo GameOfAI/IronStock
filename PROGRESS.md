@@ -1,12 +1,12 @@
 # İlerleyiş
 
-Son güncelleme: 2026-06-03 (PR-DP07 tamamlandı — EntityPageRegistry + Plugin Slot mimarisi)
+Son güncelleme: 2026-06-03 (PR-DP08 tamamlandı — Kind-specific overview card'ları)
 
 ## Mevcut Durum
 
 - **Önceki Fazlar (Faz 0–11):** 27/27 PR tamamlandı ✅
-- **Developer Portal Dönüşümü (DP Fazı):** 7/15 PR tamamlandı
-- **Son tamamlanan:** PR-DP07 (EntityPageRegistry plugin slot — registerTab/getTabsForKind context, item-detail entegrasyonu)
+- **Developer Portal Dönüşümü (DP Fazı):** 8/15 PR tamamlandı
+- **Son tamamlanan:** PR-DP08 (Server/Database/Service/Certificate Genel Bakış sekmeleri, DefaultTabsRegistrar)
 
 ## Developer Portal PR'ları (DP Fazı)
 
@@ -19,7 +19,7 @@ Son güncelleme: 2026-06-03 (PR-DP07 tamamlandı — EntityPageRegistry + Plugin
 | PR-DP05 | Backend kind filter (search endpoint) — ?kind=Server,Database | ✅ |
 | PR-DP06 | Entity Detail URL routing — /catalog/:kind/:namespace/:name | ✅ |
 | PR-DP07 | EntityPageRegistry + Plugin Slot mimarisi | ✅ |
-| PR-DP08 | Kind-specific overview card'ları | ⏳ |
+| PR-DP08 | Kind-specific overview card'ları | ✅ |
 | PR-DP09 | Navigation yeniden yapılandırma | ⏳ |
 | PR-DP10 | Golden Path Template Wizard (5-step) | ⏳ |
 | PR-DP11 | portal_templates tablosu + API | ⏳ |

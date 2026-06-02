@@ -1,10 +1,17 @@
 /**
- * default-entity-tabs — documents the built-in tab IDs reserved by ItemDetail.
+ * default-entity-tabs — built-in tab IDs + kind-specific overview registrations (PR-DP07/08).
  *
- * External code using EntityPageRegistry must not re-use these IDs. PR-DP07.
+ * DefaultTabsRegistrar must be rendered inside EntityPageRegistryProvider (done in App.tsx).
  */
 
-/** Tab IDs already rendered by ItemDetail — do not register these via EntityPageRegistry. */
+import * as React from 'react';
+import { useEntityPageRegistry } from '@/lib/entity-page-registry';
+import { ServerOverviewTab } from '@/components/catalog/kind-overviews/server-overview';
+import { DatabaseOverviewTab } from '@/components/catalog/kind-overviews/database-overview';
+import { ServiceOverviewTab } from '@/components/catalog/kind-overviews/service-overview';
+import { CertificateOverviewTab } from '@/components/catalog/kind-overviews/certificate-overview';
+
+/** Tab IDs already rendered by ItemDetail — do not re-register via EntityPageRegistry. */
 export const BUILTIN_TAB_IDS = [
   'genel',
   'alanlar',
@@ -17,3 +24,40 @@ export const BUILTIN_TAB_IDS = [
 ] as const;
 
 export type BuiltinTabId = (typeof BUILTIN_TAB_IDS)[number];
+
+/**
+ * Renders nothing; registers kind-specific overview tabs once on mount.
+ * Render this inside EntityPageRegistryProvider (App.tsx does this).
+ */
+export function DefaultTabsRegistrar() {
+  const { registerTab } = useEntityPageRegistry();
+
+  React.useEffect(() => {
+    registerTab('Server', {
+      id: 'server-overview',
+      label: 'Genel Bakış',
+      order: 0,
+      component: ServerOverviewTab,
+    });
+    registerTab('Database', {
+      id: 'database-overview',
+      label: 'Genel Bakış',
+      order: 0,
+      component: DatabaseOverviewTab,
+    });
+    registerTab('Service', {
+      id: 'service-overview',
+      label: 'Genel Bakış',
+      order: 0,
+      component: ServiceOverviewTab,
+    });
+    registerTab('Certificate', {
+      id: 'certificate-overview',
+      label: 'Genel Bakış',
+      order: 0,
+      component: CertificateOverviewTab,
+    });
+  }, [registerTab]);
+
+  return null;
+}
