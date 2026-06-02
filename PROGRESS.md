@@ -1,12 +1,12 @@
 # İlerleyiş
 
-Son güncelleme: 2026-06-03 (PR-DP10 tamamlandı — Golden Path Template Wizard)
+Son güncelleme: 2026-06-03 (PR-DP11 tamamlandı — portal_templates tablosu + API)
 
 ## Mevcut Durum
 
 - **Önceki Fazlar (Faz 0–11):** 27/27 PR tamamlandı ✅
-- **Developer Portal Dönüşümü (DP Fazı):** 10/15 PR tamamlandı
-- **Son tamamlanan:** PR-DP10 (5-adım Golden Path wizard — template seç / entity bilgileri / ilişkiler / lifecycle / özet+oluştur)
+- **Developer Portal Dönüşümü (DP Fazı):** 11/15 PR tamamlandı
+- **Son tamamlanan:** PR-DP11 (migration 00064, PortalTemplateHandlers CRUD, router wiring, shared types, web hook)
 
 ## Developer Portal PR'ları (DP Fazı)
 
@@ -22,7 +22,7 @@ Son güncelleme: 2026-06-03 (PR-DP10 tamamlandı — Golden Path Template Wizard
 | PR-DP08 | Kind-specific overview card'ları | ✅ |
 | PR-DP09 | Navigation yeniden yapılandırma | ✅ |
 | PR-DP10 | Golden Path Template Wizard (5-step) | ✅ |
-| PR-DP11 | portal_templates tablosu + API | ⏳ |
+| PR-DP11 | portal_templates tablosu + API | ✅ |
 | PR-DP12 | Shared types + Tauri sync | ⏳ |
 | PR-DP13 | Portal Home Dashboard | ⏳ |
 | PR-DP14 | MCP server portal catalog tools | ⏳ |

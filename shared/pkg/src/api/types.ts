@@ -270,6 +270,41 @@ export interface UpsertAnnotationRequest {
   value: string;
 }
 
+// --- Portal Templates (PR-DP11) ---
+// Golden Path scaffold blueprints for the Create wizard.
+
+/** A portal (golden path) template defining entity kind + default scaffolding. */
+export interface PortalTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  kind_key: string;
+  item_type_id?: number | null;
+  default_fields?: Record<string, unknown> | null;
+  default_annotations?: Record<string, string> | null;
+  default_lifecycle_stages?: string[] | null;
+  default_relations?: unknown[] | null;
+  is_builtin: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PortalTemplateListResponse {
+  templates: PortalTemplate[];
+}
+
+export interface CreatePortalTemplateRequest {
+  name: string;
+  description?: string;
+  kind_key: string;
+  item_type_id?: number | null;
+  default_fields?: Record<string, unknown> | null;
+  default_annotations?: Record<string, string> | null;
+  default_lifecycle_stages?: string[] | null;
+  default_relations?: unknown[] | null;
+}
+
 /** One snapshot of a field's encrypted value (PR-N2). Server stores opaque blobs. */
 export interface FieldVersionOutput {
   version_number: number;

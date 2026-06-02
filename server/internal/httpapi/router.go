@@ -63,8 +63,9 @@ type Deps struct {
 	APIToken      *APITokenHandlers         // PR-ANSIBLE: API token management
 	SCIM          *SCIMHandlers             // PR-SCIM: SCIM 2.0 user provisioning
 	Scan          *ScanHandlers             // PR-SCAN: Secret fingerprint scanning
-	Annotation    *AnnotationHandlers       // PR-DP01: Backstage-style item annotations
-	CORSOrigins   []string                  // ENVANTER_CORS_ORIGINS
+	Annotation      *AnnotationHandlers       // PR-DP01: Backstage-style item annotations
+	PortalTemplate  *PortalTemplateHandlers   // PR-DP11: Golden Path portal templates
+	CORSOrigins     []string                  // ENVANTER_CORS_ORIGINS
 	PprofEnabled  bool                      // PR-PROD5: pprof debug endpoints
 }
 
@@ -413,6 +414,18 @@ func NewRouter(d Deps) http.Handler {
 			Put("/api/v1/items/{id}/annotations/{key}", d.Annotation.UpsertAnnotation)
 		r.With(timeoutMW, requireAuth).
 			Delete("/api/v1/items/{id}/annotations/{key}", d.Annotation.DeleteAnnotation)
+	}
+
+	// Portal template routes (PR-DP11) — Golden Path scaffold blueprints.
+	// GET: all authenticated users; POST/PUT/DELETE: admin only.
+	if d.PortalTemplate != nil && d.Auth != nil {
+		mw := []func(http.Handler) http.Handler{timeoutMW, requireAuth}
+		mwAdmin := []func(http.Handler) http.Handler{timeoutMW, requireAuth, RequireRole(RoleAdmin)}
+		r.With(mw...).Get("/api/v1/portal-templates", d.PortalTemplate.ListPortalTemplates)
+		r.With(mw...).Get("/api/v1/portal-templates/{id}", d.PortalTemplate.GetPortalTemplate)
+		r.With(mwAdmin...).Post("/api/v1/portal-templates", d.PortalTemplate.CreatePortalTemplate)
+		r.With(mwAdmin...).Put("/api/v1/portal-templates/{id}", d.PortalTemplate.UpdatePortalTemplate)
+		r.With(mwAdmin...).Delete("/api/v1/portal-templates/{id}", d.PortalTemplate.DeletePortalTemplate)
 	}
 
 	// Graph routes (PR-F5a) — pipeline relationship map.

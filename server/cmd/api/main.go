@@ -572,6 +572,12 @@ func run() error {
 		Logger:  logger,
 	}
 
+	// --- Portal template handler (PR-DP11) ---
+	portalTemplateHandlers := &httpapi.PortalTemplateHandlers{
+		DB:     pool,
+		Logger: logger,
+	}
+
 	// --- HTTP layer ---
 	router := httpapi.NewRouter(httpapi.Deps{
 		Logger:         logger,
@@ -604,8 +610,9 @@ func run() error {
 		APIToken:     apiTokenHandlers,      // PR-ANSIBLE
 		SCIM:         scimHandlers,          // PR-SCIM
 		Scan:         scanHandlers,          // PR-SCAN
-		Annotation:   annotationHandlers,    // PR-DP01
-		CORSOrigins:  cfg.CORSOrigins,       // ENVANTER_CORS_ORIGINS
+		Annotation:     annotationHandlers,      // PR-DP01
+		PortalTemplate: portalTemplateHandlers,  // PR-DP11
+		CORSOrigins:    cfg.CORSOrigins,         // ENVANTER_CORS_ORIGINS
 		PprofEnabled: cfg.PprofEnabled,      // PR-PROD5
 	})
 
