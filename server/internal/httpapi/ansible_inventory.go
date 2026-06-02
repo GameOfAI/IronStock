@@ -118,7 +118,6 @@ func (h *AnsibleInventoryHandlers) GetInventory(w http.ResponseWriter, r *http.R
 		description string
 		itemType    string
 		folderID    string
-		fieldKeys   map[string]string // key → label (not values — E2E encrypted)
 		tags        []string
 	}
 

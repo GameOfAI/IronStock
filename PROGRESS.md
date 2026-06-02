@@ -1,6 +1,26 @@
 # İlerleyiş
 
-Son güncelleme: 2026-06-02 (QA bug-fix turu: 7 gerçek bug + pre-existing CI debt)
+Son güncelleme: 2026-06-02 (QA bug-fix turu + golangci-lint v1→v2 CI migrasyonu)
+
+### 2026-06-02 — golangci-lint v1→v2 CI Migrasyonu (branch: fix/ux-and-dev-build)
+
+`go.mod`/`go.work` `go 1.25.0` istiyor (go-webauthn v0.17.4 transitively go ≥1.25);
+ama CI golangci-lint **v1.62.2** (Go 1.23 toolchain) pinliydi → Server + Pre-commit
+job'ları `package requires newer Go version go1.25 (typecheck)` ile kırılıyordu (main'den
+gelen pre-existing debt).
+
+- **golangci-lint v1 → v2.12.2**: `server/.golangci.yml` v2 formatına migrate edildi
+  (`golangci-lint migrate`). Standart exclusion preset'leri (comments,
+  std-error-handling, common-false-positives) eklendi → v2'nin yeni linter
+  sürümlerinin sürdüğü pre-existing stil/std-lib gürültüsü baseline'a çekildi.
+- **gosec golangci'den çıkarıldı**: ayrı "Go SAST (gosec)" job'u zaten kapsıyor (duplikasyon).
+- **33 gerçek bulgu kodda düzeltildi**: sqlclosecheck FP (nolint), unused dead-code (3),
+  unconvert, redis `SetEx`→`Set`, De Morgan, early-return, receiver/parametre isimleri,
+  errcheck `_ =` (audit fire-and-forget), test SA4031/SA9003.
+- **CI**: `ci.yml` setup-go 1.23→1.25 (3 job), golangci-lint-action v6→v7 (v2.12.2),
+  Pre-commit job'a Node + web deps kuruldu (eslint-web hook için).
+- **Pre-existing whitespace**: 5 SVG asset trailing-whitespace/EOF düzeltildi.
+- Lint **0 issue**, `go build`/`go vet`/`go test` (cache, ws, httpapi, health, metrics) ✅.
 
 ### 2026-06-02 — QA Bug-Fix Turu (branch: fix/ux-and-dev-build)
 

@@ -20,7 +20,7 @@ func TestDuplicateCheckResponseZeroValue(t *testing.T) {
 	if resp.Count != 0 {
 		t.Errorf("Count = %d, want 0", resp.Count)
 	}
-	// Items may be nil in zero-value — that's fine; handler initialises with make().
+	// Items may be nil in zero-value — that's fine; handler initializes with make().
 }
 
 // TestFormatArgNBasic verifies formatArgN returns correct positional parameter strings.
@@ -57,7 +57,7 @@ func TestDuplicateCheckNameRequired(t *testing.T) {
 	}
 	for _, tc := range cases {
 		trimmed := tc.name
-		// Simulate strings.TrimSpace behaviour.
+		// Simulate strings.TrimSpace behavior.
 		for len(trimmed) > 0 && trimmed[0] == ' ' {
 			trimmed = trimmed[1:]
 		}

@@ -20,6 +20,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/hex"
 	"encoding/pem"
+	"errors"
 	"math/big"
 	"net/http"
 	"net/url"
@@ -156,7 +157,7 @@ func TestErrorSentinels_Distinct(t *testing.T) {
 
 	for i := 0; i < len(errs); i++ {
 		for j := i + 1; j < len(errs); j++ {
-			if errs[i] == errs[j] {
+			if errors.Is(errs[i], errs[j]) {
 				t.Errorf("error[%d] == error[%d]: sentinel values must be distinct", i, j)
 			}
 		}

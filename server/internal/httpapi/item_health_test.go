@@ -21,8 +21,10 @@ func TestHealthReportResponseDefaults(t *testing.T) {
 	if resp.Count != 0 {
 		t.Errorf("Count = %d, want 0", resp.Count)
 	}
-	if resp.Items == nil {
-		// nil Items is acceptable; handler uses make() so response is never null
+	// Zero-value Items is nil; the handler uses make() so the JSON response is
+	// never null in practice.
+	if resp.Items != nil {
+		t.Errorf("zero-value Items = %v, want nil", resp.Items)
 	}
 }
 

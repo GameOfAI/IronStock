@@ -180,7 +180,7 @@ func (c *Client) send(to, subject, htmlBody string) error {
 }
 
 func (c *Client) dialAndSend(to, msg string) error {
-	addr := fmt.Sprintf("%s:%d", c.cfg.Host, c.cfg.Port)
+	addr := net.JoinHostPort(c.cfg.Host, fmt.Sprintf("%d", c.cfg.Port))
 
 	switch c.cfg.TLSMode {
 	case TLSModeTLS:

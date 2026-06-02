@@ -34,13 +34,6 @@ type TemplateHandlers struct {
 	Logger  *slog.Logger
 }
 
-// templateField represents a pre-filled field in a template.
-type templateField struct {
-	FieldDefKey  string `json:"field_def_key"`
-	DefaultValue string `json:"default_value"`
-	Required     bool   `json:"required"`
-}
-
 // templateResponse is the JSON body for a single template.
 type templateResponse struct {
 	ID          string          `json:"id"`

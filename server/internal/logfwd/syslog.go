@@ -20,7 +20,7 @@ type SyslogForwarder struct {
 
 // NewSyslogForwarder dials the syslog target and returns a ready forwarder.
 func NewSyslogForwarder(configID string, cfg SyslogConfig) (*SyslogForwarder, error) {
-	addr := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
+	addr := net.JoinHostPort(cfg.Host, fmt.Sprintf("%d", cfg.Port))
 	conn, err := net.DialTimeout(cfg.Protocol, addr, 5*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("logfwd: syslog dial %s %s: %w", cfg.Protocol, addr, err)

@@ -188,7 +188,7 @@ func (h *ExportHandlers) Export(w http.ResponseWriter, r *http.Request) {
 }
 
 // writeCSV renders the export as RFC 4180 CSV with UTF-8 BOM for Excel compat.
-func (h *ExportHandlers) writeCSV(w http.ResponseWriter, items []exportItem, exportedAt string) {
+func (*ExportHandlers) writeCSV(w http.ResponseWriter, items []exportItem, exportedAt string) {
 	filename := fmt.Sprintf("ironstock-export-%s.csv",
 		strings.ReplaceAll(exportedAt[:10], ":", "-"))
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")

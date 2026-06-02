@@ -1,6 +1,17 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-06-02 — QA bug-fix turu (7 bug + CI temizliği).
+Son güncelleme: 2026-06-02 — QA bug-fix turu + golangci-lint v2 CI migrasyonu.
+
+## ✅ golangci-lint v1→v2 CI Migrasyonu (2026-06-02) — branch: fix/ux-and-dev-build
+
+- [x] `.golangci.yml` v1→v2 migrate (`golangci-lint migrate`) + standart exclusion preset'leri
+- [x] golangci-lint v1.62.2 → v2.12.2 (Go 1.25 modülünü typecheck edebiliyor)
+- [x] gosec golangci'den çıkarıldı (ayrı "Go SAST" job'u kapsıyor)
+- [x] 33 gerçek lint bulgusu kodda düzeltildi (sqlclose FP, dead-code, redis SetEx, De Morgan, receiver/param isimleri, errcheck, test SA403x)
+- [x] `ci.yml`: setup-go 1.23→1.25 (server/integration/pre-commit), golangci-action v6→v7
+- [x] Pre-commit job'a Node + web deps (eslint-web hook) eklendi
+- [x] 5 SVG pre-existing trailing-whitespace/EOF düzeltildi
+- [x] Lint 0 issue, build/vet/test ✅
 
 ## ✅ QA Bug-Fix Turu (2026-06-02) — branch: fix/ux-and-dev-build
 

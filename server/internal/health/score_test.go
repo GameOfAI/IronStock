@@ -11,7 +11,6 @@ var baseNow = time.Date(2026, 5, 23, 12, 0, 0, 0, time.UTC)
 
 // ptr helpers
 func tp(t time.Time) *time.Time { return &t }
-func ip(n int) *int             { return &n }
 
 func TestScoreFullyHealthy(t *testing.T) {
 	now := baseNow

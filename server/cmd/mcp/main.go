@@ -168,7 +168,7 @@ func (s *mcpServer) handle(req rpcRequest) rpcResponse {
 	return base
 }
 
-func (s *mcpServer) toolList() []map[string]any {
+func (*mcpServer) toolList() []map[string]any {
 	return []map[string]any{
 		{
 			"name":        "inventory_search",

@@ -171,7 +171,7 @@ func (h *SCIMHandlers) scimJSON(w http.ResponseWriter, status int, v interface{}
 	}
 }
 
-func (h *SCIMHandlers) scimError(w http.ResponseWriter, status int, scimType, detail string) {
+func (*SCIMHandlers) scimError(w http.ResponseWriter, status int, scimType, detail string) {
 	w.Header().Set("Content-Type", scimContentType)
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(scimErrorResp{
