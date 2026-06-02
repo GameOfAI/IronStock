@@ -565,6 +565,7 @@ export interface UnreadCountResponse {
 // --- Graph / Pipeline Relationships (PR-F5a) ---
 
 export type RelationshipType =
+  // Original IronStock snake_case types.
   | 'hosted_on'
   | 'accessed_via'
   | 'part_of'
@@ -573,7 +574,24 @@ export type RelationshipType =
   | 'uses_tool'
   | 'builds_to'
   | 'scans_with'
-  | 'deploys_to';
+  | 'deploys_to'
+  | 'runs_in'
+  // PR-DP03: Backstage-native camelCase aliases.
+  | 'ownedBy'
+  | 'dependsOn'
+  | 'memberOf'
+  | 'providesApi'
+  | 'consumesApi';
+
+/** PR-DP03: Backstage-standard relation type computed from IronStock type. */
+export type BackstageRelationType =
+  | 'dependsOn'
+  | 'partOf'
+  | 'hasPart'
+  | 'ownedBy'
+  | 'memberOf'
+  | 'providesApi'
+  | 'consumesApi';
 
 /** A graph node representing an item the caller can see. Name is decrypted server-side. */
 export interface GraphNode {
@@ -590,6 +608,8 @@ export interface GraphEdge {
   target_id: string;
   type: RelationshipType;
   metadata?: Record<string, unknown>;
+  /** PR-DP03: Backstage-standard relation type computed server-side. */
+  backstage_type?: BackstageRelationType;
 }
 
 export interface GraphResponse {
