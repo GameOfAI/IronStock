@@ -1,12 +1,12 @@
 # İlerleyiş
 
-Son güncelleme: 2026-06-03 (PR-DP05 tamamlandı — backend kind filter)
+Son güncelleme: 2026-06-03 (PR-DP06 tamamlandı — Entity Detail URL routing)
 
 ## Mevcut Durum
 
 - **Önceki Fazlar (Faz 0–11):** 27/27 PR tamamlandı ✅
-- **Developer Portal Dönüşümü (DP Fazı):** 5/15 PR tamamlandı
-- **Son tamamlanan:** PR-DP05 (backend kind filter — ?kind= param for search endpoint)
+- **Developer Portal Dönüşümü (DP Fazı):** 6/15 PR tamamlandı
+- **Son tamamlanan:** PR-DP06 (Entity Detail URL — /catalog/:kind/:namespace/:name, EntityHeader)
 
 ## Developer Portal PR'ları (DP Fazı)
 
@@ -17,7 +17,7 @@ Son güncelleme: 2026-06-03 (PR-DP05 tamamlandı — backend kind filter)
 | PR-DP03 | Relation type Backstage alias'ları (migration 00063) | ✅ |
 | PR-DP04 | Catalog Browser sayfası (web) — /catalog, entity-card, kind filter | ✅ |
 | PR-DP05 | Backend kind filter (search endpoint) — ?kind=Server,Database | ✅ |
-| PR-DP06 | Entity Detail URL routing | ⏳ |
+| PR-DP06 | Entity Detail URL routing — /catalog/:kind/:namespace/:name | ✅ |
 | PR-DP07 | EntityPageRegistry + Plugin Slot mimarisi | ⏳ |
 | PR-DP08 | Kind-specific overview card'ları | ⏳ |
 | PR-DP09 | Navigation yeniden yapılandırma | ⏳ |

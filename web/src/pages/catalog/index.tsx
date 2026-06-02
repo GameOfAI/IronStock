@@ -40,7 +40,12 @@ export default function CatalogPage() {
   const items = data?.items ?? [];
 
   function handleItemClick(item: Item) {
-    navigate(`/inventory?item=${item.id}`);
+    if (item.kind && item.name) {
+      const encodedName = encodeURIComponent(item.name);
+      navigate(`/catalog/${item.kind}/default/${encodedName}`);
+    } else {
+      navigate(`/inventory?item=${item.id}`);
+    }
   }
 
   const showEmptySearch = q.trim().length < 2;

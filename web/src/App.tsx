@@ -41,6 +41,7 @@ import SharePage from '@/pages/share';
 import ImportPage from '@/pages/import';
 import AccessRequestsPage from '@/pages/access-requests';
 import CatalogPage from '@/pages/catalog';
+import EntityDetailPage from '@/pages/catalog/entity-detail';
 import NotFoundPage from '@/pages/not-found';
 
 /**
@@ -137,6 +138,7 @@ export default function App() {
                     <Route path="/import" element={<ImportPage />} />
                     <Route path="/access-requests" element={<AccessRequestsPage />} />
                     <Route path="/catalog" element={<CatalogPage />} />
+                    <Route path="/catalog/:kind/:namespace/:name" element={<EntityDetailPage />} />
 
                     {/* Admin */}
                     <Route element={<RoleGate role="admin" />}>
