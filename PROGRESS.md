@@ -1,12 +1,12 @@
 # İlerleyiş
 
-Son güncelleme: 2026-06-03 (PR-DP13 tamamlandı — Portal Home Dashboard)
+Son güncelleme: 2026-06-03 (PR-DP14 tamamlandı — MCP server portal catalog tools)
 
 ## Mevcut Durum
 
 - **Önceki Fazlar (Faz 0–11):** 27/27 PR tamamlandı ✅
-- **Developer Portal Dönüşümü (DP Fazı):** 13/15 PR tamamlandı
-- **Son tamamlanan:** PR-DP13 (portal-home page, usePortalStatsQuery, App.tsx root route, logo link)
+- **Developer Portal Dönüşümü (DP Fazı):** 14/15 PR tamamlandı
+- **Son tamamlanan:** PR-DP14 (catalog_list_by_kind, catalog_get_entity, portal_list_templates tools in MCP server)
 
 ## Developer Portal PR'ları (DP Fazı)
 
@@ -25,7 +25,7 @@ Son güncelleme: 2026-06-03 (PR-DP13 tamamlandı — Portal Home Dashboard)
 | PR-DP11 | portal_templates tablosu + API | ✅ |
 | PR-DP12 | Shared types + Tauri sync | ✅ |
 | PR-DP13 | Portal Home Dashboard | ✅ |
-| PR-DP14 | MCP server portal catalog tools | ⏳ |
+| PR-DP14 | MCP server portal catalog tools | ✅ |
 | PR-DP15 | ADR-0013 + PROGRESS/TODO sync | ⏳ |
 
 ### Tamamlanan PR'lar (kod taramasıyla doğrulandı — 2026-05-22)

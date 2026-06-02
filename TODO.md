@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-06-03 — PR-DP13 tamamlandı (Portal Home Dashboard).
+Son güncelleme: 2026-06-03 — PR-DP14 tamamlandı (MCP server portal catalog tools).
 
 ## 🔄 Developer Portal Dönüşümü (Aktif)
 
@@ -17,7 +17,7 @@ Son güncelleme: 2026-06-03 — PR-DP13 tamamlandı (Portal Home Dashboard).
 - [x] PR-DP11: portal_templates tablosu + API
 - [x] PR-DP12: Shared types + Tauri sync
 - [x] PR-DP13: Portal Home Dashboard
-- [ ] PR-DP14: MCP server portal catalog tools
+- [x] PR-DP14: MCP server portal catalog tools
 - [ ] PR-DP15: ADR-0013 + PROGRESS/TODO sync
 
 ## ✅ Post-Deploy Fixes (2026-05-25)
