@@ -2,7 +2,7 @@
 -- Log forwarding configuration table (PR-LOG1).
 -- Stores syslog (UDP/TCP) and Slack webhook targets for audit events.
 CREATE TABLE log_forwarding_configs (
-    id          UUID        PRIMARY KEY DEFAULT uuid_generate_v7(),
+    id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     name        TEXT        NOT NULL,
     target_type TEXT        NOT NULL CHECK (target_type IN ('syslog', 'slack')),
     enabled     BOOLEAN     NOT NULL DEFAULT true,

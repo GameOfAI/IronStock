@@ -22,7 +22,9 @@ export function useCreateLogForwardingMutation() {
     mutationFn: (req: CreateLogForwardingRequest) =>
       apiFetch<LogForwardingConfig>('/api/v1/admin/log-forwarding', {
         method: 'POST',
-        body: JSON.stringify(req),
+        // apiFetch already JSON.stringifies the body — passing a pre-stringified
+        // string here double-encodes it and the server rejects "invalid JSON".
+        body: req,
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: [QK] });
@@ -36,7 +38,8 @@ export function useUpdateLogForwardingMutation(id: string) {
     mutationFn: (req: UpdateLogForwardingRequest) =>
       apiFetch<LogForwardingConfig>(`/api/v1/admin/log-forwarding/${id}`, {
         method: 'PUT',
-        body: JSON.stringify(req),
+        // See create mutation — body must be the object, not a JSON string.
+        body: req,
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: [QK] });

@@ -45,10 +45,10 @@ const (
 	ActionFolderPermissionRevoke = "folder.permission_revoked"
 
 	// Item lifecycle (PR-9).
-	ActionItemCreated      = "item.created"
-	ActionItemUpdated      = "item.updated"
-	ActionItemDeleted      = "item.deleted"
-	ActionItemFieldUpdated = "item.field_updated"
+	ActionItemCreated       = "item.created"
+	ActionItemUpdated       = "item.updated"
+	ActionItemDeleted       = "item.deleted"
+	ActionItemFieldUpdated  = "item.field_updated"
 	ActionItemShared        = "item.shared"
 	ActionItemUnshared      = "item.unshared"
 	ActionItemGroupShared   = "item.group_shared"   // PR-GROUP-SHARE

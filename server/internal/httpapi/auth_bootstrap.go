@@ -107,7 +107,7 @@ func (s *AuthHandlers) BootstrapSetup(w http.ResponseWriter, r *http.Request) {
 	}
 	if exists {
 		writeError(w, s.Logger, http.StatusConflict, ErrCodeConflict,
-			"Admin hesabı zaten mevcut. /admin-login ile giriş yapın.", errors.New("admin exists"))
+			"Admin hesabı zaten mevcut. /login ile giriş yapın.", errors.New("admin exists"))
 		return
 	}
 

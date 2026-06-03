@@ -27,7 +27,7 @@ jobs:
     # Sadece pull_request'te çalışır — direkt main push'ta uygulanamaz (hook zaten yerel yakaladı)
     if: github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0  # Tam geçmiş — base branch karşılaştırması için
 
@@ -80,18 +80,15 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        # Go 1.23 — pin'lenmiş çünkü:
-        # 1. golangci-lint v1.62.2 binary'si Go 1.23 ile derlenmiş; Go 1.26 SDK'sındaki
-        #    fips140only_go1.26.go gibi dosyaları typecheck edemiyor (v2.x'e migrate
-        #    edilince stable'a dönülebilir).
-        # 2. go-version değişimi setup-go cache key'ini invalidate eder, eski stale
-        #    modül cache'i (pgx v5.9.2 vs) temizlenir.
-        go: ["1.23"]
+        # Go 1.25 — go.work/go.mod `go 1.25.0` gerektiriyor (go-webauthn v0.17.4
+        # transitively go >= 1.25 ister). golangci-lint v2.x bu modülü typecheck
+        # edebiliyor; v1.62.2 edemiyordu (bu PR'da v1→v2 migrate edildi).
+        go: ["1.25"]
     defaults:
       run:
         working-directory: server
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -121,11 +118,10 @@ jobs:
           fi
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v9
         with:
-          version: v1.62.2
+          version: v2.12.2
           working-directory: server
-          args: --timeout=5m
 
       - name: Build
         run: go build ./...
@@ -134,7 +130,7 @@ jobs:
         run: go test -race -coverprofile=coverage.out ./...
 
       - name: Upload coverage artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: server-coverage-${{ matrix.os }}
           path: server/coverage.out
@@ -151,7 +147,7 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -192,7 +188,7 @@ jobs:
       run:
         working-directory: client
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -227,10 +223,10 @@ jobs:
       run:
         working-directory: server
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.23"
+          go-version: "1.25"
           cache: true
           cache-dependency-path: server/go.sum
       - name: Run integration tests
@@ -252,7 +248,7 @@ jobs:
       (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
       startsWith(github.ref, 'refs/tags/v')
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           # Full clone so we can push back the kustomization tag update.
           fetch-depth: 0
@@ -265,7 +261,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Determine platforms
         id: platforms
@@ -338,7 +334,7 @@ jobs:
     runs-on: windows-latest
     needs: [client]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -369,7 +365,7 @@ jobs:
         if: |
           github.event_name == 'push' &&
           (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ironstock-win-x64-${{ github.sha }}
           path: |
@@ -392,7 +388,7 @@ jobs:
       (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
       startsWith(github.ref, 'refs/tags/v')
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -420,7 +416,7 @@ jobs:
         run: npm run tauri:build -- --target universal-apple-darwin
 
       - name: Upload DMG artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ironstock-mac-universal-${{ github.sha }}
           path: |
@@ -439,16 +435,16 @@ jobs:
       contents: write
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Download Windows artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ironstock-win-x64-${{ github.sha }}
           path: dist/win
 
       - name: Download macOS artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ironstock-mac-universal-${{ github.sha }}
           path: dist/mac
@@ -473,19 +469,26 @@ jobs:
     name: Pre-commit hooks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.23"
+          go-version: "1.25"
           cache: false
       - name: Install golangci-lint
         run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/v1.62.2/install.sh \
-            | sh -s -- -b "$(go env GOPATH)/bin" v1.62.2
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/v2.12.2/install.sh \
+            | sh -s -- -b "$(go env GOPATH)/bin" v2.12.2
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      # eslint-web hook çağırdığı binary: web/node_modules/.bin/eslint
+      # workspace install (root) tüm paketleri (web/client/shared) kurar.
+      - name: Install web deps (eslint-web hook için)
+        run: npm install --no-audit --no-fund
       - name: Run pre-commit
         uses: pre-commit/action@v3.0.1
         with:

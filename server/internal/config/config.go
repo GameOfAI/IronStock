@@ -106,7 +106,7 @@ type Config struct {
 	RedisPassword string // ENVANTER_REDIS_PASSWORD — optional auth password
 
 	// RateLimitBackend selects the rate limiter implementation.
-	// "memory" (default) = per-pod in-memory token bucket (existing behaviour).
+	// "memory" (default) = per-pod in-memory token bucket (existing behavior).
 	// "redis"            = shared sliding-window counter via Redis (requires RedisURL).
 	// Falls back to "memory" if Redis is unavailable regardless of setting.
 	RateLimitBackend string // ENVANTER_RATE_LIMIT_BACKEND: memory|redis (default "memory")
@@ -118,6 +118,10 @@ type Config struct {
 	LLMAPIKey   string // ENVANTER_LLM_API_KEY
 	LLMBaseURL  string // ENVANTER_LLM_BASE_URL — override endpoint (Ollama: "http://localhost:11434/v1")
 	LLMModel    string // ENVANTER_LLM_MODEL — default: claude-sonnet-4-5 (anthropic) or gpt-4o (openai)
+
+	// CORS izinli origin'ler. Varsayılanlar: tauri://, localhost dev portları.
+	// Production'da ENVANTER_CORS_ORIGINS ile gerçek frontend domain'i eklenmeli.
+	CORSOrigins []string // ENVANTER_CORS_ORIGINS (comma-separated, ekleme — varsayılanlar korunur)
 
 	// PR-PROD5: pprof debug endpoint (CPU + memory profiling).
 	// Production'da kapalı tutulmalı — yalnızca sorun giderme sırasında açılır.
@@ -171,7 +175,14 @@ func Load() (*Config, error) {
 		LLMAPIKey:             os.Getenv("ENVANTER_LLM_API_KEY"),
 		LLMBaseURL:            os.Getenv("ENVANTER_LLM_BASE_URL"),
 		LLMModel:              os.Getenv("ENVANTER_LLM_MODEL"),
-		PprofEnabled:          envBoolOr("ENVANTER_PPROF_ENABLED", false),
+		CORSOrigins: envStringSliceOr("ENVANTER_CORS_ORIGINS", []string{
+			"tauri://localhost",
+			"http://localhost:1420",
+			"https://localhost:1420",
+			"http://localhost",
+			"https://localhost",
+		}),
+		PprofEnabled: envBoolOr("ENVANTER_PPROF_ENABLED", false),
 	}
 	if err := cfg.Validate(); err != nil {
 		return nil, err

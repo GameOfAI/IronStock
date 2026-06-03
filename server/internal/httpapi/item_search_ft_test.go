@@ -19,7 +19,7 @@ func TestFuzzySearchQueryParam(t *testing.T) {
 		want     bool
 	}{
 		{"true", true},
-		{"True", false},  // case-sensitive comparison in handler
+		{"True", false}, // case-sensitive comparison in handler
 		{"1", false},
 		{"", false},
 		{"false", false},
@@ -36,9 +36,9 @@ func TestFuzzySearchQueryParam(t *testing.T) {
 // produce the correct WHERE clause fragments.
 func TestFuzzySearchWhereClause(t *testing.T) {
 	cases := []struct {
-		fuzzy        bool
-		wantSubstr   string
-		wantNotIn    string
+		fuzzy      bool
+		wantSubstr string
+		wantNotIn  string
 	}{
 		{
 			fuzzy:      false,

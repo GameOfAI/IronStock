@@ -24,6 +24,7 @@ import { useToast } from '@/hooks/use-toast';
 import { bootstrapStatus, bootstrapLogin } from '@/api/bootstrap';
 import { useAuthStore } from '@/store/auth';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { userFriendlyError } from '@/lib/user-error';
 
 export default function AdminLoginPage() {
   useDocumentTitle('Admin Giriş');
@@ -75,7 +76,7 @@ export default function AdminLoginPage() {
       // MustChangePasswordGate handles the redirect if must_change_password=true
       navigate('/admin/users', { replace: true });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Giriş başarısız.';
+      const msg = userFriendlyError(err);
       toast({ title: 'Giriş başarısız', description: msg, variant: 'destructive' });
     } finally {
       setLoading(false);

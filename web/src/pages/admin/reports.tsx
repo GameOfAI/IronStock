@@ -21,6 +21,7 @@ import { apiFetch } from '@/api/client';
 import { useGenerateReportMutation } from '@/api/reports';
 import type { ItemListResponse, Item } from '@/api/types';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { userFriendlyError } from '@/lib/user-error';
 
 // ─── Item search ──────────────────────────────────────────────────────────────
 
@@ -130,7 +131,7 @@ export default function AdminReportsPage() {
       },
       {
         onSuccess: () => toast({ title: '✅ Rapor indirildi' }),
-        onError: (e) => toast({ title: 'Hata', description: e.message, variant: 'destructive' }),
+        onError: (e) => toast({ title: 'Hata', description: userFriendlyError(e), variant: 'destructive' }),
       },
     );
   };

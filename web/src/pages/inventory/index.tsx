@@ -36,6 +36,7 @@ import {
 } from '@/components/pipeline/pipeline-constants';
 import type { Item } from '@/api/types';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { userFriendlyError } from '@/lib/user-error';
 
 type FolderModal = 'create-root' | 'create-sub' | 'rename' | 'delete' | null;
 type ItemModal = 'create' | 'edit' | 'delete' | 'share' | null;
@@ -91,6 +92,10 @@ export default function InventoryPage() {
   };
 
   const handleSelectItem = (id: string) => {
+    // Clear any item that a previous modal action (edit/delete/share/duplicate)
+    // pinned into activeItem — otherwise it shadows the freshly-clicked item and
+    // the toolbar would act on the WRONG item (e.g. delete the previous one).
+    setActiveItem(null);
     updateParams((p) => p.set('item', id));
   };
 
@@ -137,7 +142,11 @@ export default function InventoryPage() {
     });
   }
 
-  const selectedItem = activeItem ?? (activeItems ?? []).find((i) => i.id === itemId) ?? null;
+  // Prefer the item matching the current URL ?item= when it's visible in the
+  // list; only fall back to activeItem (a modal-pinned item that may live
+  // outside the current list, e.g. a search result) when there's no match.
+  const selectedItem =
+    (activeItems ?? []).find((i) => i.id === itemId) ?? activeItem ?? null;
 
   function openItemModal(modal: ItemModal, item?: Item) {
     setActiveItem(item ?? null);
@@ -199,7 +208,7 @@ export default function InventoryPage() {
     } catch (err) {
       toast({
         title: 'Kopyalanamadı',
-        description: err instanceof Error ? err.message : 'Şifre çözme başarısız.',
+        description: userFriendlyError(err),
         variant: 'destructive',
       });
     }

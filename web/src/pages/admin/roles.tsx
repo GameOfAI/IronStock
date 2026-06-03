@@ -26,6 +26,7 @@ import { ApiError } from '@/api/errors';
 import { RelativeTime } from '@/components/common/relative-time';
 import type { AdminUser } from '@/api/types';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { userFriendlyError } from '@/lib/user-error';
 
 // ---------- Sabit rol tanımları (DB seed: migrations/00003_roles.sql) ----------
 
@@ -87,7 +88,7 @@ function RoleUserCard({ role, users, isLoading, onRefetch }: RoleUserCardProps) 
       toast({ title: `'${role.label}' rolü kaldırıldı` });
       onRefetch();
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : 'Hata oluştu.';
+      const msg = userFriendlyError(err);
       toast({ title: 'Rol kaldırılamadı', description: msg, variant: 'destructive' });
     } finally {
       setPendingId(null);
@@ -185,7 +186,7 @@ export default function AdminRolesPage() {
     if (error instanceof ApiError) {
       toast({
         title: 'Kullanıcı listesi alınamadı',
-        description: error.message,
+        description: userFriendlyError(error),
         variant: 'destructive',
       });
     }

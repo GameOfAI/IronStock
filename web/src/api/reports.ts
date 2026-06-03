@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import { apiFetch } from './client';
+import { getAccessToken } from './token-storage';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -25,7 +26,7 @@ export function useGenerateReportMutation() {
   return useMutation({
     mutationFn: async (req: GenerateReportRequest): Promise<void> => {
       // We need raw fetch here because the response is HTML (not JSON).
-      const token = localStorage.getItem('access_token') ?? '';
+      const token = getAccessToken() ?? '';
       const apiBase = (window as unknown as { __ENVANTER_API_BASE__?: string }).__ENVANTER_API_BASE__ ?? '';
       const resp = await fetch(`${apiBase}/api/v1/admin/reports/generate`, {
         method: 'POST',
@@ -81,7 +82,7 @@ export function useSetK8sBindingMutation() {
     }) =>
       apiFetch<K8sBinding>(`/api/v1/items/${itemId}/k8s/bind`, {
         method: 'POST',
-        body: JSON.stringify({ cluster_id: clusterId, namespace_name: namespaceName }),
+        body: { cluster_id: clusterId, namespace_name: namespaceName },
       }),
   });
 }

@@ -45,6 +45,8 @@ import { ApiError, ErrCode } from '@/api/errors';
 import { usePublicSSOProvidersQuery } from '@/api/admin-sso';
 import type { SSOProviderInfo } from '@/api/types';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { APP_VERSION } from '@/version';
+import { userFriendlyError } from '@/lib/user-error';
 
 // --- Password input with show/hide toggle ---
 
@@ -152,7 +154,7 @@ function LDAPDialog({ provider, open, onClose }: LDAPDialogProps) {
     } catch (err) {
       toast({
         title: 'LDAP girişi başarısız',
-        description: err instanceof Error ? err.message : 'Bilinmeyen hata.',
+        description: userFriendlyError(err),
         variant: 'destructive',
       });
       setBusy(false);
@@ -243,6 +245,10 @@ export default function LoginPage() {
   const [waUsername, setWaUsername] = React.useState('');
   const [waDialogOpen, setWaDialogOpen] = React.useState(false);
   const [waBusy, setWaBusy] = React.useState(false);
+  // Server reports 501/not_configured when WebAuthn isn't enabled. Once we
+  // learn that, hide the security-key UI for the rest of the session instead
+  // of showing a scary error toast (browser support != server support).
+  const [waUnavailable, setWaUnavailable] = React.useState(false);
 
   const [username, setUsername] = React.useState('');
   const [password, setPassword] = React.useState('');
@@ -269,18 +275,21 @@ export default function LoginPage() {
       remember_device: opts.remember || undefined,
     });
 
-    setSubstep('fetching_keypair');
-    const keypair = await fetchMyKeypair(loginRes.access_token);
-
     const sessionUser: SessionUser = {
       id: loginRes.user_id,
       username,
       roles: loginRes.roles,
     };
 
-    const kekParams = keypair.kek_params as unknown as KEKParams & { alg?: string };
+    setSubstep('fetching_keypair');
+    let keypair: Awaited<ReturnType<typeof fetchMyKeypair>> | null = null;
+    try {
+      keypair = await fetchMyKeypair(loginRes.access_token);
+    } catch {
+      // Bootstrap admin or first-run: no keypair yet → bootstrap session.
+    }
 
-    if (kekParams?.alg === 'none') {
+    if (!keypair || (keypair.kek_params as Record<string, unknown>)?.alg === 'none') {
       setBootstrapSession({
         user: sessionUser,
         accessToken: loginRes.access_token,
@@ -289,6 +298,7 @@ export default function LoginPage() {
         mustSetupTOTP: loginRes.must_setup_totp,
       });
     } else {
+      const kekParams = keypair.kek_params as unknown as KEKParams & { alg?: string };
       setSubstep('deriving_key');
       const kekSalt = fromBase64(keypair.kek_salt);
       const kek = await deriveKEK(password, kekSalt, kekParams);
@@ -334,7 +344,20 @@ export default function LoginPage() {
       });
       navigate(fromPath ?? '/inventory', { replace: true });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Bilinmeyen hata.';
+      // Server doesn't have WebAuthn configured — hide the option for this
+      // session and inform the user gently instead of a destructive error.
+      if (err instanceof ApiError && (err.status === 501 || err.code === 'not_configured')) {
+        setWaUnavailable(true);
+        setWaDialogOpen(false);
+        setWaUsername('');
+        toast({
+          title: 'Güvenlik anahtarı bu sunucuda etkin değil',
+          description: 'Lütfen kullanıcı adı ve parola ile giriş yapın.',
+        });
+        setWaBusy(false);
+        return;
+      }
+      const msg = userFriendlyError(err);
       if (!msg.includes('NotAllowed') && !msg.includes('abort') && !msg.includes('cancelled')) {
         toast({
           title: 'Güvenlik anahtarı ile giriş başarısız',
@@ -369,15 +392,9 @@ export default function LoginPage() {
         setTotpDialogOpen(true);
         return;
       }
-      const msg =
-        err instanceof ApiError
-          ? err.message
-          : err instanceof Error
-            ? err.message
-            : 'Giriş başarısız.';
       toast({
         title: 'Giriş başarısız',
-        description: msg,
+        description: userFriendlyError(err),
         variant: 'destructive',
       });
     }
@@ -401,15 +418,9 @@ export default function LoginPage() {
       // Success → dialog closes automatically via navigation
     } catch (err) {
       setSubstep('idle');
-      const msg =
-        err instanceof ApiError
-          ? err.message
-          : err instanceof Error
-            ? err.message
-            : 'Doğrulama başarısız.';
       toast({
         title: 'Doğrulama başarısız',
-        description: msg,
+        description: userFriendlyError(err),
         variant: 'destructive',
       });
     }
@@ -447,7 +458,7 @@ export default function LoginPage() {
           <div className="text-center">
             <h1 className="text-xl font-bold tracking-tight text-slate-100">IronStock</h1>
             <p className="mt-0.5 font-mono text-[11px] text-slate-500">
-              DevOps Credential Vault · v0.3
+              DevOps Credential Vault · v{APP_VERSION}
             </p>
           </div>
         </div>
@@ -580,7 +591,7 @@ export default function LoginPage() {
           )}
 
           {/* WebAuthn / Security Key section (PR-SEC4) */}
-          {isWebAuthnSupported() && (
+          {isWebAuthnSupported() && !waUnavailable && (
             <div className="mt-5">
               <div className="flex items-center gap-3">
                 <span className="h-px flex-1 bg-slate-800" />

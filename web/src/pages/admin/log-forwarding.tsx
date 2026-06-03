@@ -60,6 +60,7 @@ import type {
   ElasticConfig,
 } from '@envanter/shared/api/types';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { userFriendlyError } from '@/lib/user-error';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -210,7 +211,7 @@ export default function AdminLogForwardingPage() {
     testMutation.mutate(id, {
       onSuccess: () => toast({ title: 'Test başarılı', description: 'Hedef bağlantı sağlandı.' }),
       onError: (e) =>
-        toast({ title: 'Test başarısız', description: String(e), variant: 'destructive' }),
+        toast({ title: 'Test başarısız', description: userFriendlyError(e), variant: 'destructive' }),
     });
   }
 
@@ -221,7 +222,7 @@ export default function AdminLogForwardingPage() {
         setDeleteTarget(null);
         toast({ title: 'Silindi' });
       },
-      onError: (e) => toast({ title: 'Hata', description: String(e), variant: 'destructive' }),
+      onError: (e) => toast({ title: 'Hata', description: userFriendlyError(e), variant: 'destructive' }),
     });
   }
 
@@ -332,7 +333,7 @@ function ConfigCard({ cfg, onEdit, onDelete, onTest, testing }: ConfigCardProps)
     updateMutation.mutate(
       { enabled: !cfg.enabled },
       {
-        onError: (e) => toast({ title: 'Hata', description: String(e), variant: 'destructive' }),
+        onError: (e) => toast({ title: 'Hata', description: userFriendlyError(e), variant: 'destructive' }),
       }
     );
   }
@@ -448,7 +449,7 @@ function ConfigDialog({
             toast({ title: 'Güncellendi' });
             onSuccess();
           },
-          onError: (e) => toast({ title: 'Hata', description: String(e), variant: 'destructive' }),
+          onError: (e) => toast({ title: 'Hata', description: userFriendlyError(e), variant: 'destructive' }),
         }
       );
     } else {
@@ -459,7 +460,7 @@ function ConfigDialog({
             toast({ title: 'Oluşturuldu' });
             onSuccess();
           },
-          onError: (e) => toast({ title: 'Hata', description: String(e), variant: 'destructive' }),
+          onError: (e) => toast({ title: 'Hata', description: userFriendlyError(e), variant: 'destructive' }),
         }
       );
     }

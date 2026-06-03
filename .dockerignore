@@ -6,3 +6,12 @@ docs/
 .gitignore
 .pre-commit-config.yaml
 Makefile
+node_modules/
+browser-extension/node_modules/
+client/
+cli/
+terraform/
+e2e/
+deploy/
+scripts/
+.claude/

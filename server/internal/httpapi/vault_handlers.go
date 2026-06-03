@@ -17,6 +17,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -24,6 +25,19 @@ import (
 	"envanter.app/server/internal/auth"
 	"envanter.app/server/internal/vault"
 )
+
+// isCleanVaultPath rejects path traversal sequences and suspicious characters.
+func isCleanVaultPath(p string) bool {
+	if strings.Contains(p, "..") || strings.Contains(p, "//") || strings.HasPrefix(p, "/") {
+		return false
+	}
+	for _, r := range p {
+		if r < 0x20 || r == '\\' {
+			return false
+		}
+	}
+	return true
+}
 
 // VaultHandlers groups the vault proxy HTTP handlers.
 type VaultHandlers struct {
@@ -125,6 +139,11 @@ func (h *VaultHandlers) VaultFetch(w http.ResponseWriter, r *http.Request) {
 			"external_source.mount ve path zorunlu.", errors.New("missing mount/path"))
 		return
 	}
+	if !isCleanVaultPath(src.Mount) || !isCleanVaultPath(src.Path) {
+		writeError(w, h.Logger, http.StatusBadRequest, ErrCodeBadRequest,
+			"mount veya path geçersiz karakter içeriyor.", errors.New("path traversal attempt"))
+		return
+	}
 
 	// 3. Fetch from Vault.
 	kvData, fetchErr := h.Vault.ReadKV(ctx, src)
@@ -205,6 +224,11 @@ func (h *VaultHandlers) VaultListPaths(w http.ResponseWriter, r *http.Request) {
 		mount = "secret"
 	}
 	prefix := r.URL.Query().Get("path")
+	if !isCleanVaultPath(mount) || (prefix != "" && !isCleanVaultPath(prefix)) {
+		writeError(w, h.Logger, http.StatusBadRequest, ErrCodeBadRequest,
+			"mount veya path geçersiz karakter içeriyor.", errors.New("path traversal attempt"))
+		return
+	}
 
 	paths, err := h.Vault.ListPaths(r.Context(), mount, prefix)
 	if err != nil {

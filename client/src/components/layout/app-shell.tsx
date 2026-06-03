@@ -15,6 +15,7 @@
 import * as React from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
+  BookOpen,
   FileText,
   Fingerprint,
   Folder,
@@ -205,6 +206,12 @@ export function AppShell() {
               to="/inventory"
               icon={Folder}
               label="Envanter"
+              collapsed={sidebarCollapsed && !mobileOpen}
+            />
+            <NavItem
+              to="/catalog"
+              icon={BookOpen}
+              label="Catalog"
               collapsed={sidebarCollapsed && !mobileOpen}
             />
 

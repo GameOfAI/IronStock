@@ -75,6 +75,12 @@ type itemRequest struct {
 	RotationIntervalDays *int    `json:"rotation_interval_days,omitempty"`
 }
 
+// ownerRef is the Backstage-style entity owner reference {kind, name} (PR-DP02).
+type ownerRef struct {
+	Kind string `json:"kind"`
+	Name string `json:"name"`
+}
+
 // itemResponse is the API representation. name is decrypted for the caller;
 // fields are returned as-is (still client-encrypted).
 // owner_dek_wrapped / owner_wrap_nonce are the caller's row from item_shares
@@ -103,6 +109,10 @@ type itemResponse struct {
 	// receive fields. Fields are omitted and my_access_request is populated.
 	RequiresApproval *bool              `json:"requires_approval,omitempty"`
 	MyAccessRequest  *AccessRequestInfo `json:"my_access_request,omitempty"`
+
+	// PR-DP02: Backstage entity envelope fields.
+	Kind     *string   `json:"kind,omitempty"`      // item_types.kind_key
+	OwnerRef *ownerRef `json:"owner_ref,omitempty"` // creator {kind:"User", name:username}
 }
 
 type itemFieldOutput struct {
@@ -455,7 +465,7 @@ func (h *ItemHandlers) List(w http.ResponseWriter, r *http.Request) {
 			h.Logger.Warn("item name decrypt failed", slog.String("item_id", ir.ID))
 			continue
 		}
-		out = append(out, itemResponse{
+		resp := itemResponse{
 			ID:                   ir.ID,
 			FolderID:             ir.FolderID,
 			ItemTypeID:           ir.ItemTypeID,
@@ -467,7 +477,15 @@ func (h *ItemHandlers) List(w http.ResponseWriter, r *http.Request) {
 			ExpiresAt:            ir.ExpiresAt,
 			RotationIntervalDays: ir.RotationIntervalDays,
 			LastRotatedAt:        ir.LastRotatedAt,
-		})
+		}
+		if ir.KindKey != "" {
+			k := ir.KindKey
+			resp.Kind = &k
+		}
+		if ir.OwnerUsername != "" {
+			resp.OwnerRef = &ownerRef{Kind: "User", Name: ir.OwnerUsername}
+		}
+		out = append(out, resp)
 	}
 
 	// Async audit — item.listed records folder browse events.
@@ -487,7 +505,7 @@ func (h *ItemHandlers) List(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, itemListResponse{Items: out})
 }
 
-// Search implements GET /api/v1/items/search?q=term[&type_id=N][&limit=N][&fuzzy=true].
+// Search implements GET /api/v1/items/search?q=term[&type_id=N][&limit=N][&fuzzy=true][&kind=Server,Database].
 //
 // Cross-folder substring search across all folders the user can read.
 // Results include folder_id so the client can navigate to the item.
@@ -497,6 +515,9 @@ func (h *ItemHandlers) List(w http.ResponseWriter, r *http.Request) {
 // ILIKE substring matching. Results are ordered by similarity score descending
 // (typo-tolerant search). Requires migration 00052 (GIN indexes + pg_trgm).
 // Field values are E2E encrypted and CANNOT be searched by design (ADR-0004).
+//
+// PR-DP05: kind= accepts comma-separated kind_key values (e.g. "Server,Database").
+// Filters via item_types.kind_key (already LEFT-JOINed from PR-DP02).
 func (h *ItemHandlers) Search(w http.ResponseWriter, r *http.Request) {
 	claims := ClaimsFromContext(r.Context())
 	if claims == nil {
@@ -515,11 +536,21 @@ func (h *ItemHandlers) Search(w http.ResponseWriter, r *http.Request) {
 	typeIDStr := r.URL.Query().Get("type_id")
 	fuzzy := r.URL.Query().Get("fuzzy") == "true"
 
+	// PR-DP05: parse comma-separated kind filter.
+	var kindKeys []string
+	if kindStr := strings.TrimSpace(r.URL.Query().Get("kind")); kindStr != "" {
+		for _, k := range strings.Split(kindStr, ",") {
+			if k = strings.TrimSpace(k); k != "" {
+				kindKeys = append(kindKeys, k)
+			}
+		}
+	}
+
 	ctx := r.Context()
 
 	// Build WHERE and ORDER based on fuzzy mode.
 	// Fuzzy: trigram similarity (requires pg_trgm + GIN indexes from migration 00052).
-	// Exact: ILIKE substring match (legacy behaviour).
+	// Exact: ILIKE substring match (legacy behavior).
 	var (
 		whereExpr string
 		orderExpr string
@@ -542,24 +573,33 @@ func (h *ItemHandlers) Search(w http.ResponseWriter, r *http.Request) {
 	var err error
 
 	// Admin can search all items; others are restricted to accessible folders.
+	// PR-DP02: search SELECT includes kind_key (via LEFT JOIN item_types).
+	const searchSelect = `
+		SELECT i.id::text, i.folder_id::text, i.item_type_id,
+		       i.name_enc, i.server_dek_wrapped,
+		       i.created_by::text, i.created_at::text, i.updated_at::text,
+		       i.expires_at::text, i.rotation_interval_days, i.last_rotated_at::text,
+		       COALESCE(it.kind_key, '') AS kind_key
+		FROM items i
+		LEFT JOIN item_types it ON it.id = i.item_type_id
+	`
+
 	if hasRole(claims, RoleAdmin) {
 		var qb strings.Builder
 		args := []any{term, limit}
 		where := strings.ReplaceAll(whereExpr, "$QTERM", "$1")
 		order := strings.ReplaceAll(orderExpr, "$QTERM", "$1")
-		qb.WriteString(`
-			SELECT i.id::text, i.folder_id::text, i.item_type_id,
-			       i.name_enc, i.server_dek_wrapped,
-			       i.created_by::text, i.created_at::text, i.updated_at::text,
-			       i.expires_at::text, i.rotation_interval_days, i.last_rotated_at::text
-			FROM items i
-			WHERE ` + where + `
-		`)
+		qb.WriteString(searchSelect + ` WHERE ` + where)
 		if typeIDStr != "" {
 			args = append(args, typeIDStr)
 			qb.WriteString(` AND i.item_type_id = $` + fmt.Sprint(len(args)))
 		}
+		if len(kindKeys) > 0 {
+			args = append(args, kindKeys)
+			qb.WriteString(` AND it.kind_key = ANY($` + fmt.Sprint(len(args)) + `::text[])`)
+		}
 		qb.WriteString(` ORDER BY ` + order + ` LIMIT $2`)
+		//nolint:sqlclosecheck // rows closed via defer (*rows).Close() below
 		r2, e := h.Service.DB.Query(ctx, qb.String(), args...)
 		if e != nil {
 			writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal, "Arama hatası.", e)
@@ -587,19 +627,18 @@ func (h *ItemHandlers) Search(w http.ResponseWriter, r *http.Request) {
 			      AND (fgp.valid_from IS NULL OR fgp.valid_from <= NOW())
 			      AND (fgp.valid_until IS NULL OR fgp.valid_until > NOW())
 			)
-			SELECT i.id::text, i.folder_id::text, i.item_type_id,
-			       i.name_enc, i.server_dek_wrapped,
-			       i.created_by::text, i.created_at::text, i.updated_at::text,
-			       i.expires_at::text, i.rotation_interval_days, i.last_rotated_at::text
-			FROM items i
-			JOIN accessible a ON a.folder_id = i.folder_id
-			WHERE ` + where + `
 		`)
+		qb.WriteString(searchSelect + `JOIN accessible a ON a.folder_id = i.folder_id WHERE ` + where)
 		if typeIDStr != "" {
 			args = append(args, typeIDStr)
 			qb.WriteString(` AND i.item_type_id = $` + fmt.Sprint(len(args)))
 		}
+		if len(kindKeys) > 0 {
+			args = append(args, kindKeys)
+			qb.WriteString(` AND it.kind_key = ANY($` + fmt.Sprint(len(args)) + `::text[])`)
+		}
 		qb.WriteString(` ORDER BY ` + order + ` LIMIT $3`)
+		//nolint:sqlclosecheck // rows closed via defer (*rows).Close() below
 		r2, e := h.Service.DB.Query(ctx, qb.String(), args...)
 		rows = &r2
 		err = e
@@ -620,6 +659,7 @@ func (h *ItemHandlers) Search(w http.ResponseWriter, r *http.Request) {
 			&ir.NameEnc, &ir.ServerDEKWrapped,
 			&ir.CreatedBy, &ir.CreatedAt, &ir.UpdatedAt,
 			&expiresAt, &rotInterval, &lastRotatedAt,
+			&ir.KindKey,
 		); err != nil {
 			continue
 		}
@@ -631,7 +671,7 @@ func (h *ItemHandlers) Search(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			continue
 		}
-		out = append(out, itemResponse{
+		resp := itemResponse{
 			ID:                   ir.ID,
 			FolderID:             ir.FolderID,
 			ItemTypeID:           ir.ItemTypeID,
@@ -642,7 +682,12 @@ func (h *ItemHandlers) Search(w http.ResponseWriter, r *http.Request) {
 			ExpiresAt:            ir.ExpiresAt,
 			RotationIntervalDays: ir.RotationIntervalDays,
 			LastRotatedAt:        ir.LastRotatedAt,
-		})
+		}
+		if ir.KindKey != "" {
+			k := ir.KindKey
+			resp.Kind = &k
+		}
+		out = append(out, resp)
 	}
 
 	h.Audit.WriteAsync(audit.Entry{
@@ -973,17 +1018,24 @@ type itemRow struct {
 
 	// Onay/Checkout Workflow (PR-N3).
 	RequiresApproval bool
+
+	// PR-DP02: Backstage entity envelope.
+	KindKey       string
+	OwnerUsername string
 }
 
 func fetchItemForUpdate(ctx context.Context, db auth.DBExec, id string) (itemRow, error) {
 	const sqlText = `
-		SELECT id::text, folder_id::text, item_type_id,
-		       name_enc, server_dek_wrapped,
-		       description,
-		       created_by::text, created_at::text, updated_at::text,
-		       expires_at::text, rotation_interval_days, last_rotated_at::text,
-		       requires_approval
-		FROM items WHERE id = $1::uuid LIMIT 1
+		SELECT i.id::text, i.folder_id::text, i.item_type_id,
+		       i.name_enc, i.server_dek_wrapped,
+		       i.description,
+		       i.created_by::text, i.created_at::text, i.updated_at::text,
+		       i.expires_at::text, i.rotation_interval_days, i.last_rotated_at::text,
+		       i.requires_approval,
+		       COALESCE(it.kind_key, '') AS kind_key
+		FROM items i
+		LEFT JOIN item_types it ON it.id = i.item_type_id
+		WHERE i.id = $1::uuid LIMIT 1
 	`
 	var row itemRow
 	err := db.QueryRow(ctx, sqlText, id).Scan(
@@ -993,6 +1045,7 @@ func fetchItemForUpdate(ctx context.Context, db auth.DBExec, id string) (itemRow
 		&row.CreatedBy, &row.CreatedAt, &row.UpdatedAt,
 		&row.ExpiresAt, &row.RotationIntervalDays, &row.LastRotatedAt,
 		&row.RequiresApproval,
+		&row.KindKey,
 	)
 	return row, err
 }
@@ -1017,8 +1070,16 @@ func fetchItemFull(ctx context.Context, db auth.DBExec, svc *auth.Service, id, u
 	if err != nil {
 		return itemResponse{}, err
 	}
+
+	// PR-DP02: resolve creator username for owner_ref.
+	var ownerUsername string
+	_ = db.QueryRow(ctx,
+		`SELECT username FROM users WHERE id = $1::uuid LIMIT 1`,
+		row.CreatedBy,
+	).Scan(&ownerUsername)
+
 	ra := row.RequiresApproval
-	return itemResponse{
+	resp := itemResponse{
 		ID:                   row.ID,
 		FolderID:             row.FolderID,
 		ItemTypeID:           row.ItemTypeID,
@@ -1034,7 +1095,15 @@ func fetchItemFull(ctx context.Context, db auth.DBExec, svc *auth.Service, id, u
 		RotationIntervalDays: row.RotationIntervalDays,
 		LastRotatedAt:        row.LastRotatedAt,
 		RequiresApproval:     &ra,
-	}, nil
+	}
+	if row.KindKey != "" {
+		k := row.KindKey
+		resp.Kind = &k
+	}
+	if ownerUsername != "" {
+		resp.OwnerRef = &ownerRef{Kind: "User", Name: ownerUsername}
+	}
+	return resp, nil
 }
 
 // fetchCallerDEK returns the caller's e2e_dek_wrapped + wrap_nonce from
@@ -1091,36 +1160,45 @@ func fetchItemList(ctx context.Context, db auth.DBExec, folderID string, q strin
 	var sqlText string
 	var args []any
 
+	// PR-DP02: colList now prefixes all columns with "i." and includes kind_key
+	// and owner username from LEFT JOINs with item_types and users.
 	const colList = `
-		    COALESCE(array_agg(id::text               ORDER BY COALESCE(name_plain, '')), '{}'),
-		    COALESCE(array_agg(folder_id::text         ORDER BY COALESCE(name_plain, '')), '{}'),
-		    COALESCE(array_agg(item_type_id            ORDER BY COALESCE(name_plain, '')), '{}'),
-		    COALESCE(array_agg(name_enc                ORDER BY COALESCE(name_plain, '')), '{}'),
-		    COALESCE(array_agg(server_dek_wrapped      ORDER BY COALESCE(name_plain, '')), '{}'),
-		    COALESCE(array_agg(created_by::text        ORDER BY COALESCE(name_plain, '')), '{}'),
-		    COALESCE(array_agg(created_at::text        ORDER BY COALESCE(name_plain, '')), '{}'),
-		    COALESCE(array_agg(updated_at::text        ORDER BY COALESCE(name_plain, '')), '{}'),
-		    COALESCE(array_agg(expires_at::text        ORDER BY COALESCE(name_plain, '')), '{}'),
-		    COALESCE(array_agg(rotation_interval_days  ORDER BY COALESCE(name_plain, '')), '{}'),
-		    COALESCE(array_agg(last_rotated_at::text   ORDER BY COALESCE(name_plain, '')),'{}')
+		    COALESCE(array_agg(i.id::text                         ORDER BY COALESCE(i.name_plain, '')), '{}'),
+		    COALESCE(array_agg(i.folder_id::text                  ORDER BY COALESCE(i.name_plain, '')), '{}'),
+		    COALESCE(array_agg(i.item_type_id                     ORDER BY COALESCE(i.name_plain, '')), '{}'),
+		    COALESCE(array_agg(i.name_enc                         ORDER BY COALESCE(i.name_plain, '')), '{}'),
+		    COALESCE(array_agg(i.server_dek_wrapped               ORDER BY COALESCE(i.name_plain, '')), '{}'),
+		    COALESCE(array_agg(i.created_by::text                 ORDER BY COALESCE(i.name_plain, '')), '{}'),
+		    COALESCE(array_agg(i.created_at::text                 ORDER BY COALESCE(i.name_plain, '')), '{}'),
+		    COALESCE(array_agg(i.updated_at::text                 ORDER BY COALESCE(i.name_plain, '')), '{}'),
+		    COALESCE(array_agg(i.expires_at::text                 ORDER BY COALESCE(i.name_plain, '')), '{}'),
+		    COALESCE(array_agg(i.rotation_interval_days           ORDER BY COALESCE(i.name_plain, '')), '{}'),
+		    COALESCE(array_agg(i.last_rotated_at::text            ORDER BY COALESCE(i.name_plain, '')), '{}'),
+		    COALESCE(array_agg(COALESCE(it.kind_key,  '')         ORDER BY COALESCE(i.name_plain, '')), '{}'),
+		    COALESCE(array_agg(COALESCE(u.username,   '')         ORDER BY COALESCE(i.name_plain, '')), '{}')
+	`
+
+	const fromJoins = `
+		FROM items i
+		LEFT JOIN item_types it ON it.id = i.item_type_id
+		LEFT JOIN users u       ON u.id  = i.created_by
 	`
 
 	if q != "" {
 		term := "%" + strings.ToLower(q) + "%"
-		sqlText = `SELECT` + colList + `
-			FROM items
-			WHERE folder_id = $1::uuid
+		sqlText = `SELECT` + colList + fromJoins + `
+			WHERE i.folder_id = $1::uuid
 			  AND (
-			        (name_plain IS NOT NULL AND name_plain LIKE $2)
-			     OR (name_plain IS NULL     AND name_search = $3)
-			     OR (description IS NOT NULL AND lower(description) LIKE $2)
+			        (i.name_plain IS NOT NULL AND i.name_plain LIKE $2)
+			     OR (i.name_plain IS NULL     AND i.name_search = $3)
+			     OR (i.description IS NOT NULL AND lower(i.description) LIKE $2)
 			  )
 		`
 		// $3 = legacy HMAC fallback for un-backfilled rows (will be phased out)
 		// We pass zero bytes so it never matches unless name_plain is NULL.
 		args = []any{folderID, term, []byte(nil)}
 	} else {
-		sqlText = `SELECT` + colList + `FROM items WHERE folder_id = $1::uuid`
+		sqlText = `SELECT` + colList + fromJoins + `WHERE i.folder_id = $1::uuid`
 		args = []any{folderID}
 	}
 
@@ -1129,10 +1207,12 @@ func fetchItemList(ctx context.Context, db auth.DBExec, folderID string, q strin
 	var typeIDs []int16
 	var rotIntervals []*int
 	var nameEncs, dekWraps [][]byte
+	var kindKeys, ownerUsernames []string
 	if err := db.QueryRow(ctx, sqlText, args...).Scan(
 		&ids, &folderIDs, &typeIDs, &nameEncs, &dekWraps,
 		&createdBys, &createdAts, &updatedAts,
 		&expiresAts, &rotIntervals, &lastRotatedAts,
+		&kindKeys, &ownerUsernames,
 	); err != nil {
 		return nil, err
 	}
@@ -1156,6 +1236,12 @@ func fetchItemList(ctx context.Context, db auth.DBExec, folderID string, q strin
 		}
 		if i < len(lastRotatedAts) {
 			row.LastRotatedAt = lastRotatedAts[i]
+		}
+		if i < len(kindKeys) {
+			row.KindKey = kindKeys[i]
+		}
+		if i < len(ownerUsernames) {
+			row.OwnerUsername = ownerUsernames[i]
 		}
 		out = append(out, row)
 	}
@@ -1183,7 +1269,7 @@ func decryptItemName(svc *auth.Service, itemID string, dekWrapped, nameEnc []byt
 
 // RunItemNameBackfill fills name_plain for existing items where it is NULL.
 // Should be called once at startup as a goroutine. Exits when all rows are
-// backfilled or context is cancelled.
+// backfilled or context is canceled.
 func RunItemNameBackfill(ctx context.Context, svc *auth.Service, logger *slog.Logger) {
 	const batchSize = 200
 	total := 0
@@ -1320,7 +1406,7 @@ func looksLikeUUID(s string) bool {
 				return false
 			}
 		default:
-			if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+			if (c < '0' || c > '9') && (c < 'a' || c > 'f') && (c < 'A' || c > 'F') {
 				return false
 			}
 		}

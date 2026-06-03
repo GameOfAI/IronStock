@@ -156,7 +156,7 @@ type shareItemRequest struct {
 	UserID     string     `json:"user_id"`
 	Permission string     `json:"permission"` // 'read' | 'write'
 	DEKWrapped []byte     `json:"dek_wrapped"`
-	WrapNonce  []byte     `json:"wrap_nonce"` // 12B
+	WrapNonce  []byte     `json:"wrap_nonce"`  // 12B
 	ValidFrom  *time.Time `json:"valid_from"`  // optional, RFC 3339
 	ValidUntil *time.Time `json:"valid_until"` // optional, RFC 3339
 }

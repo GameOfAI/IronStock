@@ -24,7 +24,7 @@ func TestAISuggestionHandlersNotNilWhenConfigured(t *testing.T) {
 		ItemH: nil, // LLM = nil → 501 Not Implemented
 		LLM:   nil,
 	}
-	if h == nil {
-		t.Error("handler struct should not be nil")
+	if h.LLM != nil {
+		t.Error("expected LLM client to be nil for the 501 scenario")
 	}
 }

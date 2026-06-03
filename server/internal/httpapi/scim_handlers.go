@@ -102,7 +102,7 @@ type scimPatchOp struct {
 }
 
 type scimOperation struct {
-	Op    string          `json:"op"`           // Add, Remove, Replace
+	Op    string          `json:"op"` // Add, Remove, Replace
 	Path  string          `json:"path,omitempty"`
 	Value json.RawMessage `json:"value,omitempty"`
 }
@@ -171,7 +171,7 @@ func (h *SCIMHandlers) scimJSON(w http.ResponseWriter, status int, v interface{}
 	}
 }
 
-func (h *SCIMHandlers) scimError(w http.ResponseWriter, status int, scimType, detail string) {
+func (*SCIMHandlers) scimError(w http.ResponseWriter, status int, scimType, detail string) {
 	w.Header().Set("Content-Type", scimContentType)
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(scimErrorResp{
@@ -187,7 +187,7 @@ func (h *SCIMHandlers) scimError(w http.ResponseWriter, status int, scimType, de
 // GetServiceProviderConfig implements GET /scim/v2/ServiceProviderConfig.
 func (h *SCIMHandlers) GetServiceProviderConfig(w http.ResponseWriter, _ *http.Request) {
 	cfg := map[string]interface{}{
-		"schemas":         []string{scimSchemaSpConfig},
+		"schemas":          []string{scimSchemaSpConfig},
 		"documentationUri": "https://docs.ironstock.internal/integrations/scim",
 		"patch":            map[string]bool{"supported": true},
 		"bulk":             map[string]interface{}{"supported": false, "maxOperations": 0, "maxPayloadSize": 0},

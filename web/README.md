@@ -1,192 +1,216 @@
-# Web (Admin UI)
+# IronStock Web Admin
 
-React 18 + TypeScript + Vite tabanlı admin paneli.
-Kullanıcı yönetimi, audit log izleme ve tam envanter görüntüleme/düzenleme içerir.
+<p>
+  <img src="https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black" alt="React" />
+  <img src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Vite-5-646CFF?logo=vite&logoColor=white" alt="Vite" />
+  <img src="https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white" alt="Tailwind" />
+  <img src="https://img.shields.io/badge/tests-179_passed-brightgreen" alt="Tests" />
+</p>
+
+Full-featured admin panel for IronStock. Manage users, credentials, folders, audit logs, integrations, and security settings from the browser.
 
 ---
 
-## Sayfa Yapısı
+## Features
+
+- **Complete vault management** &mdash; folders, items, sharing, tags, relationships
+- **Client-side E2E encryption** &mdash; Argon2id + X25519 + AES-256-GCM in the browser
+- **Real-time sync** &mdash; WebSocket-powered live updates
+- **Admin dashboard** &mdash; users, audit log, SSO, SCIM, K8s clusters, reports
+- **Import wizard** &mdash; CSV and KeePass (.kdbx) file import
+- **Relationship graph** &mdash; visual item dependency map (React Flow)
+- **Health scores** &mdash; credential rotation tracking and expiry alerts
+- **AI suggestions** &mdash; LLM-powered field recommendations
+- **Auto-versioning** &mdash; version injected from package.json at build time
+
+---
+
+## Page Structure
 
 ```mermaid
 graph TD
-    App["App.tsx\nReact Router"]
+    App["App.tsx\nReact Router v6"]
 
-    App --> AG["AuthGate\ntoken + TOTP kontrolü"]
-    AG --> Login["pages/login.tsx\nGiriş formu"]
-    AG --> TOTP["pages/totp-setup.tsx\nMFA kayıt sihirbazı"]
-    AG --> Recover["pages/recover.tsx\nParola kurtarma"]
+    App --> AuthGate["AuthGate\ntoken + TOTP check"]
+    AuthGate --> Login["login.tsx"]
+    AuthGate --> ForgotPW["forgot-password.tsx"]
+    AuthGate --> Register["register.tsx"]
+    AuthGate --> TOTPSetup["totp-setup.tsx"]
 
-    AG --> Shell["layout/app-shell.tsx\nsidebar + topbar"]
+    AuthGate --> Shell["AppShell\nsidebar + topbar"]
 
-    Shell --> Inv["pages/inventory/index.tsx\nEnvanter görünümü"]
-    Shell --> AdminIdx["pages/admin/index.tsx\nYönetici paneli"]
-    Shell --> Users["pages/admin/users.tsx\nKullanıcı yönetimi"]
-    Shell --> AuditLog["pages/admin/audit-log.tsx\nAudit log viewer"]
+    Shell --> Inventory["inventory/\nfolder tree + items"]
+    Shell --> Graph["graph.tsx\nrelationship map"]
+    Shell --> Import["import.tsx\nCSV + KeePass"]
+    Shell --> Tags["tags.tsx"]
+    Shell --> Share["share.tsx"]
+    Shell --> AccessReq["access-requests.tsx"]
 
-    Inv --> FolderTree["inventory/folder-tree.tsx"]
-    Inv --> ItemList["inventory/item-list.tsx"]
-    Inv --> ItemDetail["inventory/item-detail.tsx"]
-
-    Users --> UserTable["admin/user-table.tsx"]
-    Users --> UserActions["admin/user-actions-menu.tsx"]
-    AuditLog --> AuditFilters["admin/audit-filters.tsx"]
-    AuditLog --> AuditRow["admin/audit-row.tsx"]
+    Shell --> Admin["Admin Pages"]
+    Admin --> Users["admin/users"]
+    Admin --> Audit["admin/audit"]
+    Admin --> SSO["admin/sso"]
+    Admin --> SCIM["admin/scim"]
+    Admin --> K8s["admin/k8s-clusters"]
+    Admin --> Reports["admin/reports"]
+    Admin --> LogFwd["admin/log-forwarding"]
+    Admin --> SecScan["admin/secret-scanning"]
+    Admin --> Groups["admin/groups"]
+    Admin --> IPRestrict["admin/ip-restrictions"]
+    Admin --> ClientCerts["admin/client-certs"]
 ```
 
 ---
 
-## Kimlik Doğrulama Akışı
+## Component Architecture
 
 ```mermaid
-sequenceDiagram
-    participant U as Kullanıcı
-    participant W as Web UI
-    participant S as Server
-
-    U->>W: Kullanıcı adı + parola gir
-    W->>S: POST /auth/login
-    S-->>W: access_token + refresh_token + totp_required
-
-    alt TOTP gerekli
-        W->>U: TOTP kodu sor
-        U->>W: 6 haneli kod
-        W->>S: POST /auth/totp/verify
-        S-->>W: yeni access_token
+graph TD
+    subgraph ui["UI Layer"]
+        Shell["AppShell\nsidebar + topbar + version"]
+        Pages["Page Components"]
+        Inventory["Inventory\nfolder-tree + item-list + item-detail"]
+        Forms["Form Modals\nitem-form + folder-form + template-gallery"]
     end
 
-    W->>W: Token kaydet (memory + sessionStorage)
-    W->>W: AuthGate geçti → App Shell göster
-
-    Note over W,S: Token yenileme (arka planda)
-    W->>S: POST /auth/refresh
-    S-->>W: yeni access_token
-```
-
----
-
-## API Katmanı
-
-```mermaid
-flowchart LR
-    Component --> Hook["useQuery / useMutation\nTanStack Query"]
-    Hook --> ApiFn["api/*.ts fonksiyonları"]
-    ApiFn --> Client["api/client.ts\nfetch + auto-refresh"]
-    Client --> Server["Go API Server"]
-
-    WS["api/ws.ts\nWebSocket"] --> WSProv["ws-provider.tsx\ncontext + event dispatch"]
-    WSProv --> Hook
-```
-
-`api/client.ts` 401 aldığında `/auth/refresh` ile token yeniler; başarılıysa orijinal isteği tekrarlar.
-
----
-
-## Admin Kullanıcı Yönetimi Akışı
-
-```mermaid
-sequenceDiagram
-    actor A as Admin
-    participant W as Web UI
-    participant API as Go API
-    participant DB as PostgreSQL
-
-    A->>W: Kullanıcılar sayfasını aç
-    W->>API: GET /admin/users?page=1
-    API->>DB: users JOIN roles sayfalı
-    API-->>W: [{id, username, role, status, last_login}]
-    W-->>A: Tablo göster
-
-    A->>W: Kullanıcı devre dışı bırak
-    W->>W: DisableConfirmDialog göster
-    A->>W: Onayla
-    W->>API: POST /admin/users/:id/disable
-    API->>DB: users SET disabled=true
-    API->>DB: sessions DELETE (aktif tokenlar iptal)
-    API->>DB: audit_log INSERT
-    API-->>W: 204 No Content
-    W->>W: TanStack Query cache invalidate
-    W-->>A: Tablo güncellendi
-```
-
----
-
-## Audit Log Görünümü
-
-```mermaid
-flowchart LR
-    subgraph filters["Filtreler (audit-filters.tsx)"]
-        DF["Tarih aralığı\ndate picker"]
-        UF["Kullanıcı\ndropdown"]
-        AF["Eylem tipi\nauth.login · item.create · ..."]
+    subgraph data["Data Layer"]
+        RQ["TanStack React Query\nserver state + cache"]
+        WS["WebSocket Client\nreal-time events"]
+        API["API Modules\n15+ domain clients"]
     end
 
-    filters -->|"query params değişti"| Query["useAuditLog hook\nTanStack Query"]
-    Query -->|"GET /admin/audit"| API["Go API\nsayfalı + filtrelenmiş"]
-    API --> Rows["AuditRow × N\nzaman · kullanıcı · eylem · hedef"]
-    Rows --> Pag["Pagination\ncommon/pagination.tsx"]
+    subgraph state["State Layer"]
+        Auth["store/auth\nuser + tokens + KEK + privateKey"]
+        UI["store/ui\ntheme + sidebar"]
+    end
+
+    subgraph crypto["Crypto Layer"]
+        Argon2["Argon2id WASM\nKEK derivation"]
+        X25519["X25519\nkey exchange"]
+        AES["AES-256-GCM\nfield encryption"]
+        WebAuthn["WebAuthn\nbrowser API"]
+    end
+
+    Pages --> RQ
+    RQ --> API
+    Inventory --> Auth
+    Inventory --> crypto
+    Forms --> crypto
+    API --> Auth
 ```
 
 ---
 
-## Bileşen Katmanları
+## API Layer
 
-### Admin Bileşenleri (`components/admin/`)
-
-| Bileşen | Açıklama |
-|---------|---------|
-| `user-table.tsx` | Sayfalı kullanıcı listesi — durum, rol, son giriş |
-| `user-actions-menu.tsx` | Dropdown: rol değiştir, devre dışı bırak, parola sıfırla |
-| `audit-filters.tsx` | Tarih aralığı + kullanıcı + eylem filtresi |
-| `audit-row.tsx` | Log satırı — zaman, kullanıcı, eylem, hedef kaynak |
-| `role-badges.tsx` | Renk kodlu rol etiketi (admin / editor / viewer) |
-| `status-badge.tsx` | Kullanıcı durumu etiketi (aktif / devre dışı) |
-
-### Envanter Bileşenleri (`components/inventory/`)
-
-| Bileşen | Açıklama |
-|---------|---------|
-| `folder-tree.tsx` | Genişletilebilir ağaç — inline yeni klasör + izin yönetimi |
-| `item-list.tsx` | Seçili klasörün item'ları — arama + sıralama |
-| `item-detail.tsx` | Sağ panel: meta + şifreli alanlar + ekler + paylaşım |
-| `item-form-modal.tsx` | Yeni item / düzenle — tip seçimi + alan girdileri |
-| `item-share-modal.tsx` | Kullanıcı paylaşımı — DEK yeniden wrap |
-| `item-attachment-panel.tsx` | Presigned URL ile upload/download |
-| `permission-badge.tsx` | `read` / `write` etiketi |
-
-### UI Bileşenleri (`components/ui/`)
-
-shadcn/ui tabanlı 17 primitive: `alert-dialog`, `badge`, `button`, `card`, `checkbox`, `collapsible`, `dialog`, `dropdown-menu`, `input`, `label`, `popover`, `select`, `skeleton`, `table`, `toast`, `toaster`, `tooltip`.
+| Module | Purpose |
+|--------|---------|
+| `client.ts` | Base fetch wrapper with 401 auto-refresh |
+| `token-storage.ts` | In-memory token storage (never localStorage) |
+| `ws.ts` | WebSocket client with heartbeat + reconnection |
+| `folders.ts` | Folder CRUD + permissions |
+| `items.ts` | Item CRUD + search + duplicates |
+| `attachments.ts` | Presigned upload/download |
+| `shares.ts` | Item sharing |
+| `item-links.ts` | Item relationships |
+| `templates.ts` | Item templates |
+| `vault.ts` | Vault proxy + dynamic credentials |
+| `health.ts` | Item health scores |
+| `ai-suggestions.ts` | AI-powered suggestions |
+| `admin.ts` | User management + export |
+| `admin-k8s.ts` | K8s cluster management |
+| `reports.ts` | HTML report generation |
+| `api-tokens.ts` | API token management |
 
 ---
 
-## Geliştirme
+## Client-Side Cryptography
+
+| Function | Algorithm | Purpose |
+|----------|-----------|---------|
+| KEK derivation | Argon2id (WASM) | Derive key from master password |
+| Key exchange | X25519 | Wrap/unwrap per-item DEKs |
+| Field encryption | AES-256-GCM | Encrypt/decrypt credential fields |
+| Search hashing | HMAC-SHA256 | Blind index for server-side search |
+| Hardware auth | WebAuthn | FIDO2 security key support |
+
+---
+
+## UI Components
+
+Built on [shadcn/ui](https://ui.shadcn.com/) (Radix UI primitives + Tailwind CSS):
+
+- Alert Dialog, Checkbox, Collapsible, Dialog, Dropdown Menu
+- Label, Popover, Select, Switch, Tabs, Toast, Tooltip
+- Custom: ErrorBoundary, FolderTree, ItemDetail, ItemFormModal, TemplateGallery
+
+---
+
+## Development
 
 ```bash
 cd web
-
-# Bağımlılıklar
 npm install
 
-# Dev sunucu (localhost:5173)
+# Development server (HMR)
 npm run dev
+# → http://localhost:5173
 
-# Testler (Vitest + React Testing Library)
-npm test
-
-# Tip kontrolü
+# Type checking
 npx tsc -b
 
 # Lint
 npm run lint
 
-# Production build
-npm run build
-# Çıktı: dist/ — k8s nginx pod'una serve edilir
+# Format
+npm run format
 ```
 
-### Ortam Ayarları
+### Testing
 
-| Değişken | Açıklama | Varsayılan |
-|---------|---------|---------|
-| `VITE_API_URL` | Go API base URL | `http://localhost:8080` |
-| `VITE_WS_URL` | WebSocket URL | `ws://localhost:8080/ws` |
+```bash
+npm test
+# 179 tests across 43 files
+```
+
+Tests use Vitest + React Testing Library. Radix UI components are mocked for jsdom compatibility.
+
+### Build
+
+```bash
+npm run build
+# Output: dist/
+```
+
+The build injects `APP_VERSION` from `package.json` via Vite's `define` feature.
+
+---
+
+## Project Structure
+
+```
+web/
+├── index.html                    # Entry point + CSP meta tag
+├── vite.config.ts                # Vite config + version injection
+├── vitest.config.ts              # Test config
+├── package.json                  # Version source of truth
+├── src/
+│   ├── main.tsx                  # React root + ErrorBoundary
+│   ├── version.ts                # APP_VERSION constant
+│   ├── api/                      # API client modules (15+)
+│   ├── components/
+│   │   ├── layout/               # AppShell, sidebar, topbar
+│   │   ├── inventory/            # Folder tree, item detail, forms
+│   │   ├── ui/                   # shadcn/ui primitives
+│   │   └── ErrorBoundary.tsx     # Global error boundary
+│   ├── hooks/                    # Custom React hooks
+│   ├── lib/                      # Crypto, WebAuthn, utilities
+│   ├── pages/                    # Route page components
+│   │   ├── admin/                # Admin pages (11)
+│   │   ├── inventory/            # Main credential browser
+│   │   └── pipeline/             # Pipeline views
+│   ├── routes/                   # Auth gate, connection gate
+│   └── store/                    # Zustand state stores
+└── tsconfig.json
+```

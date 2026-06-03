@@ -31,11 +31,11 @@ import (
 	"envanter.app/server/internal/email"
 	"envanter.app/server/internal/geoip"
 	"envanter.app/server/internal/httpapi"
+	"envanter.app/server/internal/llm"
 	"envanter.app/server/internal/logfwd"
 	"envanter.app/server/internal/logging"
 	"envanter.app/server/internal/notify"
 	"envanter.app/server/internal/storage"
-	"envanter.app/server/internal/llm"
 	"envanter.app/server/internal/vault"
 	webauthnpkg "envanter.app/server/internal/webauthn"
 	"envanter.app/server/internal/ws"
@@ -142,6 +142,7 @@ func run() error {
 			redisClient = rc
 			defer func() { _ = redisClient.Close() }()
 			logger.Info("redis: client ready", slog.String("url", cfg.RedisURL))
+			httpapi.SetOIDCStateRedis(rc)
 		}
 	} else {
 		logger.Info("redis not configured — single-pod WebSocket mode")
@@ -186,13 +187,13 @@ func run() error {
 	var emailClient *email.Client
 	if cfg.SMTPHost != "" {
 		emailCfg := email.Config{
-			Host:    cfg.SMTPHost,
-			Port:    cfg.SMTPPort,
+			Host:     cfg.SMTPHost,
+			Port:     cfg.SMTPPort,
 			Username: cfg.SMTPUser,
 			Password: cfg.SMTPPassword,
-			From:    cfg.SMTPFrom,
-			TLSMode: email.TLSMode(cfg.SMTPTLSMode),
-			AppURL:  cfg.AppURL,
+			From:     cfg.SMTPFrom,
+			TLSMode:  email.TLSMode(cfg.SMTPTLSMode),
+			AppURL:   cfg.AppURL,
 		}
 		var emailErr error
 		emailClient, emailErr = email.New(emailCfg, pool, logger)
@@ -252,6 +253,7 @@ func run() error {
 		AppURL:           cfg.AppURL,
 		PasswordResetTTL: cfg.PasswordResetTTL,
 		WebAuthn:         waService,
+		Redis:            redisClient,
 	}
 
 	// --- Credential expiry scanner (PR-N1 + PR-N8) ---
@@ -564,6 +566,24 @@ func run() error {
 		Logger: logger,
 	}
 
+	// --- Annotation handler (PR-DP01) ---
+	annotationHandlers := &httpapi.AnnotationHandlers{
+		Service: authSvc,
+		Logger:  logger,
+	}
+
+	// --- Portal template handler (PR-DP11) ---
+	portalTemplateHandlers := &httpapi.PortalTemplateHandlers{
+		DB:     pool,
+		Logger: logger,
+	}
+
+	// --- Catalog entity handler (PR-DP-E1) ---
+	catalogEntityHandlers := &httpapi.CatalogEntityHandlers{
+		Service: authSvc,
+		Logger:  logger,
+	}
+
 	// --- HTTP layer ---
 	router := httpapi.NewRouter(httpapi.Deps{
 		Logger:         logger,
@@ -573,30 +593,34 @@ func run() error {
 		Item:           itemHandlers,
 		Attachment:     attachmentHandlers,
 		Admin:          adminHandlers,
-		ClientCert:     clientCertHandlers, // PR-SEC3
-		SSO:            ssoHandlers,         // PR-LDAP
+		ClientCert:     clientCertHandlers,     // PR-SEC3
+		SSO:            ssoHandlers,            // PR-LDAP
 		Group:          groupHandlers,
 		Tag:            tagHandlers,
 		Notification:   notificationHandlers,
 		Graph:          graphHandlers,
-		LogForwarding:  logForwardingHandlers, // PR-LOG1
-		Catalog:      catalogHandlers,
-		WS:           wsHandlers,
-		ShareLink:    shareLinkHandlers,
-		Lifecycle:    lifecycleHandlers,
-		Pipeline:     pipelineHandlers,
-		Export:       exportHandlers,
-		Vault:        vaultHandlers,        // PR-VAULT
-		K8sCluster:   k8sClusterHandlers,   // PR-K8S
-		K8s:          k8sHandlers,          // PR-K8S
-		Report:       reportHandlers,       // PR-K8S
-		Template:     templateHandlers,     // PR-TPL
-		AISuggestion: aiSuggestionHandlers, // PR-AI
-		Ansible:      ansibleHandlers,       // PR-ANSIBLE
-		APIToken:     apiTokenHandlers,      // PR-ANSIBLE
-		SCIM:         scimHandlers,          // PR-SCIM
-		Scan:         scanHandlers,          // PR-SCAN
-		PprofEnabled: cfg.PprofEnabled,      // PR-PROD5
+		LogForwarding:  logForwardingHandlers,  // PR-LOG1
+		Catalog:        catalogHandlers,
+		WS:             wsHandlers,
+		ShareLink:      shareLinkHandlers,
+		Lifecycle:      lifecycleHandlers,
+		Pipeline:       pipelineHandlers,
+		Export:         exportHandlers,
+		Vault:          vaultHandlers,          // PR-VAULT
+		K8sCluster:     k8sClusterHandlers,     // PR-K8S
+		K8s:            k8sHandlers,            // PR-K8S
+		Report:         reportHandlers,         // PR-K8S
+		Template:       templateHandlers,       // PR-TPL
+		AISuggestion:   aiSuggestionHandlers,   // PR-AI
+		Ansible:        ansibleHandlers,        // PR-ANSIBLE
+		APIToken:       apiTokenHandlers,       // PR-ANSIBLE
+		SCIM:           scimHandlers,           // PR-SCIM
+		Scan:           scanHandlers,           // PR-SCAN
+		Annotation:     annotationHandlers,     // PR-DP01
+		PortalTemplate: portalTemplateHandlers, // PR-DP11
+		CatalogEntity:  catalogEntityHandlers,  // PR-DP-E1
+		CORSOrigins:    cfg.CORSOrigins,        // ENVANTER_CORS_ORIGINS
+		PprofEnabled:   cfg.PprofEnabled,       // PR-PROD5
 	})
 
 	if cfg.PprofEnabled {
@@ -607,6 +631,9 @@ func run() error {
 		Addr:              cfg.Addr,
 		Handler:           router,
 		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       60 * time.Second,
+		WriteTimeout:      120 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	// --- Lifecycle ---

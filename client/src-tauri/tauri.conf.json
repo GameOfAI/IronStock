@@ -17,6 +17,8 @@
         "height": 800,
         "minWidth": 800,
         "minHeight": 600,
+        "center": true,
+        "visible": true,
         "resizable": true,
         "fullscreen": false
       }
@@ -33,6 +35,7 @@
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.png",
+      "icons/icon.icns",
       "icons/icon.ico"
     ],
     "category": "Utility",

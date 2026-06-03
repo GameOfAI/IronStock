@@ -21,18 +21,17 @@ CREATE INDEX IF NOT EXISTS idx_items_description_trgm
     ON items USING gin (description gin_trgm_ops)
     WHERE description IS NOT NULL;
 
--- GIN trigram index on tag label_plain for tag search.
+-- GIN trigram index on tag name for tag search.
 -- Allows fuzzy tag matching in item search results.
-CREATE INDEX IF NOT EXISTS idx_tags_label_plain_trgm
-    ON tags USING gin (label_plain gin_trgm_ops)
-    WHERE label_plain IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_tags_name_trgm
+    ON tags USING gin (name gin_trgm_ops);
 
 -- +goose StatementEnd
 
 -- +goose Down
 -- +goose StatementBegin
 
-DROP INDEX IF EXISTS idx_tags_label_plain_trgm;
+DROP INDEX IF EXISTS idx_tags_name_trgm;
 DROP INDEX IF EXISTS idx_items_description_trgm;
 DROP INDEX IF EXISTS idx_items_name_plain_trgm;
 -- Note: we intentionally do NOT drop the pg_trgm extension on rollback

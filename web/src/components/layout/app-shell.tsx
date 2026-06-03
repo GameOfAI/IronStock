@@ -14,7 +14,7 @@
  */
 
 import * as React from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Folder,
   Shield,
@@ -43,6 +43,13 @@ import {
   ClipboardCheck,
   Users2,
   ScanLine,
+  ChevronDown,
+  ChevronRight,
+  Eye,
+  Server,
+  BookOpen,
+  PlusCircle,
+  Wrench,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -61,6 +68,7 @@ import {
   useMarkAllReadMutation,
 } from '@/api/notifications';
 import { cn } from '@/lib/cn';
+import { APP_VERSION } from '@/version';
 
 // --- Theme toggle ---
 
@@ -209,6 +217,72 @@ function NavItem({ to, icon: Icon, label, collapsed }: NavItemProps) {
         </>
       )}
     </NavLink>
+  );
+}
+
+// --- Collapsible nav group ---
+
+interface NavGroupProps {
+  icon: React.ElementType;
+  label: string;
+  collapsed: boolean;
+  /** Extra paths (beyond children `to` props) that should activate this group */
+  prefixes?: string[];
+  children: React.ReactNode;
+}
+
+function NavGroup({ icon: Icon, label, collapsed, prefixes = [], children }: NavGroupProps) {
+  const location = useLocation();
+  // Collect `to` props from NavItem children for matching
+  const childPaths = React.useMemo(() => {
+    const paths: string[] = [];
+    React.Children.forEach(children, (child) => {
+      if (React.isValidElement<{ to?: string }>(child) && child.props.to) {
+        paths.push(child.props.to);
+      }
+    });
+    return paths;
+  }, [children]);
+  const isActive =
+    childPaths.some((p) => location.pathname === p || location.pathname.startsWith(p + '/')) ||
+    prefixes.some((p) => location.pathname === p);
+  const [open, setOpen] = React.useState(isActive);
+
+  // Auto-open when navigating into this group
+  React.useEffect(() => {
+    if (isActive && !open) setOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive]);
+
+  if (collapsed) {
+    // In collapsed mode, show only the group icon as a tooltip-trigger
+    return <>{children}</>;
+  }
+
+  return (
+    <div className="flex flex-col">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={cn(
+          'flex items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[13px] transition-colors',
+          isActive
+            ? 'text-slate-200'
+            : 'text-slate-500 hover:bg-slate-900 hover:text-slate-300',
+        )}
+      >
+        <Icon className={cn('h-[15px] w-[15px] shrink-0', isActive && 'text-blue-400')} />
+        <span className="flex-1 truncate text-[11px] font-semibold uppercase tracking-wider">
+          {label}
+        </span>
+        {open ? (
+          <ChevronDown className="h-3 w-3 shrink-0 text-slate-500" />
+        ) : (
+          <ChevronRight className="h-3 w-3 shrink-0 text-slate-500" />
+        )}
+      </button>
+      {open && <div className="ml-2.5 flex flex-col gap-0.5 border-l border-slate-800 pl-2">{children}</div>}
+    </div>
   );
 }
 
@@ -383,6 +457,8 @@ function NotificationBell() {
 
 // Page title map for TopBar
 const NAV_LABELS: Record<string, string> = {
+  '/catalog': 'Catalog',
+  '/create': 'Entity Oluştur',
   '/inventory': 'Envanter',
   '/tags': 'Etiketlerim',
   '/graph': 'İlişki Haritası',
@@ -402,6 +478,7 @@ const NAV_LABELS: Record<string, string> = {
   '/admin/secret-scanning': 'Sızıntı Taraması',
   '/admin/k8s-clusters': 'K8s Kümeleri',
   '/admin/reports': 'Raporlar',
+  '/admin/portal-templates': 'Portal Şablonları',
   '/profile': 'Profil',
 };
 
@@ -475,15 +552,15 @@ export function AppShell() {
         </button>
 
         {/* Logo + branding */}
-        <div className="flex items-center gap-2">
+        <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
           <div className="grid h-6 w-6 place-items-center rounded-md bg-blue-600">
             <Key className="h-[13px] w-[13px] text-white" />
           </div>
           <span className="text-[14px] font-semibold tracking-tight text-slate-100">IronStock</span>
-          <span className="font-mono text-[10px] text-slate-500">v0.3</span>
-          <span className="mx-1.5 h-3 w-px bg-slate-800" />
-          <span className="text-[13px] text-slate-400">{pageTitle}</span>
-        </div>
+          <span className="font-mono text-[10px] text-slate-500">v{APP_VERSION}</span>
+        </Link>
+        <span className="mx-1.5 h-3 w-px bg-slate-800" />
+        <span className="text-[13px] text-slate-400">{pageTitle}</span>
 
         {/* Right side actions */}
         <div className="ml-auto flex items-center gap-1">
@@ -550,105 +627,195 @@ export function AppShell() {
           )}
           aria-label="Ana navigasyon"
         >
-          <nav className="flex flex-1 flex-col gap-0.5 p-2" role="navigation">
+          <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2" role="navigation">
+            {/* ── Catalog ── */}
+            <NavGroup
+              icon={BookOpen}
+              label="Catalog"
+              collapsed={sidebarCollapsed && !mobileOpen}
+              prefixes={['/catalog']}
+            >
+              <NavItem
+                to="/catalog"
+                icon={BookOpen}
+                label="Tüm Entityler"
+                collapsed={sidebarCollapsed && !mobileOpen}
+              />
+              <NavItem
+                to="/inventory"
+                icon={Folder}
+                label="Envanter"
+                collapsed={sidebarCollapsed && !mobileOpen}
+              />
+            </NavGroup>
+
+            {/* ── Explore ── */}
+            <NavGroup
+              icon={Eye}
+              label="Explore"
+              collapsed={sidebarCollapsed && !mobileOpen}
+              prefixes={['/graph', '/pipeline']}
+            >
+              <NavItem
+                to="/graph"
+                icon={GitBranch}
+                label="İlişki Haritası"
+                collapsed={sidebarCollapsed && !mobileOpen}
+              />
+              <NavItem
+                to="/pipeline"
+                icon={Network}
+                label="Pipeline"
+                collapsed={sidebarCollapsed && !mobileOpen}
+              />
+              <NavItem
+                to="/pipeline/lifecycle"
+                icon={Layers}
+                label="Lifecycle Lanes"
+                collapsed={sidebarCollapsed && !mobileOpen}
+              />
+            </NavGroup>
+
+            {/* ── Create ── */}
             <NavItem
-              to="/inventory"
-              icon={Folder}
-              label="Envanter"
+              to="/create"
+              icon={PlusCircle}
+              label="Create"
               collapsed={sidebarCollapsed && !mobileOpen}
             />
-            <NavItem
-              to="/tags"
-              icon={Tag}
-              label="Etiketlerim"
+
+            {/* ── Araçlar ── */}
+            <NavGroup
+              icon={Wrench}
+              label="Araçlar"
               collapsed={sidebarCollapsed && !mobileOpen}
-            />
-            <NavItem
-              to="/graph"
-              icon={GitBranch}
-              label="İlişki Haritası"
-              collapsed={sidebarCollapsed && !mobileOpen}
-            />
-            <NavItem
-              to="/pipeline"
-              icon={Network}
-              label="Pipeline Diyagramları"
-              collapsed={sidebarCollapsed && !mobileOpen}
-            />
-            <NavItem
-              to="/pipeline/lifecycle"
-              icon={Layers}
-              label="Lifecycle Lanes"
-              collapsed={sidebarCollapsed && !mobileOpen}
-            />
-            <NavItem
-              to="/import"
-              icon={Upload}
-              label="Toplu Aktarma"
-              collapsed={sidebarCollapsed && !mobileOpen}
-            />
-            <NavItem
-              to="/access-requests"
-              icon={ClipboardCheck}
-              label="Onay İstekleri"
-              collapsed={sidebarCollapsed && !mobileOpen}
-            />
+              prefixes={['/access-requests', '/import', '/tags']}
+            >
+              <NavItem
+                to="/access-requests"
+                icon={ClipboardCheck}
+                label="Onay İstekleri"
+                collapsed={sidebarCollapsed && !mobileOpen}
+              />
+              <NavItem
+                to="/import"
+                icon={Upload}
+                label="Toplu Aktarma"
+                collapsed={sidebarCollapsed && !mobileOpen}
+              />
+              <NavItem
+                to="/tags"
+                icon={Tag}
+                label="Etiketlerim"
+                collapsed={sidebarCollapsed && !mobileOpen}
+              />
+            </NavGroup>
+
+            {/* ── Admin ── */}
             {isAdmin && (
               <>
-                <NavItem
-                  to="/admin"
-                  icon={Shield}
-                  label="Kullanıcı Yönetimi"
-                  collapsed={sidebarCollapsed && !mobileOpen}
-                />
-                <NavItem
-                  to="/admin/audit-log"
-                  icon={FileText}
-                  label="Audit Log"
-                  collapsed={sidebarCollapsed && !mobileOpen}
-                />
-                <NavItem
-                  to="/admin/client-certs"
-                  icon={Fingerprint}
-                  label="Sertifikalar"
-                  collapsed={sidebarCollapsed && !mobileOpen}
-                />
-                <NavItem
-                  to="/admin/log-forwarding"
-                  icon={Radio}
-                  label="Log Yönlendirme"
-                  collapsed={sidebarCollapsed && !mobileOpen}
-                />
-                <NavItem
-                  to="/admin/sso"
-                  icon={ShieldCheck}
-                  label="SSO / LDAP"
-                  collapsed={sidebarCollapsed && !mobileOpen}
-                />
-                <NavItem
-                  to="/admin/scim"
+                {!(sidebarCollapsed && !mobileOpen) && (
+                  <div className="my-1.5 h-px bg-slate-800" />
+                )}
+
+                {/* Kullanıcı & Erişim */}
+                <NavGroup
                   icon={Users2}
-                  label="SCIM Provisioning"
+                  label="Kullanıcı & Erişim"
                   collapsed={sidebarCollapsed && !mobileOpen}
-                />
-                <NavItem
-                  to="/admin/secret-scanning"
-                  icon={ScanLine}
-                  label="Sızıntı Taraması"
+                  prefixes={['/admin']}
+                >
+                  <NavItem
+                    to="/admin"
+                    icon={Shield}
+                    label="Kullanıcı Yönetimi"
+                    collapsed={sidebarCollapsed && !mobileOpen}
+                  />
+                  <NavItem
+                    to="/admin/groups"
+                    icon={Users2}
+                    label="Gruplar"
+                    collapsed={sidebarCollapsed && !mobileOpen}
+                  />
+                  <NavItem
+                    to="/admin/roles"
+                    icon={ShieldCheck}
+                    label="Roller"
+                    collapsed={sidebarCollapsed && !mobileOpen}
+                  />
+                  <NavItem
+                    to="/admin/sso"
+                    icon={ShieldCheck}
+                    label="SSO / LDAP"
+                    collapsed={sidebarCollapsed && !mobileOpen}
+                  />
+                  <NavItem
+                    to="/admin/scim"
+                    icon={Users2}
+                    label="SCIM Provisioning"
+                    collapsed={sidebarCollapsed && !mobileOpen}
+                  />
+                  <NavItem
+                    to="/admin/client-certs"
+                    icon={Fingerprint}
+                    label="Sertifikalar"
+                    collapsed={sidebarCollapsed && !mobileOpen}
+                  />
+                </NavGroup>
+
+                {/* Güvenlik & İzleme */}
+                <NavGroup
+                  icon={ShieldAlert}
+                  label="Güvenlik & İzleme"
                   collapsed={sidebarCollapsed && !mobileOpen}
-                />
-                <NavItem
-                  to="/admin/k8s-clusters"
-                  icon={Layers}
-                  label="K8s Kümeleri"
+                  prefixes={[]}
+                >
+                  <NavItem
+                    to="/admin/audit-log"
+                    icon={FileText}
+                    label="Audit Log"
+                    collapsed={sidebarCollapsed && !mobileOpen}
+                  />
+                  <NavItem
+                    to="/admin/log-forwarding"
+                    icon={Radio}
+                    label="Log Yönlendirme"
+                    collapsed={sidebarCollapsed && !mobileOpen}
+                  />
+                  <NavItem
+                    to="/admin/secret-scanning"
+                    icon={ScanLine}
+                    label="Sızıntı Taraması"
+                    collapsed={sidebarCollapsed && !mobileOpen}
+                  />
+                  <NavItem
+                    to="/admin/reports"
+                    icon={FileText}
+                    label="Raporlar"
+                    collapsed={sidebarCollapsed && !mobileOpen}
+                  />
+                </NavGroup>
+
+                {/* Altyapı */}
+                <NavGroup
+                  icon={Server}
+                  label="Altyapı"
                   collapsed={sidebarCollapsed && !mobileOpen}
-                />
-                <NavItem
-                  to="/admin/reports"
-                  icon={FileText}
-                  label="Raporlar"
-                  collapsed={sidebarCollapsed && !mobileOpen}
-                />
+                  prefixes={[]}
+                >
+                  <NavItem
+                    to="/admin/k8s-clusters"
+                    icon={Layers}
+                    label="K8s Kümeleri"
+                    collapsed={sidebarCollapsed && !mobileOpen}
+                  />
+                  <NavItem
+                    to="/admin/portal-templates"
+                    icon={FileText}
+                    label="Portal Şablonları"
+                    collapsed={sidebarCollapsed && !mobileOpen}
+                  />
+                </NavGroup>
               </>
             )}
           </nav>

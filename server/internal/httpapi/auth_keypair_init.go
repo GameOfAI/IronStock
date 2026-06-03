@@ -17,11 +17,11 @@ import (
 // ships the encrypted private key here. The server replaces the placeholder
 // without touching the password or revoking sessions.
 type keypairInitRequest struct {
-	CurrentPassword string         `json:"current_master_password"`
-	NewPublicKey    []byte         `json:"new_public_key"`    // 32-byte X25519 pub, base64
-	NewPrivateKeyEnc []byte        `json:"new_private_key_enc"` // encrypted private key, base64
-	NewKEKSalt      []byte         `json:"new_kek_salt"`        // base64
-	NewKEKParams    map[string]any `json:"new_kek_params"`
+	CurrentPassword  string         `json:"current_master_password"`
+	NewPublicKey     []byte         `json:"new_public_key"`      // 32-byte X25519 pub, base64
+	NewPrivateKeyEnc []byte         `json:"new_private_key_enc"` // encrypted private key, base64
+	NewKEKSalt       []byte         `json:"new_kek_salt"`        // base64
+	NewKEKParams     map[string]any `json:"new_kek_params"`
 }
 
 // InitKeypair implements POST /api/v1/auth/keypair-init.

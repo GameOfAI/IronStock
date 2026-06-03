@@ -41,6 +41,7 @@ import {
   randomKEKSalt,
   toBase64,
 } from '@/lib/crypto';
+import { userFriendlyError } from '@/lib/user-error';
 
 interface Props {
   open: boolean;
@@ -130,7 +131,7 @@ export function ChangePasswordDialog({ open, onOpenChange }: Props) {
     } catch (err) {
       toast({
         title: 'Parola değiştirilemedi',
-        description: err instanceof Error ? err.message : 'Bilinmeyen hata.',
+        description: userFriendlyError(err),
         variant: 'destructive',
       });
       setBusy(false);

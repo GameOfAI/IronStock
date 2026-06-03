@@ -104,7 +104,16 @@ export function ItemList({
               className={cn('cursor-pointer', selectedItemId === item.id && 'bg-accent')}
               onClick={() => onSelect(item.id)}
             >
-              <TableCell className="font-medium">{item.name}</TableCell>
+              <TableCell className="font-medium">
+                <div className="flex items-center gap-1.5">
+                  {item.kind && (
+                    <span className="shrink-0 rounded border border-slate-700 bg-slate-800/60 px-1 font-mono text-[9px] uppercase tracking-wide text-slate-400">
+                      {item.kind}
+                    </span>
+                  )}
+                  {item.name}
+                </div>
+              </TableCell>
               <TableCell className="text-muted-foreground">
                 {itemTypeLabel(itemTypes, item.item_type_id)}
               </TableCell>

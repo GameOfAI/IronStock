@@ -1,314 +1,258 @@
-# Server
+# IronStock Server
 
-Go 1.22 tabanlı REST + WebSocket API sunucusu.
-PostgreSQL 16, envelope şifreleme, RBAC, audit log ve MinIO nesne depolama entegrasyonu içerir.
+<p>
+  <img src="https://img.shields.io/badge/Go-1.22-00ADD8?logo=go&logoColor=white" alt="Go" />
+  <img src="https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white" alt="PostgreSQL" />
+  <img src="https://img.shields.io/badge/Redis-supported-DC382D?logo=redis&logoColor=white" alt="Redis" />
+</p>
+
+Go REST + WebSocket API server powering IronStock. Handles authentication, encryption, RBAC, real-time sync, and all integrations.
 
 ---
 
-## Paket Mimarisi
+## Architecture
 
 ```mermaid
 graph TD
     main["cmd/api/main.go\ngraceful shutdown"]
-    router["httpapi/router.go\nchi v5"]
+    router["httpapi/router.go\nchi v5 router"]
 
     main --> router
 
-    router --> mw_authn["middleware_authn\nJWT doğrulama"]
-    router --> mw_rbac["middleware_rbac\nfolder-level yetki"]
-    router --> mw_rl["middleware_ratelimit\ntoken bucket"]
+    router --> mw_authn["middleware_authn\nJWT + session check"]
+    router --> mw_rbac["middleware_rbac\nfolder-level RBAC"]
+    router --> mw_rl["middleware_ratelimit\ntoken bucket / Redis"]
 
-    router --> auth_h["Auth Handlers\nlogin · logout · register\nTOTP · refresh · recover"]
-    router --> folder_h["Folder Handlers\nCRUD · permissions"]
-    router --> item_h["Item Handlers\nCRUD · shares · attachments"]
-    router --> admin_h["Admin Handlers\nusers · audit log"]
-    router --> ws_h["WS Handler\nWebSocket upgrade"]
+    router --> auth_h["auth_handlers\nlogin, register, TOTP, WebAuthn"]
+    router --> auth_sso["auth_sso\nOIDC, LDAP, JWKS verification"]
+    router --> item_h["item_handlers\nCRUD, search, duplicates, health"]
+    router --> folder_h["folder_handlers\nCRUD, permissions, sharing"]
+    router --> vault_h["vault_handlers\nVault proxy, dynamic creds"]
+    router --> k8s_h["admin_k8s\ncluster mgmt, proxy, scanning"]
+    router --> scim_h["scim_handlers\nSCIM 2.0 provisioning"]
+    router --> admin_h["admin_*\nusers, audit, export, reports"]
+    router --> ws_h["WebSocket\nhub + Redis pub/sub"]
 
-    auth_h --> auth_pkg["internal/auth\nArgon2id · TOTP · JWT · session · lockout"]
-    item_h --> crypto_pkg["internal/crypto\nAES-GCM envelope · X25519 sealedbox"]
-    item_h --> storage_pkg["internal/storage\nMinIO Backend"]
-    folder_h --> db_pkg["internal/db\npgx pool · sqlc queries"]
-    admin_h --> audit_pkg["internal/audit\nappend-only log"]
-    ws_h --> ws_pkg["internal/ws\nhub · events"]
-
-    db_pkg --> pg[("PostgreSQL 16")]
-    storage_pkg --> minio[("MinIO")]
+    auth_h --> auth["auth/\nJWT, Argon2id, sessions"]
+    auth_h --> crypto["crypto/\nenvelope, X25519, AES-GCM"]
+    item_h --> db["db/\npgx pool, migrations"]
+    vault_h --> vault_c["vault/\nHashiCorp Vault client"]
+    k8s_h --> k8s_c["k8s/\nK8s client, SSRF guard"]
+    ws_h --> ws_c["ws/\nhub, Redis fan-out"]
+    admin_h --> email_c["email/\nSMTP + templates"]
+    router --> cache["cache/\nRedis circuit-breaker"]
+    router --> metrics["metrics/\nPrometheus"]
 ```
 
 ---
 
-## İstek Yaşam Döngüsü (Middleware Zinciri)
+## Package Reference
 
-```mermaid
-flowchart LR
-    Req(["HTTP İsteği"]) --> RL["RateLimit\ntoken bucket\nIP bazlı"]
-    RL --> Log["Logger\nistek/süre kaydı"]
-    Log --> Authn{"JWT\nDoğrulama"}
-    Authn -->|geçersiz| E401["401 Unauthorized"]
-    Authn -->|geçerli| RBAC{"Folder\nRBAC"}
-    RBAC -->|yetersiz| E403["403 Forbidden"]
-    RBAC -->|yetki tamam| Handler["Handler\niş mantığı"]
-    Handler --> DB[("PostgreSQL")]
-    Handler --> WS["WS Hub\nbroadcast"]
-    Handler --> Audit["Audit Log"]
-    Handler -->|200| Resp(["HTTP Yanıt"])
-```
-
----
-
-## Internal Paketler
-
-| Paket | Sorumluluk |
-|-------|-----------|
-| `auth` | Argon2id hash, TOTP (RFC 6238), JWT access/refresh, session, hesap kilitleme, recovery code |
-| `crypto` | AES-256-GCM envelope şifreleme (metadata), X25519 sealed box (E2E key wrap), Argon2id KDF, arama hash'i |
-| `db` | pgx/v5 bağlantı havuzu, sqlc üretilmiş sorgular, goose migration runner |
-| `httpapi` | chi router, tüm handler'lar, 3 middleware katmanı (authn, RBAC, rate-limit), hata biçimlendirme |
-| `ws` | WebSocket bağlantı hub'ı, olay tanımları, client yayın yönetimi |
-| `audit` | Mutasyon olayları (auth, CRUD, permission) kayıt, server-side plaintext |
-| `storage` | `Backend` arayüzü + `MinioBackend` (EnsureBucket, Put, Get, Delete, presign URL) |
-| `config` | Ortam değişkeni tabanlı yapılandırma yükleme |
-| `logging` | Yapılandırılmış loglama |
-| `metrics` | Prometheus `/metrics` enstrümantasyonu |
+| Package | Description |
+|---------|-------------|
+| `cmd/api` | HTTP server entry point with graceful shutdown |
+| `cmd/mcp` | MCP JSON-RPC 2.0 stdio server (6 read-only tools) |
+| `httpapi` | All HTTP handlers + middleware (auth, RBAC, rate limit, CORS) |
+| `auth` | JWT signer, Argon2id hasher, session management |
+| `crypto` | Envelope encryption, X25519 key exchange, AES-GCM, search hashing |
+| `db` | PostgreSQL connection pool, migration runner |
+| `k8s` | Kubernetes client, resource fetcher, SSRF protection |
+| `ws` | WebSocket hub, connection lifecycle, Redis pub/sub fan-out |
+| `cache` | Redis client wrapper with circuit-breaker (5 errors → 30s open) |
+| `config` | Environment-based configuration |
+| `audit` | Audit event type constants |
+| `email` | SMTP client + 6 HTML email templates |
+| `geoip` | ip-api.com GeoIP lookup + Tor exit node detection (24h cache) |
+| `health` | Item health score engine (0-100, 8 scoring rules) |
+| `llm` | LLM client (Anthropic / OpenAI-compatible) |
+| `logfwd` | Log forwarding (Syslog RFC 5424 + Splunk HEC) |
+| `metrics` | Prometheus counters, gauges, histograms |
+| `storage` | MinIO/S3 client for attachments |
+| `vault` | HashiCorp Vault client (KV + dynamic credentials) |
+| `webauthn` | WebAuthn/FIDO2 service wrapper |
+| `clientcert` | mTLS client certificate management |
 
 ---
 
-## WebSocket Hub
+## API Endpoints
 
-```mermaid
-graph TD
-    subgraph hub["ws/hub.go"]
-        reg["register chan"]
-        unreg["unregister chan"]
-        bcast["broadcast chan"]
-        clients["clients map\nconn → user_id"]
-    end
+### Authentication
 
-    API_h["item_handlers\nfolder_handlers"] -->|"ItemUpdated\nFolderDeleted\nShareChanged"| bcast
-    bcast --> filt{"kullanıcı\nyetki filtresi"}
-    filt -->|izinliyse| C1["Client 1\nWebSocket"]
-    filt -->|izinliyse| C2["Client 2\nWebSocket"]
-    filt -->|izinliyse| C3["Client N\nWebSocket"]
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/v1/auth/register` | Register with public key |
+| POST | `/api/v1/auth/login` | Login (Argon2id + optional TOTP/WebAuthn) |
+| POST | `/api/v1/auth/refresh` | Refresh access token |
+| POST | `/api/v1/auth/logout` | Revoke session |
+| POST | `/api/v1/auth/forgot-password` | Initiate password reset |
+| POST | `/api/v1/auth/reset-password` | Complete password reset |
+| GET/POST | `/api/v1/auth/totp/*` | TOTP setup + verification |
+| GET/POST | `/api/v1/auth/webauthn/*` | WebAuthn register + login |
 
-    C1 -->|connect| reg
-    C1 -->|disconnect| unreg
-```
+### SSO
 
----
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/auth/sso/providers` | List configured SSO providers |
+| GET | `/api/v1/auth/sso/:provider/authorize` | Initiate OIDC/LDAP flow |
+| GET/POST | `/api/v1/auth/sso/:provider/callback` | SSO callback (JWKS verified) |
 
-## API Endpoint Özeti
+### Inventory
 
-```
-POST   /auth/register           Kullanıcı kaydı
-POST   /auth/login              Login → access + refresh token
-POST   /auth/logout             Refresh token iptal
-POST   /auth/refresh            Access token yenileme
-POST   /auth/totp/enroll        TOTP kaydı başlat
-POST   /auth/totp/verify        TOTP doğrulama + etkinleştirme
-POST   /auth/change-password    Parola değiştirme
-POST   /auth/recover            Recovery code ile parola sıfırlama
+| Method | Path | Description |
+|--------|------|-------------|
+| GET/POST | `/api/v1/folders` | List / create folders |
+| GET/PUT/DELETE | `/api/v1/folders/:id` | Folder CRUD |
+| POST | `/api/v1/folders/:id/permissions` | Share folder |
+| GET/POST | `/api/v1/items` | List / create items |
+| GET/PUT/DELETE | `/api/v1/items/:id` | Item CRUD |
+| GET | `/api/v1/items/search` | Full-text + fuzzy search |
+| GET | `/api/v1/items/duplicates` | Duplicate detection |
+| GET | `/api/v1/items/:id/health` | Item health score |
+| GET | `/api/v1/items/health-report` | Vault-wide health report |
+| POST/DELETE | `/api/v1/items/:id/dynamic-cred` | Dynamic Vault credentials |
 
-GET    /catalog/item-types      Item type tanımları
-GET    /catalog/field-defs      Alan tanımları
+### Admin
 
-GET    /folders                 Klasör ağacı
-POST   /folders                 Yeni klasör
-PATCH  /folders/:id             Klasör güncelle
-DELETE /folders/:id             Klasör sil
-GET    /folders/:id/permissions Klasör yetkileri
-PUT    /folders/:id/permissions Klasör yetki güncelle
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/admin/users` | User management |
+| GET | `/api/v1/admin/audit-log` | Audit log (6 filters) |
+| GET/POST | `/api/v1/admin/sso` | SSO provider configuration |
+| GET/PATCH | `/api/v1/admin/ip-restrictions` | GeoIP + CIDR rules |
+| POST | `/api/v1/admin/export/encrypted` | Encrypted bulk export |
+| GET/POST | `/api/v1/admin/k8s/clusters` | Kubernetes cluster management |
+| GET | `/api/v1/admin/reports/generate` | HTML report generation |
 
-GET    /items?folder_id=        Item listesi
-POST   /items                   Yeni item (şifreli field değerleriyle)
-GET    /items/:id               Item detayı
-PATCH  /items/:id               Item güncelle
-DELETE /items/:id               Item sil
-GET    /items/:id/shares        Item paylaşımları
-PUT    /items/:id/shares        Item paylaşım güncelle
+### Integrations
 
-POST   /items/:id/attachments   Presigned upload URL al
-GET    /items/:id/attachments   Ek listesi
-GET    /items/:id/attachments/:aid  Presigned download URL al
-DELETE /items/:id/attachments/:aid  Ek sil
-
-GET    /admin/users             Kullanıcı listesi (admin)
-PATCH  /admin/users/:id         Kullanıcı güncelle (admin)
-POST   /admin/users/:id/disable Kullanıcıyı devre dışı bırak
-GET    /admin/audit             Audit log (sayfalı)
-
-GET    /healthz                 Sağlık kontrolü (k8s probe)
-GET    /metrics                 Prometheus metrikleri
-WS     /ws                      WebSocket bağlantısı
-```
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/ansible/inventory` | Ansible dynamic inventory |
+| * | `/scim/v2/*` | SCIM 2.0 provisioning (Users + Groups) |
+| GET | `/api/v1/ws` | WebSocket upgrade (real-time sync) |
+| GET | `/metrics` | Prometheus metrics |
 
 ---
 
-## Veritabanı Şeması (ER)
-
-```mermaid
-erDiagram
-    users {
-        uuid id PK
-        text username
-        text password_hash
-        bytea public_key
-        bytea private_key_enc
-        bool totp_enabled
-        bool disabled
-    }
-    sessions {
-        uuid id PK
-        uuid user_id FK
-        text refresh_token_hash
-        timestamptz expires_at
-    }
-    folders {
-        uuid id PK
-        uuid parent_id FK
-        text name_enc
-    }
-    folder_permissions {
-        uuid folder_id FK
-        uuid user_id FK
-        text role
-    }
-    items {
-        uuid id PK
-        uuid folder_id FK
-        int item_type_id FK
-        text name_enc
-        bytea dek_wrapped
-        bytea owner_dek_wrapped
-    }
-    item_fields {
-        uuid item_id FK
-        int field_definition_id FK
-        int position
-        bytea value_enc
-        bytea value_nonce
-    }
-    item_shares {
-        uuid item_id FK
-        uuid user_id FK
-        text role
-        bytea dek_wrapped
-    }
-    item_attachments {
-        uuid id PK
-        uuid item_id FK
-        text minio_key
-        text mime_type
-        bigint size_bytes
-    }
-    audit_log {
-        uuid id PK
-        uuid user_id FK
-        text action
-        text resource_type
-        uuid resource_id
-        timestamptz created_at
-    }
-    item_types {
-        int id PK
-        text label
-        text key
-    }
-    field_definitions {
-        int id PK
-        int item_type_id FK
-        text label
-        text key
-        bool is_secret
-    }
-
-    users ||--o{ sessions : "sahip olur"
-    users ||--o{ folder_permissions : "alır"
-    users ||--o{ item_shares : "paylaşılır"
-    folders ||--o{ folders : "içerir (parent)"
-    folders ||--o{ folder_permissions : "tanımlar"
-    folders ||--o{ items : "barındırır"
-    items ||--o{ item_fields : "içerir"
-    items ||--o{ item_shares : "paylaşılır"
-    items ||--o{ item_attachments : "taşır"
-    item_types ||--o{ field_definitions : "şema tanımlar"
-    item_types ||--o{ items : "tipler"
-    field_definitions ||--o{ item_fields : "tanımlar"
-    users ||--o{ audit_log : "üretir"
-```
-
----
-
-## Şifreleme Akışı
+## Authentication Flow
 
 ```mermaid
 sequenceDiagram
-    participant C as Client
-    participant S as Server
-    participant KV as Master Key (k8s Secret)
+    participant Client
+    participant API as Go API
     participant DB as PostgreSQL
 
-    Note over C,DB: Item oluşturma
-    C->>C: Argon2id(master_password) → user_key
-    C->>C: X25519 → private_key (user_key ile şifreli)
-    C->>C: AES-256-GCM → secret_fields şifrele
-    C->>S: POST /items {name, metadata, encrypted_fields, wrapped_dek}
+    Client->>API: POST /auth/login {username, password}
+    API->>DB: Lookup user by username
+    DB-->>API: user record (argon2id hash)
+    API->>API: Verify Argon2id(password, hash)
+    
+    alt TOTP required
+        API-->>Client: {totp_required: true}
+        Client->>API: POST /auth/login {username, password, totp_code}
+        API->>API: Verify TOTP code
+    end
 
-    S->>KV: master_key al
-    S->>S: AES-256-GCM → metadata şifrele (envelope)
-    S->>DB: şifreli item + wrapped DEK kaydet
-
-    Note over C,DB: Item okuma
-    C->>S: GET /items/:id
-    S->>DB: şifreli item al
-    S->>KV: master_key ile metadata çöz
-    S->>C: metadata (çözülmüş) + secret_fields (şifreli)
-    C->>C: private_key → DEK unwrap → field çöz
+    API->>DB: Create session record
+    API->>API: Sign JWT (15-min access, 7-day refresh)
+    API-->>Client: {access_token, refresh_token, private_key_enc}
+    
+    Note over Client: Decrypt private_key with Argon2id(password)
+    Note over Client: Hold private_key in RAM only
 ```
 
 ---
 
-## Migration Listesi
+## Configuration
 
-| No | Dosya | İçerik |
-|----|-------|--------|
-| 1 | `00001_init_extensions.sql` | pgcrypto extension + `set_updated_at()` trigger |
-| 2 | `00002_users.sql` | Kullanıcı tablosu, Argon2id hash, durum, soft-lock |
-| 3 | `00003_roles.sql` | Roller (read, write) + user_roles |
-| 4 | `00004_sessions.sql` | Refresh token deposu |
-| 5 | `00005_audit_log.sql` | Audit trail + BRIN index |
-| 6 | `00006_master_keys.sql` | Server-side envelope master key metadata |
-| 7 | `00007_user_keypairs.sql` | X25519 public/private key çiftleri |
-| 8 | `00008_totp_secrets.sql` | TOTP gizli anahtarları |
-| 9 | `00009_recovery_codes.sql` | Hesap kurtarma kodları |
-| 10 | `00010_item_types.sql` | Item tipi tanımları |
-| 11 | `00011_field_definitions.sql` | Alan şema tanımları |
-| 12 | `00012_folders.sql` | Klasör ağacı (self-referential) |
-| 13 | `00013_folder_permissions.sql` | Klasör × kullanıcı × rol |
-| 14 | `00014_items.sql` | Envanter öğeleri (şifreli metadata + DEK) |
-| 15 | `00015_item_fields.sql` | E2E şifreli alan değerleri |
-| 16 | `00016_item_shares.sql` | Item paylaşımları (DEK wrap dahil) |
-| 17 | `00017_item_relationships.sql` | Item'lar arası ilişkiler |
-| 18 | `00018_item_description.sql` | Serbest metin açıklamaları |
-| 19 | `00019_item_attachments.sql` | Dosya eki metadata (MinIO key, boyut, MIME) |
+All configuration is via environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ENVANTER_LISTEN` | `:8080` | Server listen address |
+| `ENVANTER_DATABASE_URL` | required | PostgreSQL connection string |
+| `ENVANTER_MASTER_KEY` | required | 32-byte hex master encryption key |
+| `ENVANTER_JWT_SECRET` | required | JWT signing secret |
+| `ENVANTER_CORS_ORIGINS` | `*` | Comma-separated allowed CORS origins |
+| `ENVANTER_REDIS_URL` | optional | Redis URL for caching + pub/sub |
+| `ENVANTER_REDIS_PASSWORD` | optional | Redis password |
+| `ENVANTER_MINIO_ENDPOINT` | optional | MinIO/S3 endpoint |
+| `ENVANTER_MINIO_ACCESS_KEY` | optional | MinIO access key |
+| `ENVANTER_MINIO_SECRET_KEY` | optional | MinIO secret key |
+| `ENVANTER_VAULT_ADDR` | optional | HashiCorp Vault address |
+| `ENVANTER_VAULT_TOKEN` | optional | Vault token |
+| `ENVANTER_SMTP_HOST` | optional | SMTP server for email |
+| `ENVANTER_SMTP_PORT` | `587` | SMTP port |
+| `ENVANTER_LLM_PROVIDER` | optional | `anthropic` or `openai` |
+| `ENVANTER_LLM_API_KEY` | optional | LLM API key |
+| `ENVANTER_RATE_LIMIT_BACKEND` | `memory` | `memory` or `redis` |
 
 ---
 
-## Geliştirme
+## Database
+
+60 PostgreSQL migrations managed by Goose:
+
+```bash
+# Apply all migrations
+make migrate
+
+# Or manually
+cd server
+go run cmd/api/main.go --migrate
+```
+
+Key tables: `users`, `sessions`, `folders`, `folder_permissions`, `items`, `item_fields`, `item_shares`, `audit_events`, `api_tokens`, `sso_providers`, `k8s_clusters`, and more.
+
+---
+
+## Development
+
+### Prerequisites
+
+- Go 1.22+
+- PostgreSQL 16
+- (Optional) Redis, MinIO, HashiCorp Vault
+
+### Run
+
+```bash
+# Start dependencies
+make up  # Docker Compose: PostgreSQL + MinIO + Redis
+
+# Run server
+cd server
+go run cmd/api/main.go
+
+# Run MCP server
+cd server
+go run cmd/mcp/main.go
+```
+
+### Test
 
 ```bash
 cd server
-
-# Birim testleri
 go test ./...
-
-# Integration testleri (gerçek Postgres, testcontainers)
-go test ./internal/db/... -tags integration -timeout 10m
-
-# Lint
-golangci-lint run
-
-# Migrasyon uygula
-goose -dir migrations postgres "$ENVANTER_DB_URL" up
 ```
 
-Ortam değişkenleri için kök dizindeki `.env.example`'a bakın.
+### Build
+
+```bash
+cd server
+go build -o ironstock-api cmd/api/main.go
+go build -o ironstock-mcp cmd/mcp/main.go
+```
+
+---
+
+## Security Features
+
+- **Session revocation** &mdash; database-backed session checking on every request
+- **OIDC JWKS verification** &mdash; RSA signature validation with 1-hour key cache
+- **SSRF protection** &mdash; reject loopback, link-local, and metadata IPs in K8s URLs
+- **Path traversal guard** &mdash; block `..`, `//`, backslash, control chars in Vault paths
+- **Rate limiting** &mdash; per-IP token bucket or Redis sliding window (Lua script)
+- **Request size limits** &mdash; `MaxBytesReader` on request bodies
+- **GeoIP + IP whitelist** &mdash; country and CIDR-based access control with Tor detection

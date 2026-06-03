@@ -34,19 +34,19 @@ import (
 
 // AISuggestionHandlers groups AI suggestion endpoints.
 type AISuggestionHandlers struct {
-	ItemH  *ItemHandlers // for DB + auth + logger
-	LLM    *llm.Client  // nil when not configured
+	ItemH *ItemHandlers // for DB + auth + logger
+	LLM   *llm.Client   // nil when not configured
 }
 
 // aiSuggestionRow is a DB row from ai_suggestions.
 type aiSuggestionRow struct {
-	ID              string  `json:"id"`
-	ItemID          string  `json:"item_id"`
-	SuggestionType  string  `json:"suggestion_type"`
-	Payload         []byte  `json:"payload"`
-	AcceptedAt      *string `json:"accepted_at,omitempty"`
-	RejectedAt      *string `json:"rejected_at,omitempty"`
-	CreatedAt       string  `json:"created_at"`
+	ID             string  `json:"id"`
+	ItemID         string  `json:"item_id"`
+	SuggestionType string  `json:"suggestion_type"`
+	Payload        []byte  `json:"payload"`
+	AcceptedAt     *string `json:"accepted_at,omitempty"`
+	RejectedAt     *string `json:"rejected_at,omitempty"`
+	CreatedAt      string  `json:"created_at"`
 }
 
 // Suggest implements POST /api/v1/items/{id}/suggest.

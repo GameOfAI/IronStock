@@ -11,9 +11,9 @@
 CREATE TABLE item_links (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     source_item_id  UUID NOT NULL REFERENCES items(id) ON DELETE CASCADE,
-    source_field_def_id UUID NOT NULL REFERENCES field_definitions(id) ON DELETE CASCADE,
+    source_field_def_id BIGINT NOT NULL REFERENCES field_definitions(id) ON DELETE CASCADE,
     target_item_id  UUID NOT NULL REFERENCES items(id) ON DELETE CASCADE,
-    target_field_def_id UUID NOT NULL REFERENCES field_definitions(id) ON DELETE CASCADE,
+    target_field_def_id BIGINT NOT NULL REFERENCES field_definitions(id) ON DELETE CASCADE,
     link_type       TEXT NOT NULL CHECK (link_type IN ('mirror', 'reference')),
     created_by      UUID NOT NULL REFERENCES users(id),
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),

@@ -47,6 +47,7 @@ import {
 } from '@/api/share-links';
 import type { Item } from '@/api/types';
 import { RelativeTime } from '@/components/common/relative-time';
+import { userFriendlyError } from '@/lib/user-error';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -123,7 +124,7 @@ export function ShareLinkDialog({ item }: ShareLinkDialogProps) {
     } catch (err) {
       toast({
         title: 'Link oluşturulamadı',
-        description: err instanceof Error ? err.message : 'Bilinmeyen hata',
+        description: userFriendlyError(err),
         variant: 'destructive',
       });
     } finally {

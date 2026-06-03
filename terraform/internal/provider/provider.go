@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -22,12 +21,6 @@ type ironstockProvider struct {
 type ironstockProviderModel struct {
 	URL      types.String `tfsdk:"url"`
 	APIToken types.String `tfsdk:"api_token"`
-}
-
-type IronstockClient struct {
-	BaseURL    string
-	APIToken   string
-	HTTPClient *http.Client
 }
 
 func New(version string) func() provider.Provider {
@@ -75,10 +68,10 @@ func (p *ironstockProvider) Configure(ctx context.Context, req provider.Configur
 		return
 	}
 
-	client := &IronstockClient{
+	client := &resources.Client{
 		BaseURL:  config.URL.ValueString(),
 		APIToken: config.APIToken.ValueString(),
-		HTTPClient: &http.Client{
+		HTTP: &http.Client{
 			Timeout: 30 * time.Second,
 		},
 	}
@@ -100,25 +93,4 @@ func (p *ironstockProvider) DataSources(_ context.Context) []func() datasource.D
 		resources.NewFolderDataSource,
 		resources.NewItemDataSource,
 	}
-}
-
-func (c *IronstockClient) DoRequest(method, path string, body []byte) (*http.Response, error) {
-	url := fmt.Sprintf("%s%s", c.BaseURL, path)
-	var req *http.Request
-	var err error
-
-	if body != nil {
-		req, err = http.NewRequest(method, url, nil)
-	} else {
-		req, err = http.NewRequest(method, url, nil)
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.APIToken))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "terraform-provider-ironstock")
-
-	return c.HTTPClient.Do(req)
 }

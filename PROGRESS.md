@@ -1,12 +1,83 @@
 # İlerleyiş
 
-Son güncelleme: 2026-05-24 (PR-TF + PR-BROWSER tamamlandı — 27/27 PR tamamlandı ✅ PROJE TAMAMLANDI)
+Son güncelleme: 2026-06-03 (PR-DP15 tamamlandı — ADR-0013 + final sync — TÜM DP FAZLARI TAMAMLANDI ✅)
+
+### 2026-06-02 — golangci-lint v1→v2 CI Migrasyonu (branch: fix/ux-and-dev-build)
+
+`go.mod`/`go.work` `go 1.25.0` istiyor (go-webauthn v0.17.4 transitively go ≥1.25);
+ama CI golangci-lint **v1.62.2** (Go 1.23 toolchain) pinliydi → Server + Pre-commit
+job'ları `package requires newer Go version go1.25 (typecheck)` ile kırılıyordu (main'den
+gelen pre-existing debt).
+
+- **golangci-lint v1 → v2.12.2**: `server/.golangci.yml` v2 formatına migrate edildi
+  (`golangci-lint migrate`). Standart exclusion preset'leri (comments,
+  std-error-handling, common-false-positives) eklendi → v2'nin yeni linter
+  sürümlerinin sürdüğü pre-existing stil/std-lib gürültüsü baseline'a çekildi.
+- **gosec golangci'den çıkarıldı**: ayrı "Go SAST (gosec)" job'u zaten kapsıyor (duplikasyon).
+- **33 gerçek bulgu kodda düzeltildi**: sqlclosecheck FP (nolint), unused dead-code (3),
+  unconvert, redis `SetEx`→`Set`, De Morgan, early-return, receiver/parametre isimleri,
+  errcheck `_ =` (audit fire-and-forget), test SA4031/SA9003.
+- **CI**: `ci.yml` setup-go 1.23→1.25 (3 job), golangci-lint-action v6→v7 (v2.12.2),
+  Pre-commit job'a Node + web deps kuruldu (eslint-web hook için).
+- **Pre-existing whitespace**: 5 SVG asset trailing-whitespace/EOF düzeltildi.
+- **eslint-web pre-commit hook**: npm workspaces'te eslint binary root'a hoist
+  olduğu için `web/node_modules/.bin/eslint` yolu yoktu → hook `npm run lint`
+  çağıracak şekilde düzeltildi (CI Web job ile aynı).
+- **Integration test (stale assertion)**: `migrations_integration_test.go`
+  item_types beklenen sayı 8→9 (00045 `k8s_namespace` tipini ekliyor). Server
+  job go1.25'te kırık olduğundan integration job atlanıyordu, regresyon gizliydi.
+- Lint **0 issue**, `go build`/`go vet`/`go test` (cache, ws, httpapi, health, metrics) ✅.
+
+### 2026-06-02 — QA Bug-Fix Turu (branch: fix/ux-and-dev-build)
+
+Manuel + AI-perspektifi test sırasında bulunan 7 gerçek bug düzeltildi:
+
+- **Toolbar yanlış item'a işlem** (`inventory/index.tsx`): bir item'ı düzenleyip başka item seçince Sil/Düzenle eski item'a gidiyordu → veri kaybı riski. `activeItem` seçimde temizleniyor + URL itemId önceliği.
+- **2 sayfa çökmesi** (`access-requests.tsx`, `import.tsx`): Radix `<Select.Item value="">` crash → `'all'` / `'__none__'` sentinel.
+- **4 oluştur/güncelle kırık** (`admin-log-forwarding`, `admin-k8s`, `api-tokens`, `reports`): `apiFetch` + `body: JSON.stringify(req)` çift-encode → 400. `body: req`.
+- **Dockerfile Go sürümü** (`server/Dockerfile`, `Dockerfile.dev`): go.mod 1.25 ister, base 1.22 → build kırık. `golang:1.25-alpine`.
+- **WebAuthn login UX** (`login.tsx`): config'siz sunucuda kırmızı hata → 501'de bölüm gizlenir.
+- **DOM nesting** (`admin/groups.tsx`): `<Badge>` (`<div>`) `<p>` içinde → `<div>`.
+- **CI temizliği**: pre-existing gofmt (server geneli) + eslint (`linked-items-tab`, `kdbx-parser`, `onboarding-tour`, client `App`/`item-detail`) düzeltildi.
+
+### 2026-06-03 — Developer Portal Enhancement PRs (DP-E1 through DP-E7)
+
+Portal'ı olgunlaştıran 7 iyileştirme PR'ı tek batch'te uygulandı:
+
+- **DP-E1**: `GET /api/v1/catalog/{kind}/{name}` — tek çağrıda entity detay + annotations + relationships + health. `server/internal/httpapi/catalog_entity.go` (yeni handler), router.go + main.go wiring, web `useCatalogEntityQuery` hook, shared types.
+- **DP-E2**: Admin portal template yönetim UI'ı — `web/src/pages/admin/portal-templates.tsx` (CRUD dialog, kind/active filtreleme), `useUpdatePortalTemplateMutation` hook, backend `?all=true` param (admin inactive görsün), App.tsx route + app-shell nav.
+- **DP-E3**: Annotation düzenleme paneli — `web/src/components/inventory/annotations-panel.tsx` (inline edit, add/delete), `default-entity-tabs.tsx`'te `'*'` kind ile order:25 tab kaydı.
+- **DP-E4**: Wizard'da kind'a özel form alanları — `entity-form-step.tsx`'e `KIND_FIELD_SCHEMAS` map (Server/Database/Service/Certificate/SSHKey/CloudCredential), `CreatePage`'de `kindFields` state + annotation olarak kaydetme.
+- **DP-E5**: Portal Home admin health widget — `HealthSummaryCard` component (useHealthReportQuery, severity badge'ler, admin-only).
+- **DP-E6**: Tauri client catalog sayfası — `client/src/api/catalog-browser.ts` (hooks), `client/src/pages/catalog/` (CatalogPage + EntityDetailPage + EntityCard), App.tsx route + app-shell nav.
+- **DP-E7**: OpenAPI spec güncelleme — annotations, portal-templates, catalog entity, search, health endpoints + component schemas.
 
 ## Mevcut Durum
 
-- **Tüm Fazlar Tamamlandı:** Faz 0–11 ✅
-- **Tamamlanan PR:** 27/27 (%100)
-- **Kalan:** Yok — proje tamamlandı 🎉
+- **Önceki Fazlar (Faz 0–11):** 27/27 PR tamamlandı ✅
+- **Developer Portal Dönüşümü (DP Fazı):** 15/15 PR tamamlandı ✅ **TAMAMLANDI**
+- **Developer Portal Enhancement (DP-E Fazı):** 7/7 PR tamamlandı ✅ **TAMAMLANDI**
+- **Son tamamlanan:** DP-E1–E7 (catalog endpoint, admin template UI, annotation panel, kind fields, health widget, Tauri catalog, OpenAPI spec)
+
+## Developer Portal PR'ları (DP Fazı)
+
+| PR | Açıklama | Durum |
+|----|----------|-------|
+| PR-DP01 | item_annotations tablosu + CRUD API (migration 00061) | ✅ |
+| PR-DP02 | kind_key + EntityEnvelope (kind, owner_ref) (migration 00062) | ✅ |
+| PR-DP03 | Relation type Backstage alias'ları (migration 00063) | ✅ |
+| PR-DP04 | Catalog Browser sayfası (web) — /catalog, entity-card, kind filter | ✅ |
+| PR-DP05 | Backend kind filter (search endpoint) — ?kind=Server,Database | ✅ |
+| PR-DP06 | Entity Detail URL routing — /catalog/:kind/:namespace/:name | ✅ |
+| PR-DP07 | EntityPageRegistry + Plugin Slot mimarisi | ✅ |
+| PR-DP08 | Kind-specific overview card'ları | ✅ |
+| PR-DP09 | Navigation yeniden yapılandırma | ✅ |
+| PR-DP10 | Golden Path Template Wizard (5-step) | ✅ |
+| PR-DP11 | portal_templates tablosu + API | ✅ |
+| PR-DP12 | Shared types + Tauri sync | ✅ |
+| PR-DP13 | Portal Home Dashboard | ✅ |
+| PR-DP14 | MCP server portal catalog tools | ✅ |
+| PR-DP15 | ADR-0013 + PROGRESS/TODO sync | ✅ |
 
 ### Tamamlanan PR'lar (kod taramasıyla doğrulandı — 2026-05-22)
 
@@ -27,7 +98,22 @@ Son güncelleme: 2026-05-24 (PR-TF + PR-BROWSER tamamlandı — 27/27 PR tamamla
 
 | Özellik | Durum | Notlar |
 |---------|-------|--------|
-| **`go mod tidy`** | ⚠️ Kullanıcı aksiyonu | server/ dizininde çalıştırılmalı (go-ldap/ldap/v3 + gopkg.in/yaml.v3 download + go.sum güncelleme) |
+| **`go mod tidy`** | ✅ Tamamlandı | server/ + terraform/ dizinlerinde çalıştırıldı |
+
+### Tamamlanan (bu session — 2026-05-24 güvenlik denetimi)
+
+| Kategori | Açıklama | Durum |
+|----------|----------|-------|
+| **H1: Session Revocation** | SessionChecker middleware, RequireAccessToken revoke kontrolü, tüm route'lara uygulandı | ✅ |
+| **H3: OIDC JWKS** | JWKS fetch + RSA imza doğrulama + issuer/audience validation + 1h cache | ✅ |
+| **H4: OIDC State → Redis** | Redis-backed OIDC state store, in-memory fallback, JSON serileştirme | ✅ |
+| **H5: K8s SSRF** | Loopback/link-local/metadata IP engelleme, 14 unit test | ✅ |
+| **H6: Vault Path Traversal** | `..`, `//`, leading `/`, backslash, control char engelleme, 10 test | ✅ |
+| **M-level düzeltmeler** | CORS config, server timeout, CSP meta tag, network policy, body size limit, ErrorBoundary | ✅ |
+| **Versiyon sistemi** | package.json → Vite define → APP_VERSION, otomatik artış | ✅ |
+| **Browser ext. token mutex** | Promise-based concurrent refresh deduplication | ✅ |
+| **Test kapsamı** | 15 browser ext. testi, render-level sayfa testleri, toplam 179 web testi | ✅ |
+| **Terraform go.sum + go.work** | go mod tidy, go.work workspace entegrasyonu | ✅ |
 
 ### Tamamlanan (bu session — 2026-05-22 devam)
 

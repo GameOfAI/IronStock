@@ -309,7 +309,7 @@ func (h *K8sHandlers) logK8sFetch(r *http.Request, itemID, resource string, coun
 	if claims == nil {
 		return
 	}
-	h.Audit.Write(ctx, audit.Entry{
+	_ = h.Audit.Write(ctx, audit.Entry{
 		ActorUserID: claims.Subject,
 		Action:      audit.ActionItemK8sFetch,
 		Details: map[string]any{

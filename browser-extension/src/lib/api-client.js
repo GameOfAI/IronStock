@@ -31,6 +31,30 @@ export async function clearConfig() {
   await chrome.storage.local.remove(Object.values(STORAGE_KEYS));
 }
 
+let _refreshPromise = null;
+
+async function refreshTokens(config) {
+  const refreshResp = await fetch(`${config.serverUrl}/api/v1/auth/refresh`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh_token: config.refreshToken }),
+  });
+
+  if (!refreshResp.ok) {
+    await clearConfig();
+    throw new Error('Oturum süresi doldu — yeniden giriş yapın');
+  }
+
+  const tokens = await refreshResp.json();
+  const newConfig = {
+    ...config,
+    accessToken: tokens.access_token,
+    refreshToken: tokens.refresh_token || config.refreshToken,
+  };
+  await saveConfig(newConfig);
+  return newConfig;
+}
+
 async function apiRequest(method, path, body = null) {
   const config = await getConfig();
   if (!config.serverUrl || !config.accessToken) {
@@ -50,27 +74,18 @@ async function apiRequest(method, path, body = null) {
 
   let resp = await fetch(url, options);
 
-  // Token süresi dolmuşsa yenile
+  // Token süresi dolmuşsa yenile (mutex ile eşzamanlı refresh'leri engelle)
   if (resp.status === 401 && config.refreshToken) {
-    const refreshResp = await fetch(`${config.serverUrl}/api/v1/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: config.refreshToken }),
-    });
+    if (!_refreshPromise) {
+      _refreshPromise = refreshTokens(config).finally(() => { _refreshPromise = null; });
+    }
 
-    if (refreshResp.ok) {
-      const tokens = await refreshResp.json();
-      await saveConfig({
-        ...config,
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token || config.refreshToken,
-      });
-
-      headers['Authorization'] = `Bearer ${tokens.access_token}`;
+    try {
+      const newConfig = await _refreshPromise;
+      headers['Authorization'] = `Bearer ${newConfig.accessToken}`;
       resp = await fetch(url, { method, headers, body: options.body });
-    } else {
-      await clearConfig();
-      throw new Error('Oturum süresi doldu — yeniden giriş yapın');
+    } catch (err) {
+      throw err;
     }
   }
 

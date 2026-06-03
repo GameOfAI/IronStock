@@ -6,10 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
-	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	dschema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	rschema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -21,7 +19,7 @@ import (
 // --- Resource ---
 
 type folderResource struct {
-	client *ironstockClient
+	client *Client
 }
 
 type folderResourceModel struct {
@@ -65,7 +63,7 @@ func (r *folderResource) Configure(_ context.Context, req resource.ConfigureRequ
 	if req.ProviderData == nil {
 		return
 	}
-	r.client = req.ProviderData.(*ironstockClient)
+	r.client = req.ProviderData.(*Client)
 }
 
 func (r *folderResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -84,7 +82,7 @@ func (r *folderResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 
 	jsonBody, _ := json.Marshal(body)
-	httpResp, err := r.client.do("POST", "/api/v1/folders", jsonBody)
+	httpResp, err := r.client.Do("POST", "/api/v1/folders", jsonBody)
 	if err != nil {
 		resp.Diagnostics.AddError("Klasör oluşturulamadı", err.Error())
 		return
@@ -117,7 +115,7 @@ func (r *folderResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
-	httpResp, err := r.client.do("GET", fmt.Sprintf("/api/v1/folders/%s", state.ID.ValueString()), nil)
+	httpResp, err := r.client.Do("GET", fmt.Sprintf("/api/v1/folders/%s", state.ID.ValueString()), nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Klasör okunamadı", err.Error())
 		return
@@ -159,7 +157,7 @@ func (r *folderResource) Update(ctx context.Context, req resource.UpdateRequest,
 		"name": plan.Name.ValueString(),
 	}
 	jsonBody, _ := json.Marshal(body)
-	httpResp, err := r.client.do("PUT", fmt.Sprintf("/api/v1/folders/%s", plan.ID.ValueString()), jsonBody)
+	httpResp, err := r.client.Do("PUT", fmt.Sprintf("/api/v1/folders/%s", plan.ID.ValueString()), jsonBody)
 	if err != nil {
 		resp.Diagnostics.AddError("Klasör güncellenemedi", err.Error())
 		return
@@ -177,7 +175,7 @@ func (r *folderResource) Delete(ctx context.Context, req resource.DeleteRequest,
 		return
 	}
 
-	httpResp, err := r.client.do("DELETE", fmt.Sprintf("/api/v1/folders/%s", state.ID.ValueString()), nil)
+	httpResp, err := r.client.Do("DELETE", fmt.Sprintf("/api/v1/folders/%s", state.ID.ValueString()), nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Klasör silinemedi", err.Error())
 		return
@@ -188,7 +186,7 @@ func (r *folderResource) Delete(ctx context.Context, req resource.DeleteRequest,
 // --- Data Source ---
 
 type folderDataSource struct {
-	client *ironstockClient
+	client *Client
 }
 
 type folderDataSourceModel struct {
@@ -207,7 +205,7 @@ func (d *folderDataSource) Metadata(_ context.Context, req datasource.MetadataRe
 func (d *folderDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = dschema.Schema{
 		Description: "Mevcut bir IronStock klasörünü ID ile okur.",
-		Attributes: map[string]schema.Attribute{
+		Attributes: map[string]dschema.Attribute{
 			"id": dschema.StringAttribute{
 				Required:    true,
 				Description: "Klasör UUID'si",
@@ -224,7 +222,7 @@ func (d *folderDataSource) Configure(_ context.Context, req datasource.Configure
 	if req.ProviderData == nil {
 		return
 	}
-	d.client = req.ProviderData.(*ironstockClient)
+	d.client = req.ProviderData.(*Client)
 }
 
 func (d *folderDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -235,7 +233,7 @@ func (d *folderDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 		return
 	}
 
-	httpResp, err := d.client.do("GET", fmt.Sprintf("/api/v1/folders/%s", config.ID.ValueString()), nil)
+	httpResp, err := d.client.Do("GET", fmt.Sprintf("/api/v1/folders/%s", config.ID.ValueString()), nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Klasör okunamadı", err.Error())
 		return
@@ -253,27 +251,4 @@ func (d *folderDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 
 	config.Name = types.StringValue(result.Name)
 	resp.Diagnostics.Append(resp.State.Set(ctx, config)...)
-}
-
-// ironstockClient is the internal HTTP client shared by all resources.
-type ironstockClient struct {
-	baseURL  string
-	apiToken string
-	http     *http.Client
-}
-
-func (c *ironstockClient) do(method, path string, body []byte) (*http.Response, error) {
-	url := c.baseURL + path
-	var r io.Reader
-	if body != nil {
-		r = strings.NewReader(string(body))
-	}
-	req, err := http.NewRequest(method, url, r)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", "Bearer "+c.apiToken)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "terraform-provider-ironstock")
-	return c.http.Do(req)
 }

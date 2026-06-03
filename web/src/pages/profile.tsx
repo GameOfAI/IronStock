@@ -89,6 +89,7 @@ import {
   Pencil,
 } from 'lucide-react';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { userFriendlyError } from '@/lib/user-error';
 
 // --- Recovery Codes Display ---
 
@@ -145,7 +146,7 @@ function TOTPDisableSection() {
     } catch (err) {
       toast({
         title: '2FA kaldırılamadı',
-        description: err instanceof Error ? err.message : 'Bilinmeyen hata.',
+        description: userFriendlyError(err),
         variant: 'destructive',
       });
     }
@@ -214,7 +215,7 @@ function TOTPBackupRegenerateSection() {
     } catch (err) {
       toast({
         title: 'Yenileme başarısız',
-        description: err instanceof Error ? err.message : 'Bilinmeyen hata.',
+        description: userFriendlyError(err),
         variant: 'destructive',
       });
     }
@@ -387,7 +388,7 @@ function TrustedDevicesCard() {
     } catch (err) {
       toast({
         title: 'Cihaz kaldırılamadı',
-        description: err instanceof Error ? err.message : 'Bilinmeyen hata.',
+        description: userFriendlyError(err),
         variant: 'destructive',
       });
     }
@@ -400,7 +401,7 @@ function TrustedDevicesCard() {
     } catch (err) {
       toast({
         title: 'Cihazlar kaldırılamadı',
-        description: err instanceof Error ? err.message : 'Bilinmeyen hata.',
+        description: userFriendlyError(err),
         variant: 'destructive',
       });
     }
@@ -571,7 +572,7 @@ function NotificationPrefsCard() {
       onError: (err) => {
         toast({
           title: 'Kaydedilemedi',
-          description: err instanceof Error ? err.message : 'Bilinmeyen hata.',
+          description: userFriendlyError(err),
           variant: 'destructive',
         });
       },
@@ -674,7 +675,7 @@ function ExternalChannelsCard() {
         onError: (err) => {
           toast({
             title: 'Kanal eklenemedi',
-            description: err instanceof Error ? err.message : 'Webhook test başarısız.',
+            description: userFriendlyError(err),
             variant: 'destructive',
           });
         },
@@ -810,7 +811,7 @@ function ExternalChannelsCard() {
                         onError: (err) =>
                           toast({
                             title: 'Test başarısız',
-                            description: err instanceof Error ? err.message : '',
+                            description: userFriendlyError(err),
                             variant: 'destructive',
                           }),
                       })
@@ -880,7 +881,7 @@ function SecurityKeysCard() {
       setAddOpen(false);
       setLabel('');
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Bilinmeyen hata.';
+      const msg = userFriendlyError(err);
       // User cancelled the authenticator prompt — don't show error
       if (msg.includes('cancelled') || msg.includes('NotAllowed') || msg.includes('abort')) {
         toast({ title: 'İptal edildi', description: 'Güvenlik anahtarı eklenmedi.' });
@@ -910,7 +911,7 @@ function SecurityKeysCard() {
         onError: (err) =>
           toast({
             title: 'Güncellenemedi',
-            description: err instanceof Error ? err.message : 'Bilinmeyen hata.',
+            description: userFriendlyError(err),
             variant: 'destructive',
           }),
       },
@@ -1067,7 +1068,7 @@ function SecurityKeysCard() {
                               onError: (err) =>
                                 toast({
                                   title: 'Silinemedi',
-                                  description: err instanceof Error ? err.message : '',
+                                  description: userFriendlyError(err),
                                   variant: 'destructive',
                                 }),
                             })

@@ -21,6 +21,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { useCreateUserMutation } from '@/api/admin';
 import { ApiError } from '@/api/errors';
+import { userFriendlyError } from '@/lib/user-error';
 
 const ROLES = [
   { value: 'admin', label: 'Admin', description: 'Tam yönetim yetkisi' },
@@ -98,7 +99,7 @@ export function CreateUserModal({ open, onClose }: CreateUserModalProps) {
       onClose();
     } catch (err) {
       const msg =
-        err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Hata oluştu.';
+        err instanceof ApiError ? err.message : userFriendlyError(err);
       toast({ title: 'Kullanıcı oluşturulamadı', description: msg, variant: 'destructive' });
     }
   }

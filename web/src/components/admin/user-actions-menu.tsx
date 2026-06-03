@@ -40,7 +40,6 @@ import {
 import { useUpdateClientCertRequirementMutation } from '@/api/admin-client-certs';
 import { useIPRestrictionsQuery, useUpdateIPRestrictionsMutation } from '@/api/admin-ip-restrictions';
 import { useAuthStore } from '@/store/auth';
-import { ApiError } from '@/api/errors';
 import type { AdminUser } from '@/api/types';
 import {
   AlertDialog,
@@ -64,6 +63,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { DisableConfirmDialog } from './disable-confirm-dialog';
+import { userFriendlyError } from '@/lib/user-error';
 
 interface UserActionsMenuProps {
   user: AdminUser;
@@ -73,9 +73,7 @@ const ALL_ROLES = ['admin', 'write', 'read'] as const;
 type Role = (typeof ALL_ROLES)[number];
 
 function describeError(err: unknown): string {
-  if (err instanceof ApiError) return err.message;
-  if (err instanceof Error) return err.message;
-  return 'Beklenmeyen bir hata oluştu.';
+  return userFriendlyError(err);
 }
 
 export function UserActionsMenu({ user }: UserActionsMenuProps) {

@@ -33,37 +33,41 @@ type DBPinger interface {
 // Auth, Folder, Item, WS are optional: when nil their routes are not mounted
 // (useful for foundation tests that don't exercise those flows).
 type Deps struct {
-	Logger       *slog.Logger
-	DB           DBPinger
-	Auth         *AuthHandlers
-	Folder       *FolderHandlers
-	Item         *ItemHandlers
-	Attachment   *AttachmentHandlers
-	Admin        *AdminHandlers
-	ClientCert   *ClientCertHandlers // PR-SEC3: mTLS client certificate management
-	SSO          *SSOHandlers        // PR-LDAP: SSO/LDAP provider admin CRUD
-	Group        *GroupHandlers
-	Catalog      *CatalogHandlers
-	WS           *WSHandlers
-	Tag          *TagHandlers
-	Export       *ExportHandlers
-	Notification *NotificationHandlers
-	Graph        *GraphHandlers
-	ShareLink    *ShareLinkHandlers
-	Lifecycle      *LifecycleHandlers
-	Pipeline       *PipelineHandlers
-	LogForwarding  *LogForwardingHandlers // PR-LOG1: audit log forwarding to syslog/slack
-	Vault          *VaultHandlers         // PR-VAULT: HashiCorp Vault proxy (ADR-0007)
-	K8sCluster     *K8sClusterHandlers    // PR-K8S: Kubernetes cluster admin CRUD
-	K8s            *K8sHandlers           // PR-K8S: Per-item live K8s data proxy
-	Report         *ReportHandlers        // PR-K8S: HTML inventory report generation
-	Template       *TemplateHandlers      // PR-TPL: User-defined item templates
-	AISuggestion   *AISuggestionHandlers     // PR-AI: AI tag/relationship suggestions
-	Ansible        *AnsibleInventoryHandlers // PR-ANSIBLE: Ansible dynamic inventory
-	APIToken       *APITokenHandlers         // PR-ANSIBLE: API token management
-	SCIM           *SCIMHandlers             // PR-SCIM: SCIM 2.0 user provisioning
-	Scan           *ScanHandlers             // PR-SCAN: Secret fingerprint scanning
-	PprofEnabled   bool                      // PR-PROD5: pprof debug endpoints
+	Logger        *slog.Logger
+	DB            DBPinger
+	Auth          *AuthHandlers
+	Folder        *FolderHandlers
+	Item          *ItemHandlers
+	Attachment    *AttachmentHandlers
+	Admin         *AdminHandlers
+	ClientCert    *ClientCertHandlers // PR-SEC3: mTLS client certificate management
+	SSO           *SSOHandlers        // PR-LDAP: SSO/LDAP provider admin CRUD
+	Group         *GroupHandlers
+	Catalog       *CatalogHandlers
+	WS            *WSHandlers
+	Tag           *TagHandlers
+	Export        *ExportHandlers
+	Notification  *NotificationHandlers
+	Graph         *GraphHandlers
+	ShareLink     *ShareLinkHandlers
+	Lifecycle     *LifecycleHandlers
+	Pipeline      *PipelineHandlers
+	LogForwarding *LogForwardingHandlers    // PR-LOG1: audit log forwarding to syslog/slack
+	Vault         *VaultHandlers            // PR-VAULT: HashiCorp Vault proxy (ADR-0007)
+	K8sCluster    *K8sClusterHandlers       // PR-K8S: Kubernetes cluster admin CRUD
+	K8s           *K8sHandlers              // PR-K8S: Per-item live K8s data proxy
+	Report        *ReportHandlers           // PR-K8S: HTML inventory report generation
+	Template      *TemplateHandlers         // PR-TPL: User-defined item templates
+	AISuggestion  *AISuggestionHandlers     // PR-AI: AI tag/relationship suggestions
+	Ansible       *AnsibleInventoryHandlers // PR-ANSIBLE: Ansible dynamic inventory
+	APIToken      *APITokenHandlers         // PR-ANSIBLE: API token management
+	SCIM          *SCIMHandlers             // PR-SCIM: SCIM 2.0 user provisioning
+	Scan          *ScanHandlers             // PR-SCAN: Secret fingerprint scanning
+	Annotation      *AnnotationHandlers       // PR-DP01: Backstage-style item annotations
+	PortalTemplate  *PortalTemplateHandlers   // PR-DP11: Golden Path portal templates
+	CatalogEntity   *CatalogEntityHandlers    // PR-DP-E1: direct catalog entity endpoint
+	CORSOrigins     []string                  // ENVANTER_CORS_ORIGINS
+	PprofEnabled  bool                      // PR-PROD5: pprof debug endpoints
 }
 
 // NewRouter builds a chi router with the standard middleware stack.
@@ -76,14 +80,7 @@ func NewRouter(d Deps) http.Handler {
 	//    any auth middleware can reject them. Allows Tauri desktop client
 	//    (tauri://localhost, http://localhost:1420 dev) and same-origin web UI.
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins: []string{
-			"tauri://localhost",
-			"http://localhost:1420",
-			"https://localhost:1420",
-			"http://localhost",
-			"https://localhost",
-		},
-		AllowOriginFunc:  func(_ *http.Request, _ string) bool { return true },
+		AllowedOrigins:   d.CORSOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Authorization", "Content-Type", "X-Request-Id"},
 		ExposedHeaders:   []string{"X-Request-Id"},
@@ -111,6 +108,20 @@ func NewRouter(d Deps) http.Handler {
 	// for endpoints that should be subject to it.
 	timeoutMW := middleware.Timeout(30 * time.Second)
 
+	// Session revocation checker: verifies access token's session is not
+	// revoked on every authenticated request. This enables immediate
+	// logout enforcement (no waiting for 15-min token expiry).
+	var sessionCheck SessionChecker
+	if d.Auth != nil {
+		sessionCheck = NewDBSessionChecker(d.Auth.Service.DB)
+	}
+	requireAuth := func() func(http.Handler) http.Handler {
+		if d.Auth == nil {
+			return func(next http.Handler) http.Handler { return next }
+		}
+		return RequireAccessToken(d.Auth.Service.JWT, sessionCheck)
+	}()
+
 	// Health + metrics routes (unauthenticated, NOT timeout-wrapped)
 	h := &handlers{deps: d}
 	r.Get("/healthz", h.Healthz)
@@ -119,8 +130,11 @@ func NewRouter(d Deps) http.Handler {
 	r.Get("/metrics", metrics.Handler().ServeHTTP)
 
 	// PR-PROD5: pprof CPU+memory profiling (ENVANTER_PPROF_ENABLED=true).
-	if d.PprofEnabled {
+	// Admin-only — requires valid access token + admin role.
+	if d.PprofEnabled && d.Auth != nil {
 		r.Route("/debug/pprof", func(pr chi.Router) {
+			pr.Use(requireAuth)
+			pr.Use(RequireRole(RoleAdmin))
 			pr.Get("/", pprof.Index)
 			pr.Get("/cmdline", pprof.Cmdline)
 			pr.Get("/profile", pprof.Profile)
@@ -140,7 +154,7 @@ func NewRouter(d Deps) http.Handler {
 		// Ticket endpoint: short-lived, subject to timeout + auth middleware.
 		// d.Auth is always non-nil when d.WS is non-nil (main.go wires both together).
 		if d.Auth != nil {
-			r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+			r.With(timeoutMW, requireAuth).
 				Post("/api/v1/ws/ticket", d.WS.IssueTicket)
 		}
 	}
@@ -198,18 +212,18 @@ func NewRouter(d Deps) http.Handler {
 			// PR-SEC4: WebAuthn / FIDO2 credential management + login flow.
 			// Registration requires an access token (authenticated user adding a key).
 			// Login flow is unauthenticated (begin/finish replace the password step).
-			ar.With(RequireAccessToken(d.Auth.Service.JWT)).Post("/webauthn/register/begin", d.Auth.WebAuthnRegisterBegin)
-			ar.With(RequireAccessToken(d.Auth.Service.JWT)).Post("/webauthn/register/finish", d.Auth.WebAuthnRegisterFinish)
+			ar.With(requireAuth).Post("/webauthn/register/begin", d.Auth.WebAuthnRegisterBegin)
+			ar.With(requireAuth).Post("/webauthn/register/finish", d.Auth.WebAuthnRegisterFinish)
 			ar.With(authBruteRL.Middleware).Post("/webauthn/login/begin", d.Auth.WebAuthnLoginBegin)
 			ar.With(authBruteRL.Middleware).Post("/webauthn/login/finish", d.Auth.WebAuthnLoginFinish)
-			ar.With(RequireAccessToken(d.Auth.Service.JWT)).Get("/webauthn/credentials", d.Auth.WebAuthnListCredentials)
-			ar.With(RequireAccessToken(d.Auth.Service.JWT)).Put("/webauthn/credentials/{id}", d.Auth.WebAuthnUpdateCredential)
-			ar.With(RequireAccessToken(d.Auth.Service.JWT)).Delete("/webauthn/credentials/{id}", d.Auth.WebAuthnDeleteCredential)
+			ar.With(requireAuth).Get("/webauthn/credentials", d.Auth.WebAuthnListCredentials)
+			ar.With(requireAuth).Put("/webauthn/credentials/{id}", d.Auth.WebAuthnUpdateCredential)
+			ar.With(requireAuth).Delete("/webauthn/credentials/{id}", d.Auth.WebAuthnDeleteCredential)
 
 			// Trusted device management (PR-F2b) — access-token protected.
-			ar.With(RequireAccessToken(d.Auth.Service.JWT)).Get("/trusted-devices", d.Auth.ListTrustedDevices)
-			ar.With(RequireAccessToken(d.Auth.Service.JWT)).Delete("/trusted-devices", d.Auth.RevokeAllTrustedDevices)
-			ar.With(RequireAccessToken(d.Auth.Service.JWT)).Delete("/trusted-devices/{id}", d.Auth.RevokeTrustedDevice)
+			ar.With(requireAuth).Get("/trusted-devices", d.Auth.ListTrustedDevices)
+			ar.With(requireAuth).Delete("/trusted-devices", d.Auth.RevokeAllTrustedDevices)
+			ar.With(requireAuth).Delete("/trusted-devices/{id}", d.Auth.RevokeTrustedDevice)
 		})
 	}
 
@@ -231,7 +245,7 @@ func NewRouter(d Deps) http.Handler {
 	if d.Folder != nil && d.Auth != nil {
 		r.Route("/api/v1/folders", func(fr chi.Router) {
 			fr.Use(timeoutMW)
-			fr.Use(RequireAccessToken(d.Auth.Service.JWT))
+			fr.Use(requireAuth)
 			fr.Get("/", d.Folder.List)
 			fr.Post("/", d.Folder.Create)
 			fr.Get("/{id}", d.Folder.Get)
@@ -245,16 +259,16 @@ func NewRouter(d Deps) http.Handler {
 	if d.Item != nil && d.Auth != nil {
 		r.Route("/api/v1/items", func(ir chi.Router) {
 			ir.Use(timeoutMW)
-			ir.Use(RequireAccessToken(d.Auth.Service.JWT))
+			ir.Use(requireAuth)
 			ir.Get("/", d.Item.List)
-			ir.Get("/search", d.Item.Search)              // PR-SEARCH: cross-folder substring search
-			ir.Get("/duplicates", d.Item.CheckDuplicates)  // PR-DUP: duplicate name detection
+			ir.Get("/search", d.Item.Search)                 // PR-SEARCH: cross-folder substring search
+			ir.Get("/duplicates", d.Item.CheckDuplicates)    // PR-DUP: duplicate name detection
 			ir.Get("/health-report", d.Item.GetHealthReport) // PR-HEALTH: admin health report
 			ir.Post("/", d.Item.Create)
 			ir.Get("/{id}", d.Item.Get)
 			ir.Put("/{id}", d.Item.Update)
 			ir.Delete("/{id}", d.Item.Delete)
-			ir.Get("/{id}/shares", d.Item.ListShares)                                // PR-GROUP-SHARE
+			ir.Get("/{id}/shares", d.Item.ListShares) // PR-GROUP-SHARE
 			ir.Post("/{id}/shares", d.Item.Share)
 			ir.Delete("/{id}/shares/{user_id}", d.Item.Unshare)
 			ir.Post("/{id}/group-shares", d.Item.ShareGroup)                         // PR-GROUP-SHARE
@@ -263,7 +277,7 @@ func NewRouter(d Deps) http.Handler {
 			ir.Get("/{id}/fields/{field_def_id}/versions", d.Item.ListFieldVersions) // PR-N2
 			ir.Get("/{id}/links", d.Item.ListLinks)                                  // PR-LINK
 			ir.Post("/{id}/links", d.Item.CreateLink)                                // PR-LINK
-			ir.Delete("/{id}/links/{link_id}", d.Item.DeleteLink)                   // PR-LINK
+			ir.Delete("/{id}/links/{link_id}", d.Item.DeleteLink)                    // PR-LINK
 			ir.Get("/{id}/health", d.Item.GetHealth)                                 // PR-HEALTH
 
 			// PR-N7 tag + favorite routes under /items/{id}
@@ -290,7 +304,7 @@ func NewRouter(d Deps) http.Handler {
 	if d.Admin != nil && d.Auth != nil {
 		r.Route("/api/v1/admin", func(ar chi.Router) {
 			ar.Use(timeoutMW)
-			ar.Use(RequireAccessToken(d.Auth.Service.JWT))
+			ar.Use(requireAuth)
 			ar.Use(RequireRole(RoleAdmin))
 			ar.Get("/users", d.Admin.ListUsers)
 			ar.Post("/users", d.Admin.CreateUser)
@@ -363,7 +377,7 @@ func NewRouter(d Deps) http.Handler {
 	if d.Group != nil && d.Auth != nil {
 		r.Route("/api/v1/admin/groups", func(gr chi.Router) {
 			gr.Use(timeoutMW)
-			gr.Use(RequireAccessToken(d.Auth.Service.JWT))
+			gr.Use(requireAuth)
 			gr.Use(RequireRole(RoleAdmin))
 			gr.Get("/", d.Group.ListGroups)
 			gr.Post("/", d.Group.CreateGroup)
@@ -381,42 +395,64 @@ func NewRouter(d Deps) http.Handler {
 	if d.Tag != nil && d.Auth != nil {
 		r.Route("/api/v1/tags", func(tr chi.Router) {
 			tr.Use(timeoutMW)
-			tr.Use(RequireAccessToken(d.Auth.Service.JWT))
+			tr.Use(requireAuth)
 			tr.Get("/", d.Tag.ListTags)
 			tr.Post("/", d.Tag.CreateTag)
 			tr.Delete("/{tag_id}", d.Tag.DeleteTag)
 		})
 		r.Route("/api/v1/favorites", func(fr chi.Router) {
 			fr.Use(timeoutMW)
-			fr.Use(RequireAccessToken(d.Auth.Service.JWT))
+			fr.Use(requireAuth)
 			fr.Get("/", d.Tag.ListFavorites)
 		})
+	}
+
+	// Annotation routes (PR-DP01) — Backstage-style item metadata annotations.
+	if d.Annotation != nil && d.Item != nil && d.Auth != nil {
+		r.With(timeoutMW, requireAuth).
+			Get("/api/v1/items/{id}/annotations", d.Annotation.ListAnnotations)
+		r.With(timeoutMW, requireAuth).
+			Put("/api/v1/items/{id}/annotations/{key}", d.Annotation.UpsertAnnotation)
+		r.With(timeoutMW, requireAuth).
+			Delete("/api/v1/items/{id}/annotations/{key}", d.Annotation.DeleteAnnotation)
+	}
+
+	// Portal template routes (PR-DP11) — Golden Path scaffold blueprints.
+	// GET: all authenticated users; POST/PUT/DELETE: admin only.
+	if d.PortalTemplate != nil && d.Auth != nil {
+		mw := []func(http.Handler) http.Handler{timeoutMW, requireAuth}
+		mwAdmin := []func(http.Handler) http.Handler{timeoutMW, requireAuth, RequireRole(RoleAdmin)}
+		r.With(mw...).Get("/api/v1/portal-templates", d.PortalTemplate.ListPortalTemplates)
+		r.With(mw...).Get("/api/v1/portal-templates/{id}", d.PortalTemplate.GetPortalTemplate)
+		r.With(mwAdmin...).Post("/api/v1/portal-templates", d.PortalTemplate.CreatePortalTemplate)
+		r.With(mwAdmin...).Put("/api/v1/portal-templates/{id}", d.PortalTemplate.UpdatePortalTemplate)
+		r.With(mwAdmin...).Delete("/api/v1/portal-templates/{id}", d.PortalTemplate.DeletePortalTemplate)
 	}
 
 	// Graph routes (PR-F5a) — pipeline relationship map.
 	if d.Graph != nil && d.Auth != nil {
 		r.Route("/api/v1/graph", func(gr chi.Router) {
 			gr.Use(timeoutMW)
-			gr.Use(RequireAccessToken(d.Auth.Service.JWT))
+			gr.Use(requireAuth)
 			gr.Get("/", d.Graph.Graph)
 		})
 		// Relationship CRUD lives under /items/{id}/relationships.
 		// Mounted here (after item group) to avoid chi route conflicts.
 		if d.Item != nil {
-			r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+			r.With(timeoutMW, requireAuth).
 				Post("/api/v1/items/{id}/relationships", d.Graph.AddRelationship)
-			r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+			r.With(timeoutMW, requireAuth).
 				Delete("/api/v1/items/{id}/relationships/{target_id}/{rel_type}", d.Graph.DeleteRelationship)
 		}
 	}
 
 	// Lifecycle stage routes (PR-F5c) — DevOps lifecycle categorization.
 	if d.Lifecycle != nil && d.Auth != nil {
-		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+		r.With(timeoutMW, requireAuth).
 			Get("/api/v1/lifecycle-stages", d.Lifecycle.ListStages)
-		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+		r.With(timeoutMW, requireAuth).
 			Get("/api/v1/items/{id}/lifecycle-stages", d.Lifecycle.GetItemStages)
-		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+		r.With(timeoutMW, requireAuth).
 			Post("/api/v1/items/{id}/lifecycle-stages", d.Lifecycle.SetItemStages)
 	}
 
@@ -424,7 +460,7 @@ func NewRouter(d Deps) http.Handler {
 	if d.Pipeline != nil && d.Auth != nil {
 		r.Route("/api/v1/pipeline-diagrams", func(pr chi.Router) {
 			pr.Use(timeoutMW)
-			pr.Use(RequireAccessToken(d.Auth.Service.JWT))
+			pr.Use(requireAuth)
 			pr.Get("/", d.Pipeline.ListDiagrams)
 			pr.Post("/", d.Pipeline.CreateDiagram)
 			pr.Get("/{id}", d.Pipeline.GetDiagram)
@@ -439,27 +475,27 @@ func NewRouter(d Deps) http.Handler {
 
 	// Import routes (PR-IMPORT).
 	if d.Item != nil && d.Auth != nil {
-		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+		r.With(timeoutMW, requireAuth).
 			Post("/api/v1/import/csv/preview", d.Item.CSVPreview)
-		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+		r.With(timeoutMW, requireAuth).
 			Post("/api/v1/import/batch", d.Item.BatchImport)
 	}
 
 	// Onay/Checkout Workflow routes (PR-N3).
 	if d.Item != nil && d.Auth != nil {
 		// Per-item: create request + approval toggle (admin).
-		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+		r.With(timeoutMW, requireAuth).
 			Post("/api/v1/items/{id}/access-requests", d.Item.CreateAccessRequest)
-		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+		r.With(timeoutMW, requireAuth).
 			Patch("/api/v1/items/{id}/approval-required", d.Item.ToggleApprovalRequired)
 		// Global: list + approve/deny/cancel.
-		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+		r.With(timeoutMW, requireAuth).
 			Get("/api/v1/access-requests", d.Item.ListAccessRequests)
-		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+		r.With(timeoutMW, requireAuth).
 			Post("/api/v1/access-requests/{req_id}/approve", d.Item.ApproveAccessRequest)
-		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+		r.With(timeoutMW, requireAuth).
 			Post("/api/v1/access-requests/{req_id}/deny", d.Item.DenyAccessRequest)
-		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+		r.With(timeoutMW, requireAuth).
 			Delete("/api/v1/access-requests/{req_id}", d.Item.CancelAccessRequest)
 	}
 
@@ -467,7 +503,7 @@ func NewRouter(d Deps) http.Handler {
 	if d.Notification != nil && d.Auth != nil {
 		r.Route("/api/v1/notifications", func(nr chi.Router) {
 			nr.Use(timeoutMW)
-			nr.Use(RequireAccessToken(d.Auth.Service.JWT))
+			nr.Use(requireAuth)
 			nr.Get("/", d.Notification.List)
 			nr.Get("/unread-count", d.Notification.UnreadCount)
 			nr.Post("/read-all", d.Notification.MarkAllRead)
@@ -477,13 +513,19 @@ func NewRouter(d Deps) http.Handler {
 		// PR-NOTIFY: per-user notification preferences + external channels.
 		r.Route("/api/v1/users/me", func(mr chi.Router) {
 			mr.Use(timeoutMW)
-			mr.Use(RequireAccessToken(d.Auth.Service.JWT))
+			mr.Use(requireAuth)
 			mr.Get("/notification-prefs", d.Notification.GetNotificationPrefs)
 			mr.Put("/notification-prefs", d.Notification.UpdateNotificationPrefs)
 			mr.Get("/channels", d.Notification.ListExternalChannels)
 			mr.Post("/channels", d.Notification.AddExternalChannel)
 			mr.Delete("/channels/{channel_id}", d.Notification.DeleteExternalChannel)
 			mr.Post("/channels/{channel_id}/test", d.Notification.TestExternalChannel)
+			// E2E keypair endpoint — must live here because r.Route("/api/v1/users/me")
+			// captures the prefix; a separate r.Get("/api/v1/users/me/keypair") outside
+			// this block would 404 due to chi's sub-router isolation.
+			if d.Catalog != nil {
+				mr.Get("/keypair", d.Catalog.GetMyKeypair)
+			}
 		})
 	}
 
@@ -492,11 +534,11 @@ func NewRouter(d Deps) http.Handler {
 	// is inside the handler). The public view endpoint has NO auth middleware —
 	// anyone with the token can access it.
 	if d.ShareLink != nil && d.Auth != nil {
-		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+		r.With(timeoutMW, requireAuth).
 			Post("/api/v1/items/{id}/share-links", d.ShareLink.CreateShareLink)
-		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+		r.With(timeoutMW, requireAuth).
 			Get("/api/v1/items/{id}/share-links", d.ShareLink.ListShareLinks)
-		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+		r.With(timeoutMW, requireAuth).
 			Delete("/api/v1/items/{id}/share-links/{link_id}", d.ShareLink.RevokeShareLink)
 	}
 	if d.ShareLink != nil {
@@ -504,17 +546,20 @@ func NewRouter(d Deps) http.Handler {
 		r.With(timeoutMW).Get("/api/v1/share/{token}", d.ShareLink.ViewShareLink)
 	}
 
-	// Catalog routes — read-only lookup tables for the form/share flows
-	// + /users/me/keypair (caller's own E2E material for KEK derive).
-	// Any authenticated user may read these.
+	// Catalog routes — read-only lookup tables for the form/share flows.
+	// Note: /users/me/keypair moved into the /api/v1/users/me sub-router above
+	// to avoid chi route shadowing (sub-router captures the prefix).
 	if d.Catalog != nil && d.Auth != nil {
 		r.Route("/api/v1", func(cr chi.Router) {
 			cr.Use(timeoutMW)
-			cr.Use(RequireAccessToken(d.Auth.Service.JWT))
+			cr.Use(requireAuth)
 			cr.Get("/field-definitions", d.Catalog.ListFieldDefinitions)
 			cr.Get("/item-types", d.Catalog.ListItemTypes)
-			cr.Get("/users/me/keypair", d.Catalog.GetMyKeypair)
 			cr.Get("/users/{id}/public-key", d.Catalog.GetUserPublicKey)
+			// PR-DP-E1: direct catalog entity endpoint
+			if d.CatalogEntity != nil {
+				cr.Get("/catalog/{kind}/{name}", d.CatalogEntity.GetEntity)
+			}
 		})
 	}
 
@@ -522,21 +567,21 @@ func NewRouter(d Deps) http.Handler {
 	// vault-fetch: any authenticated user with item read permission.
 	// vault/paths: admin only (path listing leaks Vault structure).
 	if d.Vault != nil && d.Auth != nil {
-		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+		r.With(timeoutMW, requireAuth).
 			Post("/api/v1/items/{id}/vault-fetch", d.Vault.VaultFetch)
-		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+		r.With(timeoutMW, requireAuth).
 			Get("/api/v1/vault/paths", d.Vault.VaultListPaths)
 		// PR-VAULT-DYN: ephemeral dynamic credential from Vault secrets engine.
-		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+		r.With(timeoutMW, requireAuth).
 			Post("/api/v1/items/{id}/dynamic-cred", d.Vault.IssueDynamicCred)
-		r.With(timeoutMW, RequireAccessToken(d.Auth.Service.JWT)).
+		r.With(timeoutMW, requireAuth).
 			Delete("/api/v1/items/{id}/dynamic-cred/{lease_id}", d.Vault.RevokeDynamicCred)
 	}
 
 	// PR-TPL: User-defined item templates. Any authenticated user can read/create;
 	// only owner or admin can update/delete.
 	if d.Template != nil && d.Auth != nil {
-		mw := []func(http.Handler) http.Handler{timeoutMW, RequireAccessToken(d.Auth.Service.JWT)}
+		mw := []func(http.Handler) http.Handler{timeoutMW, requireAuth}
 		r.With(mw...).Get("/api/v1/templates", d.Template.List)
 		r.With(mw...).Post("/api/v1/templates", d.Template.Create)
 		r.With(mw...).Put("/api/v1/templates/{id}", d.Template.Update)
@@ -545,7 +590,7 @@ func NewRouter(d Deps) http.Handler {
 
 	// PR-AI: AI suggestion routes.
 	if d.AISuggestion != nil && d.Auth != nil {
-		mw := []func(http.Handler) http.Handler{timeoutMW, RequireAccessToken(d.Auth.Service.JWT)}
+		mw := []func(http.Handler) http.Handler{timeoutMW, requireAuth}
 		r.With(mw...).Post("/api/v1/items/{id}/suggest", d.AISuggestion.Suggest)
 		r.With(mw...).Get("/api/v1/items/{id}/suggestions", d.AISuggestion.ListSuggestions)
 		r.With(mw...).Post("/api/v1/items/{id}/suggestions/{sid}/accept", d.AISuggestion.AcceptSuggestion)
@@ -554,12 +599,12 @@ func NewRouter(d Deps) http.Handler {
 
 	// PR-ANSIBLE: Ansible dynamic inventory + API token management.
 	if d.Ansible != nil && d.Auth != nil {
-		mw := []func(http.Handler) http.Handler{timeoutMW, RequireAccessToken(d.Auth.Service.JWT)}
+		mw := []func(http.Handler) http.Handler{timeoutMW, requireAuth}
 		// Ansible inventory: also accepts raw API token (checked inside handler).
 		r.With(mw...).Get("/api/v1/ansible/inventory", d.Ansible.GetInventory)
 	}
 	if d.APIToken != nil && d.Auth != nil {
-		mw := []func(http.Handler) http.Handler{timeoutMW, RequireAccessToken(d.Auth.Service.JWT)}
+		mw := []func(http.Handler) http.Handler{timeoutMW, requireAuth}
 		r.With(mw...).Get("/api/v1/users/me/api-tokens", d.APIToken.ListAPITokens)
 		r.With(mw...).Post("/api/v1/users/me/api-tokens", d.APIToken.CreateAPIToken)
 		r.With(mw...).Delete("/api/v1/users/me/api-tokens/{id}", d.APIToken.DeleteAPIToken)
@@ -568,7 +613,7 @@ func NewRouter(d Deps) http.Handler {
 	// PR-K8S: Per-item live K8s proxy routes. Read permission sufficient for data;
 	// write permission required for binding registration.
 	if d.K8s != nil && d.Auth != nil {
-		mw := []func(http.Handler) http.Handler{timeoutMW, RequireAccessToken(d.Auth.Service.JWT)}
+		mw := []func(http.Handler) http.Handler{timeoutMW, requireAuth}
 		r.With(mw...).Get("/api/v1/items/{id}/k8s/binding", d.K8s.GetBinding)
 		r.With(mw...).Post("/api/v1/items/{id}/k8s/bind", d.K8s.SetBinding)
 		r.With(mw...).Get("/api/v1/items/{id}/k8s/pods", d.K8s.ListPods)
@@ -582,7 +627,7 @@ func NewRouter(d Deps) http.Handler {
 	// Item-level CRUD: JWT auth (standard).
 	// POST /security/scan: JWT OR API token (scope='scan'/'read'). No JWT MW applied — handled inside handler.
 	if d.Scan != nil && d.Auth != nil {
-		mw := []func(http.Handler) http.Handler{timeoutMW, RequireAccessToken(d.Auth.Service.JWT)}
+		mw := []func(http.Handler) http.Handler{timeoutMW, requireAuth}
 		r.With(mw...).Put("/api/v1/items/{id}/scan", d.Scan.UpsertFingerprint)
 		r.With(mw...).Get("/api/v1/items/{id}/scan", d.Scan.GetScanConfig)
 		r.With(mw...).Delete("/api/v1/items/{id}/scan/{fp_id}", d.Scan.DeleteFingerprint)

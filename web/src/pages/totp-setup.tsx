@@ -32,6 +32,7 @@ import { useTOTPInitMutation, useTOTPVerifyMutation } from '@/api/auth';
 import { TOTPQRCode } from '@/components/auth/totp-qr';
 import { useAuthStore } from '@/store/auth';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { userFriendlyError } from '@/lib/user-error';
 
 export default function TOTPSetupPage() {
   useDocumentTitle('TOTP Kurulumu');
@@ -71,7 +72,7 @@ export default function TOTPSetupPage() {
       onError: (err) => {
         toast({
           title: 'TOTP başlatılamadı',
-          description: err.message,
+          description: userFriendlyError(err),
           variant: 'destructive',
         });
       },
@@ -94,7 +95,7 @@ export default function TOTPSetupPage() {
     } catch (err) {
       toast({
         title: 'Kod yanlış',
-        description: err instanceof Error ? err.message : 'TOTP doğrulaması başarısız.',
+        description: userFriendlyError(err),
         variant: 'destructive',
       });
     }

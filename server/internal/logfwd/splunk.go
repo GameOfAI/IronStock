@@ -68,7 +68,7 @@ func NewSplunkForwarder(configID string, cfg SplunkConfig) *SplunkForwarder {
 func (f *SplunkForwarder) ConfigID() string { return f.configID }
 
 // Close implements Forwarder.
-func (f *SplunkForwarder) Close() error { return nil }
+func (*SplunkForwarder) Close() error { return nil }
 
 // Send implements Forwarder — delivers the event to Splunk HEC with retry.
 func (f *SplunkForwarder) Send(ctx context.Context, ev Event) error {

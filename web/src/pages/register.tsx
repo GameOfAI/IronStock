@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { userFriendlyError } from '@/lib/user-error';
 
 export default function RegisterPage() {
   useDocumentTitle('Kayıt');
@@ -55,7 +56,7 @@ export default function RegisterPage() {
     } catch (err) {
       toast({
         title: 'Hata',
-        description: err instanceof Error ? err.message : 'Kayıt başarısız',
+        description: userFriendlyError(err),
         variant: 'destructive',
       });
     } finally {

@@ -38,6 +38,7 @@ import {
   useTestLDAPConnectionMutation,
 } from '@/api/admin-sso';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { userFriendlyError } from '@/lib/user-error';
 
 // ─── Empty default for the form ───────────────────────────────────────────────
 
@@ -136,7 +137,7 @@ function ProviderFormDialog({
       toast({ title: isEdit ? 'Sağlayıcı güncellendi' : 'Sağlayıcı oluşturuldu' });
       onClose();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Bilinmeyen hata';
+      const msg = userFriendlyError(err);
       toast({ title: 'Hata', description: msg, variant: 'destructive' });
     }
   }
@@ -361,7 +362,7 @@ export default function AdminSSOPage() {
       const res = await testMut.mutateAsync(p.id);
       setTestResult({ id: p.id, ok: res.ok, msg: res.message ?? res.error ?? '' });
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Bağlantı testi başarısız';
+      const msg = userFriendlyError(err);
       setTestResult({ id: p.id, ok: false, msg });
     }
   }
@@ -373,7 +374,7 @@ export default function AdminSSOPage() {
       toast({ title: `"${deleting.name}" silindi` });
       setDeleting(null);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Silme başarısız';
+      const msg = userFriendlyError(err);
       toast({ title: 'Hata', description: msg, variant: 'destructive' });
     }
   }

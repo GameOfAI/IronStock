@@ -13,6 +13,10 @@ spec:
       labels:
         app: adminer
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
       containers:
         - name: adminer
           image: adminer:4
@@ -23,17 +27,28 @@ spec:
               value: postgres
             - name: ADMINER_DESIGN
               value: pepa-linha-dark
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
 ---
+# ClusterIP — erişim sadece kubectl port-forward ile (güvenlik).
 apiVersion: v1
 kind: Service
 metadata:
   name: adminer
   namespace: envanter
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
     app: adminer
   ports:
     - port: 8080
       targetPort: 8080
-      nodePort: 30832

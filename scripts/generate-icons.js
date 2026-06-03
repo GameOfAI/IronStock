@@ -14,6 +14,12 @@
  * Gereksinim:
  *   npm install --save-dev sharp   (web/package.json'da zaten mevcut)
  *
+ * macOS .icns için:
+ *   Bu script macOS'ta çalıştırılırsa `iconutil` (Xcode CLI Tools) kullanarak
+ *   icon.icns dosyasını otomatik üretir. macOS dışında .icns üretilmez.
+ *   macOS Dock ikonunun düzgün görünmesi için icon.icns şarttır.
+ *   Alternatif: cd client && npx tauri icon ../path/to/icon-512.png
+ *
  * Kaynak dizinde beklenen dosyalar:
  *   icon-512.png        — ana ikon (512x512)
  *   icon-128.png        — 128px versiyon
@@ -27,6 +33,7 @@
 import sharp from 'sharp';
 import fs from 'fs';
 import path from 'path';
+import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -95,6 +102,34 @@ async function run() {
   );
   fs.writeFileSync(path.join(TAURI_ICONS,'icon.ico'), buildIco(icoEntries));
   console.log('✅ client/src-tauri/icons/icon.ico (16+32+48+256)');
+
+  // ── macOS .icns (sadece macOS'ta üretilir, iconutil gerekir) ──────────────
+  if (process.platform === 'darwin') {
+    const iconsetDir = path.join(TAURI_ICONS, 'icon.iconset');
+    fs.mkdirSync(iconsetDir, { recursive: true });
+    const icnsSizes = [
+      { name: 'icon_16x16.png',      size: 16  },
+      { name: 'icon_16x16@2x.png',   size: 32  },
+      { name: 'icon_32x32.png',      size: 32  },
+      { name: 'icon_32x32@2x.png',   size: 64  },
+      { name: 'icon_128x128.png',    size: 128 },
+      { name: 'icon_128x128@2x.png', size: 256 },
+      { name: 'icon_256x256.png',    size: 256 },
+      { name: 'icon_256x256@2x.png', size: 512 },
+      { name: 'icon_512x512.png',    size: 512 },
+      { name: 'icon_512x512@2x.png', size: 1024 },
+    ];
+    await Promise.all(icnsSizes.map(({ name, size }) =>
+      sharp(src512).resize(size, size).png().toFile(path.join(iconsetDir, name))
+    ));
+    execSync(`iconutil -c icns "${iconsetDir}" --output "${path.join(TAURI_ICONS, 'icon.icns')}"`);
+    fs.rmSync(iconsetDir, { recursive: true });
+    console.log('✅ client/src-tauri/icons/icon.icns (macOS Dock + App Bundle)');
+  } else {
+    console.log('⚠️  icon.icns atlandı (sadece macOS\'ta üretilir — iconutil gerekli)');
+    console.log('   Mac\'te çalıştır: node scripts/generate-icons.js <kaynak-dizin>');
+    console.log('   Veya:            cd client && npx tauri icon path/to/icon-512.png');
+  }
 
   // ── Web public ─────────────────────────────────────────────────────────────
   await sharp(src32).resize(32,32).png().toFile(path.join(WEB_PUBLIC,'favicon-32.png'));

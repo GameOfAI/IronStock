@@ -12,6 +12,8 @@ import { AuthGate, MustChangePasswordGate, MustSetupTOTPGate, RoleGate } from '@
 import { WsProvider } from '@/components/ws-provider';
 import { SkipLink } from '@/components/layout/skip-link';
 import { OnboardingTour, useOnboardingTour } from '@/components/onboarding/onboarding-tour';
+import { EntityPageRegistryProvider } from '@/lib/entity-page-registry';
+import { DefaultTabsRegistrar } from '@/lib/default-entity-tabs';
 
 import LoginPage from '@/pages/login';
 import RegisterPage from '@/pages/register';
@@ -28,6 +30,7 @@ import AdminSCIMPage from '@/pages/admin/scim';
 import AdminSecretScanningPage from '@/pages/admin/secret-scanning';
 import AdminK8sClustersPage from '@/pages/admin/k8s-clusters';
 import AdminReportsPage from '@/pages/admin/reports';
+import AdminPortalTemplatesPage from '@/pages/admin/portal-templates';
 import SSOCallbackPage from '@/pages/sso-callback';
 import TagsPage from '@/pages/tags';
 import { GraphPage } from '@/pages/graph';
@@ -35,12 +38,15 @@ import PipelineListPage from '@/pages/pipeline/index';
 import DiagramPage from '@/pages/pipeline/diagram';
 import LifecyclePage from '@/pages/pipeline/lifecycle';
 import AdminSetupPage from '@/pages/admin-setup';
-import AdminLoginPage from '@/pages/admin-login';
 import ChangePasswordPage from '@/pages/change-password';
 import ProfilePage from '@/pages/profile';
 import SharePage from '@/pages/share';
 import ImportPage from '@/pages/import';
 import AccessRequestsPage from '@/pages/access-requests';
+import CatalogPage from '@/pages/catalog';
+import EntityDetailPage from '@/pages/catalog/entity-detail';
+import CreatePage from '@/pages/create';
+import PortalHomePage from '@/pages/portal-home';
 import NotFoundPage from '@/pages/not-found';
 
 /**
@@ -89,6 +95,8 @@ function OnboardingTourBridge() {
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
+      <EntityPageRegistryProvider>
+      <DefaultTabsRegistrar />
       <ThemeProvider>
         <BrowserRouter>
           <SkipLink />
@@ -105,7 +113,6 @@ export default function App() {
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             {/* Bootstrap admin panel — TOTP-free, ADR-0010 */}
             <Route path="/admin-setup" element={<AdminSetupPage />} />
-            <Route path="/admin-login" element={<AdminLoginPage />} />
             {/* PR-N5: Public one-time share link — no auth required */}
             <Route path="/share/:token" element={<SharePage />} />
             {/* PR-LDAP: OIDC callback landing — sets auth store from hash fragment */}
@@ -127,7 +134,7 @@ export default function App() {
                 <Route element={<MustSetupTOTPGate />}>
                   <Route element={<WsProvider><Outlet /></WsProvider>}>
                   <Route element={<><OnboardingTourBridge /><AppShell /></>}>
-                    <Route index element={<Navigate to="/inventory" replace />} />
+                    <Route index element={<PortalHomePage />} />
                     <Route path="/inventory/*" element={<InventoryPage />} />
                     <Route path="/tags" element={<TagsPage />} />
                     <Route path="/graph" element={<GraphPage />} />
@@ -137,6 +144,9 @@ export default function App() {
                     <Route path="/profile" element={<ProfilePage />} />
                     <Route path="/import" element={<ImportPage />} />
                     <Route path="/access-requests" element={<AccessRequestsPage />} />
+                    <Route path="/catalog" element={<CatalogPage />} />
+                    <Route path="/catalog/:kind/:namespace/:name" element={<EntityDetailPage />} />
+                    <Route path="/create" element={<CreatePage />} />
 
                     {/* Admin */}
                     <Route element={<RoleGate role="admin" />}>
@@ -152,6 +162,7 @@ export default function App() {
                       <Route path="/admin/secret-scanning" element={<AdminSecretScanningPage />} />
                       <Route path="/admin/k8s-clusters" element={<AdminK8sClustersPage />} />
                       <Route path="/admin/reports" element={<AdminReportsPage />} />
+                      <Route path="/admin/portal-templates" element={<AdminPortalTemplatesPage />} />
                     </Route>
                   </Route>
                   </Route>
@@ -164,6 +175,7 @@ export default function App() {
           <Toaster />
         </BrowserRouter>
       </ThemeProvider>
+      </EntityPageRegistryProvider>
       {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
     </QueryClientProvider>
   );

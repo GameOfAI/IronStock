@@ -15,9 +15,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"time"
 )
+
+// ErrSSRF is returned when the server URL resolves to a private/loopback address.
+var ErrSSRF = errors.New("k8s: server URL resolves to a private or loopback address")
 
 // AuthMode represents how the client authenticates to the cluster.
 type AuthMode string
@@ -53,8 +58,35 @@ type Client struct {
 	bearer string // resolved token (from BearerToken or Kubeconfig.Token)
 }
 
+// validateServerURL rejects URLs that point to loopback or link-local addresses
+// to prevent SSRF attacks through user-controlled cluster configs.
+func validateServerURL(serverURL string) error {
+	u, err := url.Parse(serverURL)
+	if err != nil {
+		return fmt.Errorf("k8s: invalid server URL: %w", err)
+	}
+	host := u.Hostname()
+	if host == "" {
+		return errors.New("k8s: server URL has no host")
+	}
+	ip := net.ParseIP(host)
+	if ip != nil {
+		if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
+			return ErrSSRF
+		}
+	}
+	if host == "localhost" || host == "metadata.google.internal" ||
+		host == "169.254.169.254" {
+		return ErrSSRF
+	}
+	return nil
+}
+
 // New creates a Client from cfg, constructing the appropriate TLS configuration.
 func New(cfg Config) (*Client, error) {
+	if err := validateServerURL(cfg.ServerURL); err != nil {
+		return nil, err
+	}
 	tlsCfg := &tls.Config{
 		InsecureSkipVerify: cfg.SkipTLSVerify, //nolint:gosec
 	}
@@ -98,6 +130,9 @@ func New(cfg Config) (*Client, error) {
 
 		// Use the kubeconfig server URL if set.
 		if kc.ServerURL != "" {
+			if err := validateServerURL(kc.ServerURL); err != nil {
+				return nil, err
+			}
 			cfg.ServerURL = kc.ServerURL
 		}
 	}

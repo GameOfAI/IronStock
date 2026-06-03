@@ -40,10 +40,32 @@ type graphNode struct {
 
 // graphEdge is a directed relationship between two items.
 type graphEdge struct {
-	SourceID string          `json:"source_id"`
-	TargetID string          `json:"target_id"`
-	Type     string          `json:"type"`
-	Metadata json.RawMessage `json:"metadata,omitempty"`
+	SourceID      string          `json:"source_id"`
+	TargetID      string          `json:"target_id"`
+	Type          string          `json:"type"`
+	Metadata      json.RawMessage `json:"metadata,omitempty"`
+	BackstageType string          `json:"backstage_type,omitempty"` // PR-DP03: Backstage standard relation
+}
+
+// backstageTypeMap maps IronStock relation types to Backstage-standard strings (PR-DP03).
+// camelCase Backstage-native types map to themselves.
+var backstageTypeMap = map[string]string{
+	"depends_on":  "dependsOn",
+	"part_of":     "partOf",
+	"hosted_on":   "dependsOn",
+	"accessed_via": "dependsOn",
+	"uses_tool":   "dependsOn",
+	"builds_to":   "dependsOn",
+	"deploys_to":  "dependsOn",
+	"scans_with":  "dependsOn",
+	"runs_in":     "partOf",
+	"related_to":  "hasPart",
+	// Backstage-native aliases — pass through as-is.
+	"ownedBy":    "ownedBy",
+	"dependsOn":  "dependsOn",
+	"memberOf":   "memberOf",
+	"providesApi": "providesApi",
+	"consumesApi": "consumesApi",
 }
 
 // graphResponse is the full graph payload.
@@ -61,6 +83,7 @@ type addRelationshipRequest struct {
 }
 
 var validRelTypes = map[string]bool{
+	// Original IronStock snake_case types.
 	"hosted_on":    true,
 	"accessed_via": true,
 	"part_of":      true,
@@ -71,6 +94,12 @@ var validRelTypes = map[string]bool{
 	"scans_with":   true,
 	"deploys_to":   true,
 	"runs_in":      true, // PR-K8S: application item → k8s_namespace item
+	// PR-DP03: Backstage-native camelCase aliases.
+	"ownedBy":     true,
+	"dependsOn":   true,
+	"memberOf":    true,
+	"providesApi": true,
+	"consumesApi": true,
 }
 
 // Graph implements GET /api/v1/graph.
@@ -255,6 +284,8 @@ func (h *GraphHandlers) Graph(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 		}
+		// PR-DP03: populate Backstage-standard type for catalog consumers.
+		e.BackstageType = backstageTypeMap[e.Type]
 		edges = append(edges, e)
 	}
 	if err := erows.Err(); err != nil {

@@ -18,6 +18,7 @@ package httpapi
 import (
 	"context"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/base64"
@@ -25,6 +26,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"net/http"
 	"net/url"
 	"strings"
@@ -33,6 +35,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	ldap "github.com/go-ldap/ldap/v3"
+	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -42,17 +45,16 @@ import (
 )
 
 // ─────────────────────────────────────────────
-//  OIDC state store (in-memory, single-pod MVP)
+//  OIDC state store (Redis with in-memory fallback)
 // ─────────────────────────────────────────────
 
 // oidcStateEntry holds metadata for a pending OIDC flow.
 // It expires after 10 minutes — enough for a user to authenticate
-// and have the provider redirect back. Multi-pod deployments should
-// replace this with a Redis/DB-backed store.
+// and have the provider redirect back.
 type oidcStateEntry struct {
-	ProviderID    string
-	PKCEVerifier  string
-	ExpiresAt     time.Time
+	ProviderID   string    `json:"provider_id"`
+	PKCEVerifier string    `json:"pkce_verifier"`
+	ExpiresAt    time.Time `json:"expires_at"`
 }
 
 var (
@@ -60,29 +62,70 @@ var (
 	oidcStateStore = map[string]oidcStateEntry{}
 )
 
+// oidcRedisClient is set at init when Redis is available (multi-pod support).
+var oidcRedisClient redisStateClient
+
+type redisStateClient interface {
+	SetEX(ctx context.Context, key string, value any, ttl time.Duration) error
+	GetDel(ctx context.Context, key string) (string, error)
+	IsOpen() bool
+}
+
+// SetOIDCStateRedis wires in a Redis client for multi-pod OIDC state.
+func SetOIDCStateRedis(c redisStateClient) {
+	oidcRedisClient = c
+}
+
+const oidcStatePrefix = "oidc_state:"
+
 func issueOIDCState(providerID, pkceVerifier string) string {
 	b := make([]byte, 24)
 	_, _ = rand.Read(b)
 	state := base64.RawURLEncoding.EncodeToString(b)
 
+	entry := oidcStateEntry{
+		ProviderID:   providerID,
+		PKCEVerifier: pkceVerifier,
+		ExpiresAt:    time.Now().Add(10 * time.Minute),
+	}
+
+	// Try Redis first for multi-pod support.
+	if oidcRedisClient != nil && !oidcRedisClient.IsOpen() {
+		data, _ := json.Marshal(entry)
+		if err := oidcRedisClient.SetEX(context.Background(), oidcStatePrefix+state, string(data), 10*time.Minute); err == nil {
+			return state
+		}
+	}
+
+	// Fallback to in-memory.
 	oidcStateMu.Lock()
 	defer oidcStateMu.Unlock()
-	// GC: evict expired entries.
 	now := time.Now()
 	for k, v := range oidcStateStore {
 		if now.After(v.ExpiresAt) {
 			delete(oidcStateStore, k)
 		}
 	}
-	oidcStateStore[state] = oidcStateEntry{
-		ProviderID:   providerID,
-		PKCEVerifier: pkceVerifier,
-		ExpiresAt:    now.Add(10 * time.Minute),
-	}
+	oidcStateStore[state] = entry
 	return state
 }
 
 func consumeOIDCState(state string) (oidcStateEntry, bool) {
+	// Try Redis first.
+	if oidcRedisClient != nil && !oidcRedisClient.IsOpen() {
+		data, err := oidcRedisClient.GetDel(context.Background(), oidcStatePrefix+state)
+		if err == nil && data != "" {
+			var e oidcStateEntry
+			if json.Unmarshal([]byte(data), &e) == nil {
+				if time.Now().After(e.ExpiresAt) {
+					return oidcStateEntry{}, false
+				}
+				return e, true
+			}
+		}
+	}
+
+	// Fallback to in-memory.
 	oidcStateMu.Lock()
 	defer oidcStateMu.Unlock()
 	e, ok := oidcStateStore[state]
@@ -602,7 +645,7 @@ func (s *AuthHandlers) OIDCCallback(w http.ResponseWriter, r *http.Request) {
 
 	code := r.URL.Query().Get("code")
 	if code == "" {
-		// Provider may have sent an error (e.g., user cancelled).
+		// Provider may have sent an error (e.g., user canceled).
 		providerErr := r.URL.Query().Get("error")
 		http.Error(w, "Yetkilendirme kodu eksik: "+providerErr, http.StatusBadRequest)
 		return
@@ -646,10 +689,10 @@ func (s *AuthHandlers) OIDCCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse claims from ID token payload.
-	claims, err := parseIDTokenClaims(idTokenStr)
+	// Parse and verify ID token claims via JWKS.
+	claims, err := parseAndVerifyIDToken(ctx, idTokenStr, disc, *p.ClientID)
 	if err != nil {
-		http.Error(w, "ID token ayrıştırılamadı: "+err.Error(), http.StatusBadGateway)
+		http.Error(w, "ID token doğrulanamadı: "+err.Error(), http.StatusBadGateway)
 		return
 	}
 
@@ -741,6 +784,8 @@ func (s *AuthHandlers) OIDCCallback(w http.ResponseWriter, r *http.Request) {
 type oidcDiscovery struct {
 	AuthorizationEndpoint string `json:"authorization_endpoint"`
 	TokenEndpoint         string `json:"token_endpoint"`
+	JWKSURI               string `json:"jwks_uri"`
+	Issuer                string `json:"issuer"`
 }
 
 func fetchOIDCDiscovery(ctx context.Context, discoveryURL string) (oidcDiscovery, error) {
@@ -784,7 +829,6 @@ type idTokenClaims struct {
 // returns the raw id_token JWT string.
 func exchangeOIDCCode(ctx context.Context, tokenEndpoint, clientID, clientSecret,
 	code, redirectURI, codeVerifier string) (string, error) {
-
 	vals := url.Values{
 		"grant_type":    {"authorization_code"},
 		"code":          {code},
@@ -826,11 +870,161 @@ func exchangeOIDCCode(ctx context.Context, tokenEndpoint, clientID, clientSecret
 	return tokenResp.IDToken, nil
 }
 
-// parseIDTokenClaims extracts JWT payload claims WITHOUT verifying the signature.
-// This is safe here because the token was obtained directly from the OIDC provider's
-// token endpoint over a TLS-authenticated HTTPS connection.
-// Full JWKS signature verification can be added in a follow-up PR.
-func parseIDTokenClaims(idToken string) (idTokenClaims, error) {
+// ─────────────────────────────────────────────
+//  JWKS cache (per issuer, 1-hour TTL)
+// ─────────────────────────────────────────────
+
+type jwksEntry struct {
+	Keys      []jwkKey
+	FetchedAt time.Time
+}
+
+type jwkKey struct {
+	Kid string `json:"kid"`
+	Kty string `json:"kty"`
+	Alg string `json:"alg"`
+	Use string `json:"use"`
+	N   string `json:"n"`
+	E   string `json:"e"`
+	Crv string `json:"crv"`
+	X   string `json:"x"`
+	Y   string `json:"y"`
+}
+
+var (
+	jwksCacheMu sync.Mutex
+	jwksCache   = map[string]jwksEntry{}
+)
+
+func fetchJWKS(ctx context.Context, jwksURI string) ([]jwkKey, error) {
+	jwksCacheMu.Lock()
+	if entry, ok := jwksCache[jwksURI]; ok && time.Since(entry.FetchedAt) < 1*time.Hour {
+		jwksCacheMu.Unlock()
+		return entry.Keys, nil
+	}
+	jwksCacheMu.Unlock()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, jwksURI, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("fetch JWKS: %w", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 512*1024))
+
+	var doc struct {
+		Keys []jwkKey `json:"keys"`
+	}
+	if err := json.Unmarshal(body, &doc); err != nil {
+		return nil, fmt.Errorf("parse JWKS: %w", err)
+	}
+
+	jwksCacheMu.Lock()
+	jwksCache[jwksURI] = jwksEntry{Keys: doc.Keys, FetchedAt: time.Now()}
+	jwksCacheMu.Unlock()
+	return doc.Keys, nil
+}
+
+func jwkToRSAPublicKey(k jwkKey) (*rsa.PublicKey, error) {
+	nBytes, err := base64.RawURLEncoding.DecodeString(k.N)
+	if err != nil {
+		return nil, fmt.Errorf("decode n: %w", err)
+	}
+	eBytes, err := base64.RawURLEncoding.DecodeString(k.E)
+	if err != nil {
+		return nil, fmt.Errorf("decode e: %w", err)
+	}
+	e := 0
+	for _, b := range eBytes {
+		e = e<<8 + int(b)
+	}
+	return &rsa.PublicKey{
+		N: new(big.Int).SetBytes(nBytes),
+		E: e,
+	}, nil
+}
+
+// parseAndVerifyIDToken verifies the ID token signature via JWKS, then
+// validates issuer and audience claims. Falls back to unverified parsing
+// if jwksURI is empty (legacy providers without JWKS).
+func parseAndVerifyIDToken(ctx context.Context, idToken string, disc oidcDiscovery, clientID string) (idTokenClaims, error) {
+	if disc.JWKSURI == "" {
+		return parseIDTokenUnverified(idToken)
+	}
+
+	keys, err := fetchJWKS(ctx, disc.JWKSURI)
+	if err != nil {
+		return idTokenClaims{}, fmt.Errorf("JWKS fetch: %w", err)
+	}
+
+	token, err := jwt.Parse(idToken, func(t *jwt.Token) (any, error) {
+		kid, _ := t.Header["kid"].(string)
+		for _, k := range keys {
+			if k.Kid != kid {
+				continue
+			}
+			if k.Kty == "RSA" {
+				return jwkToRSAPublicKey(k)
+			}
+			return nil, fmt.Errorf("unsupported key type: %s", k.Kty)
+		}
+		return nil, fmt.Errorf("no matching key found for kid=%s", kid)
+	})
+	if err != nil {
+		return idTokenClaims{}, fmt.Errorf("verify ID token: %w", err)
+	}
+	if !token.Valid {
+		return idTokenClaims{}, errors.New("ID token is invalid")
+	}
+
+	mapClaims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return idTokenClaims{}, errors.New("unexpected claims type")
+	}
+
+	// Validate issuer
+	if disc.Issuer != "" {
+		if iss, _ := mapClaims["iss"].(string); iss != disc.Issuer {
+			return idTokenClaims{}, fmt.Errorf("issuer mismatch: got %q, want %q", iss, disc.Issuer)
+		}
+	}
+
+	// Validate audience
+	if clientID != "" {
+		audValid := false
+		switch aud := mapClaims["aud"].(type) {
+		case string:
+			audValid = aud == clientID
+		case []any:
+			for _, a := range aud {
+				if s, ok := a.(string); ok && s == clientID {
+					audValid = true
+					break
+				}
+			}
+		}
+		if !audValid {
+			return idTokenClaims{}, fmt.Errorf("audience mismatch: expected %q", clientID)
+		}
+	}
+
+	claimsJSON, _ := json.Marshal(mapClaims)
+	var claims idTokenClaims
+	if err := json.Unmarshal(claimsJSON, &claims); err != nil {
+		return idTokenClaims{}, fmt.Errorf("parse verified claims: %w", err)
+	}
+	if claims.Sub == "" {
+		return idTokenClaims{}, errors.New("JWT missing 'sub' claim")
+	}
+	return claims, nil
+}
+
+// parseIDTokenUnverified extracts claims without signature verification.
+// Used only as fallback when JWKS URI is unavailable.
+func parseIDTokenUnverified(idToken string) (idTokenClaims, error) {
 	parts := strings.SplitN(idToken, ".", 3)
 	if len(parts) != 3 {
 		return idTokenClaims{}, errors.New("invalid JWT format")

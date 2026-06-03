@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Envanter App API
-  version: 0.3.0
+  version: 0.4.0
   description: |
     DevOps/SRE envanter yönetim uygulaması REST API'si.
 
@@ -52,6 +52,12 @@ tags:
     description: Read-only lookup tables — field defs, item types, user pub keys (PR-11).
   - name: realtime
     description: WebSocket /ws — folder/item lifecycle events (PR-10).
+  - name: annotations
+    description: Item annotations (key-value metadata) — CRUD endpoints (PR-DP01).
+  - name: portal-templates
+    description: Golden-path portal template management (PR-DP10/E2).
+  - name: developer-portal
+    description: Catalog entity detail, health report, search (PR-DP01–DP15, E1–E5).
 
 security:
   - BearerAuth: []
@@ -345,6 +351,283 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
+  # ==================== ANNOTATIONS ====================
+
+  /api/v1/items/{itemId}/annotations:
+    get:
+      tags: [annotations]
+      summary: Item'ın tüm annotation'larını listele
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Annotation listesi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ItemAnnotationsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Item bulunamadı
+
+  /api/v1/items/{itemId}/annotations/{key}:
+    put:
+      tags: [annotations]
+      summary: Annotation oluştur veya güncelle (upsert)
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: key
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertAnnotationRequest"
+      responses:
+        "200":
+          description: Annotation oluşturuldu/güncellendi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ItemAnnotation"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Yazma izni yok
+    delete:
+      tags: [annotations]
+      summary: Annotation sil
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: key
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204":
+          description: Silindi
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Annotation bulunamadı
+
+  # ==================== PORTAL TEMPLATES ====================
+
+  /api/v1/portal-templates:
+    get:
+      tags: [portal-templates]
+      summary: Portal template'leri listele
+      parameters:
+        - name: kind_key
+          in: query
+          schema: { type: string }
+          description: Kind'a göre filtrele
+        - name: all
+          in: query
+          schema: { type: string, enum: ["true"] }
+          description: Admin-only — inactive template'leri de dahil et
+      responses:
+        "200":
+          description: Template listesi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PortalTemplateListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [portal-templates]
+      summary: Yeni portal template oluştur (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePortalTemplateRequest"
+      responses:
+        "201":
+          description: Oluşturuldu
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PortalTemplate"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Admin rolü gerekli
+
+  /api/v1/portal-templates/{id}:
+    get:
+      tags: [portal-templates]
+      summary: Tek template detay
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Template detay
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PortalTemplate"
+        "404":
+          description: Bulunamadı
+    put:
+      tags: [portal-templates]
+      summary: Template güncelle (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePortalTemplateRequest"
+      responses:
+        "200":
+          description: Güncellendi
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Admin rolü gerekli
+    delete:
+      tags: [portal-templates]
+      summary: Template sil (admin, builtin silinemez)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: Silindi
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Admin rolü gerekli veya builtin template
+
+  # ==================== DEVELOPER PORTAL ====================
+
+  /api/v1/catalog/{kind}/{name}:
+    get:
+      tags: [developer-portal]
+      summary: Entity detayını tek çağrıda döndür
+      description: |
+        Kind + name ile entity lookup. Item, annotations, relationships ve
+        health score'u tek response'ta döndürür.
+      parameters:
+        - name: kind
+          in: path
+          required: true
+          schema: { type: string }
+          description: Entity kind_key (Server, Database, Service, vb.)
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+          description: Entity name (plaintext)
+      responses:
+        "200":
+          description: Entity detay
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogEntityResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Entity bulunamadı
+
+  /api/v1/items/search:
+    get:
+      tags: [developer-portal]
+      summary: Item arama (cross-folder, trigram fuzzy)
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string, minLength: 2 }
+          description: Arama sorgusu (en az 2 karakter)
+        - name: kind
+          in: query
+          schema: { type: string }
+          description: Kind'a göre filtrele
+        - name: fuzzy
+          in: query
+          schema: { type: string, enum: ["true"] }
+          description: pg_trgm fuzzy arama etkinleştir
+      responses:
+        "200":
+          description: Arama sonuçları
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ItemListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/items/{itemId}/health:
+    get:
+      tags: [developer-portal]
+      summary: Item sağlık skoru ve kırılımı
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Sağlık raporu
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ItemHealthResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/items/health-report:
+    get:
+      tags: [developer-portal]
+      summary: Toplu sağlık raporu (admin)
+      parameters:
+        - name: threshold
+          in: query
+          schema: { type: integer, default: 70 }
+          description: Bu skorun altındaki item'ları döndür
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50 }
+          description: Maksimum sonuç sayısı
+      responses:
+        "200":
+          description: Sağlık raporu
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthReportResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Admin rolü gerekli
+
 components:
   # ---------- Security ----------
   securitySchemes:
@@ -625,3 +908,178 @@ components:
         new_kek_params: { $ref: "#/components/schemas/Argon2Params" }
         new_public_key: { $ref: "#/components/schemas/PublicKey" }
         new_private_key_enc: { $ref: "#/components/schemas/EncryptedBlob" }
+
+    # ---------- Annotations (PR-DP01) ----------
+    ItemAnnotation:
+      type: object
+      required: [key, value]
+      properties:
+        key: { type: string }
+        value: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    ItemAnnotationsResponse:
+      type: object
+      required: [annotations]
+      properties:
+        annotations:
+          type: array
+          items:
+            $ref: "#/components/schemas/ItemAnnotation"
+
+    UpsertAnnotationRequest:
+      type: object
+      required: [value]
+      properties:
+        value: { type: string }
+
+    # ---------- Portal Templates (PR-DP10) ----------
+    PortalTemplate:
+      type: object
+      required: [id, name, is_builtin, is_active]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        kind_key: { type: string }
+        default_fields: { type: object, additionalProperties: true }
+        default_annotations: { type: object, additionalProperties: { type: string } }
+        default_lifecycle_stages:
+          type: array
+          items: { type: string }
+        is_builtin: { type: boolean }
+        is_active: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    PortalTemplateListResponse:
+      type: object
+      required: [templates]
+      properties:
+        templates:
+          type: array
+          items:
+            $ref: "#/components/schemas/PortalTemplate"
+
+    CreatePortalTemplateRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        description: { type: string }
+        kind_key: { type: string }
+        default_fields: { type: object, additionalProperties: true }
+        default_annotations: { type: object, additionalProperties: { type: string } }
+        default_lifecycle_stages:
+          type: array
+          items: { type: string }
+        is_active: { type: boolean, default: true }
+
+    # ---------- Developer Portal (PR-DP01–E7) ----------
+    CatalogEntityResponse:
+      type: object
+      required: [item, annotations, relationships]
+      properties:
+        item:
+          type: object
+          required: [id, folder_id, name, kind, item_type_id, created_at, updated_at]
+          properties:
+            id: { type: string, format: uuid }
+            folder_id: { type: string, format: uuid }
+            name: { type: string }
+            description: { type: string }
+            kind: { type: string }
+            item_type_id: { type: integer }
+            owner_ref:
+              type: object
+              properties:
+                kind: { type: string }
+                name: { type: string }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
+            expires_at: { type: string, format: date-time, nullable: true }
+        annotations:
+          type: object
+          additionalProperties: { type: string }
+        relationships:
+          type: array
+          items:
+            type: object
+            required: [source_id, target_id, type]
+            properties:
+              source_id: { type: string, format: uuid }
+              target_id: { type: string, format: uuid }
+              type: { type: string }
+              backstage_type: { type: string }
+        health:
+          $ref: "#/components/schemas/ItemHealthResponse"
+
+    ItemHealthResponse:
+      type: object
+      required: [item_id, score, severity, breakdown]
+      properties:
+        item_id: { type: string, format: uuid }
+        score:
+          type: integer
+          minimum: 0
+          maximum: 100
+        severity:
+          type: string
+          enum: [healthy, warning, critical]
+        breakdown:
+          type: array
+          items:
+            type: object
+            required: [rule, deduction]
+            properties:
+              rule: { type: string }
+              deduction: { type: integer }
+              detail: { type: string }
+
+    HealthReportResponse:
+      type: object
+      required: [count, items]
+      properties:
+        count: { type: integer }
+        items:
+          type: array
+          items:
+            type: object
+            required: [item_id, health_score, severity]
+            properties:
+              item_id: { type: string, format: uuid }
+              name: { type: string }
+              kind: { type: string }
+              health_score: { type: integer }
+              severity: { type: string, enum: [healthy, warning, critical] }
+
+    ItemListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ItemSummary"
+        total: { type: integer }
+
+    ItemSummary:
+      type: object
+      required: [id, name, folder_id]
+      properties:
+        id: { type: string, format: uuid }
+        folder_id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        kind: { type: string }
+        item_type_id: { type: integer }
+        owner_ref:
+          type: object
+          properties:
+            kind: { type: string }
+            name: { type: string }
+        expires_at: { type: string, format: date-time, nullable: true }
+        health_score: { type: integer, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }

@@ -25,6 +25,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useTagsQuery, useCreateTagMutation, useDeleteTagMutation } from '@/api/tags';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { userFriendlyError } from '@/lib/user-error';
 
 // ─── 64-color palette (8 hue families × 8 lightness steps) ──────────────────
 
@@ -172,7 +173,7 @@ export default function TagsPage() {
     } catch (err) {
       toast({
         title: 'Etiket oluşturulamadı',
-        description: err instanceof Error ? err.message : 'Hata.',
+        description: userFriendlyError(err),
         variant: 'destructive',
       });
     }

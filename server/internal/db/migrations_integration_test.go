@@ -147,13 +147,13 @@ func TestMigrations_UpDownUp(t *testing.T) {
 		t.Errorf("roles seeded count = %d, want 3", roleCount)
 	}
 
-	// Seed validation: 8 item_types.
+	// Seed validation: 9 item_types (8 from 00010 + k8s_namespace from 00045).
 	var itemTypeCount int
 	if err := pool.QueryRow(ctx, "SELECT count(*) FROM item_types").Scan(&itemTypeCount); err != nil {
 		t.Fatalf("count item_types: %v", err)
 	}
-	if itemTypeCount != 8 {
-		t.Errorf("item_types seeded count = %d, want 8", itemTypeCount)
+	if itemTypeCount != 9 {
+		t.Errorf("item_types seeded count = %d, want 9", itemTypeCount)
 	}
 
 	// Seed validation: at least 25 field_definitions (we seed ~30).

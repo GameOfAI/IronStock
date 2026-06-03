@@ -42,11 +42,11 @@ type ElasticConfig struct {
 
 // ecsEvent is the ECS-mapped audit event for Elasticsearch.
 type ecsEvent struct {
-	Timestamp string            `json:"@timestamp"`
-	Event     ecsEventFields    `json:"event"`
-	User      *ecsUser          `json:"user,omitempty"`
-	Log       ecsLog            `json:"log"`
-	IronStock map[string]any    `json:"ironstock,omitempty"`
+	Timestamp string         `json:"@timestamp"`
+	Event     ecsEventFields `json:"event"`
+	User      *ecsUser       `json:"user,omitempty"`
+	Log       ecsLog         `json:"log"`
+	IronStock map[string]any `json:"ironstock,omitempty"`
 }
 
 type ecsEventFields struct {
@@ -101,7 +101,7 @@ func NewElasticForwarder(configID string, cfg ElasticConfig) *ElasticForwarder {
 func (f *ElasticForwarder) ConfigID() string { return f.configID }
 
 // Close implements Forwarder.
-func (f *ElasticForwarder) Close() error { return nil }
+func (*ElasticForwarder) Close() error { return nil }
 
 // Send implements Forwarder — delivers one event via Elastic Bulk API with retry.
 // The Bulk API requires two newline-separated JSON lines per document:
@@ -127,7 +127,7 @@ func (f *ElasticForwarder) Send(ctx context.Context, ev Event) error {
 }
 
 // toECS maps a logfwd.Event to an ECS document.
-func (f *ElasticForwarder) toECS(ev Event) ecsEvent {
+func (*ElasticForwarder) toECS(ev Event) ecsEvent {
 	doc := ecsEvent{
 		Timestamp: ev.CreatedAt.UTC().Format(time.RFC3339Nano),
 		Event: ecsEventFields{

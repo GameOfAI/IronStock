@@ -113,7 +113,7 @@ func (u *WAUser) WebAuthnID() []byte                     { return u.ID }
 func (u *WAUser) WebAuthnName() string                   { return u.Name }
 func (u *WAUser) WebAuthnDisplayName() string            { return u.DisplayName }
 func (u *WAUser) WebAuthnCredentials() []gowa.Credential { return u.Credentials }
-func (u *WAUser) WebAuthnIcon() string                   { return "" }
+func (*WAUser) WebAuthnIcon() string                     { return "" }
 
 // LoadUser fetches a user's WebAuthn credentials from the DB.
 func (s *WAService) LoadUser(ctx context.Context, userID string, username string) (*WAUser, error) {
@@ -176,8 +176,8 @@ func (s *WAService) BeginRegistration(user *WAUser) (*protocol.CredentialCreatio
 	var excludeList []protocol.CredentialDescriptor
 	for _, c := range user.Credentials {
 		excludeList = append(excludeList, protocol.CredentialDescriptor{
-			Type:            protocol.PublicKeyCredentialType,
-			CredentialID:    c.ID,
+			Type:         protocol.PublicKeyCredentialType,
+			CredentialID: c.ID,
 		})
 	}
 	options, sessionData, err := s.wa.BeginRegistration(user,
