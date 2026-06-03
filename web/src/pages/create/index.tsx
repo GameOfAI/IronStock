@@ -14,6 +14,7 @@ import { useLifecycleStagesQuery } from '@/api/lifecycle';
 import { useCreateItemMutation } from '@/api/items';
 import { useAddRelationshipMutation } from '@/api/graph';
 import { useSetItemLifecycleStagesMutation } from '@/api/lifecycle';
+import { useUpsertAnnotationMutation } from '@/api/annotations';
 import { useAuthStore } from '@/store/auth';
 import { useToast } from '@/hooks/use-toast';
 import { generateDEK, toBase64 } from '@/lib/crypto';
@@ -60,6 +61,7 @@ interface WizardState {
   name: string;
   description: string;
   folderId: string;
+  kindFields: Record<string, string>;
   relations: PendingRelation[];
   lifecycleStageIds: number[];
 }
@@ -98,6 +100,7 @@ export default function CreatePage() {
     name: '',
     description: '',
     folderId: '',
+    kindFields: {},
     relations: [],
     lifecycleStageIds: [],
   });
@@ -112,6 +115,7 @@ export default function CreatePage() {
   const createItemMut = useCreateItemMutation(state.folderId);
   const addRelMut = useAddRelationshipMutation(newItemId.current);
   const setLifecycleMut = useSetItemLifecycleStagesMutation(newItemId.current);
+  const upsertAnnotationMut = useUpsertAnnotationMutation(newItemId.current);
 
   const itemTypes = typesData?.item_types ?? [];
   const folders = foldersData?.folders ?? [];
@@ -167,6 +171,10 @@ export default function CreatePage() {
         await setLifecycleMut.mutateAsync({ stage_ids: state.lifecycleStageIds });
       }
 
+      for (const [key, value] of Object.entries(state.kindFields)) {
+        if (value) await upsertAnnotationMut.mutateAsync({ key, value });
+      }
+
       toast({ title: 'Entity oluşturuldu', description: `"${createdItem.name}" başarıyla oluşturuldu.` });
 
       if (createdItem.kind) {
@@ -219,6 +227,8 @@ export default function CreatePage() {
             description={state.description}
             folderId={state.folderId}
             folders={folders}
+            kindKey={state.selectedItemType?.kind_key}
+            kindFields={state.kindFields}
             onChange={(patch) => setState((s) => ({ ...s, ...patch }))}
           />
         )}
@@ -268,6 +278,24 @@ export default function CreatePage() {
                 label="Klasör"
                 value={folders.find((f) => f.id === state.folderId)?.name ?? state.folderId}
               />
+              {Object.entries(state.kindFields).filter(([, v]) => v).length > 0 && (
+                <SummaryRow
+                  label="Ek Bilgiler"
+                  value={
+                    <ul className="space-y-0.5">
+                      {Object.entries(state.kindFields)
+                        .filter(([, v]) => v)
+                        .map(([k, v]) => (
+                          <li key={k} className="text-[12px]">
+                            <span className="font-mono text-slate-500">{k}</span>
+                            {': '}
+                            {v}
+                          </li>
+                        ))}
+                    </ul>
+                  }
+                />
+              )}
               {state.relations.length > 0 && (
                 <SummaryRow
                   label="İlişkiler"

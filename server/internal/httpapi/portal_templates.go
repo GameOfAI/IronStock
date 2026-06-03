@@ -110,13 +110,23 @@ func (h *PortalTemplateHandlers) ListPortalTemplates(w http.ResponseWriter, r *h
 	}
 
 	kindKey := strings.TrimSpace(r.URL.Query().Get("kind_key"))
+	showAll := r.URL.Query().Get("all") == "true" && hasRole(claims, RoleAdmin)
 
 	var rows pgx.Rows
 	var err error
-	if kindKey != "" {
+	if kindKey != "" && showAll {
+		rows, err = h.DB.Query(ctx,
+			templateSelect+` WHERE kind_key = $1 ORDER BY is_builtin DESC, name`,
+			kindKey,
+		)
+	} else if kindKey != "" {
 		rows, err = h.DB.Query(ctx,
 			templateSelect+` WHERE is_active = true AND kind_key = $1 ORDER BY is_builtin DESC, name`,
 			kindKey,
+		)
+	} else if showAll {
+		rows, err = h.DB.Query(ctx,
+			templateSelect+` ORDER BY is_builtin DESC, name`,
 		)
 	} else {
 		rows, err = h.DB.Query(ctx,

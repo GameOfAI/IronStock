@@ -305,6 +305,35 @@ export interface CreatePortalTemplateRequest {
   default_relations?: unknown[] | null;
 }
 
+/** PR-DP-E2: update request — same shape as create. */
+export type UpdatePortalTemplateRequest = CreatePortalTemplateRequest;
+
+// --- Catalog Entity (PR-DP-E1) ---
+
+/** Combined entity response from GET /api/v1/catalog/{kind}/{name}. */
+export interface CatalogEntityResponse {
+  item: {
+    id: string;
+    folder_id: string;
+    name: string;
+    description?: string;
+    kind: string;
+    item_type_id: number;
+    owner_ref?: OwnerRef;
+    created_at: string;
+    updated_at: string;
+    expires_at?: string | null;
+  };
+  annotations: Record<string, string>;
+  relationships: GraphEdge[];
+  health?: {
+    item_id: string;
+    score: number;
+    severity: string;
+    breakdown: Array<{ rule: string; deduction: number; detail?: string }>;
+  };
+}
+
 /** One snapshot of a field's encrypted value (PR-N2). Server stores opaque blobs. */
 export interface FieldVersionOutput {
   version_number: number;

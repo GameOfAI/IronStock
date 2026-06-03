@@ -65,6 +65,7 @@ type Deps struct {
 	Scan          *ScanHandlers             // PR-SCAN: Secret fingerprint scanning
 	Annotation      *AnnotationHandlers       // PR-DP01: Backstage-style item annotations
 	PortalTemplate  *PortalTemplateHandlers   // PR-DP11: Golden Path portal templates
+	CatalogEntity   *CatalogEntityHandlers    // PR-DP-E1: direct catalog entity endpoint
 	CORSOrigins     []string                  // ENVANTER_CORS_ORIGINS
 	PprofEnabled  bool                      // PR-PROD5: pprof debug endpoints
 }
@@ -555,6 +556,10 @@ func NewRouter(d Deps) http.Handler {
 			cr.Get("/field-definitions", d.Catalog.ListFieldDefinitions)
 			cr.Get("/item-types", d.Catalog.ListItemTypes)
 			cr.Get("/users/{id}/public-key", d.Catalog.GetUserPublicKey)
+			// PR-DP-E1: direct catalog entity endpoint
+			if d.CatalogEntity != nil {
+				cr.Get("/catalog/{kind}/{name}", d.CatalogEntity.GetEntity)
+			}
 		})
 	}
 

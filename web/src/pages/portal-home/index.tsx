@@ -14,6 +14,7 @@ import {
   Clock,
   PlusCircle,
   Package,
+  HeartPulse,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +22,8 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RelativeTime } from '@/components/common/relative-time';
 import { usePortalStatsQuery } from '@/api/portal-home';
+import { useHealthReportQuery } from '@/api/health';
+import { useAuthStore, selectIsAdmin } from '@/store/auth';
 
 const KIND_ICON: Record<string, React.ElementType> = {
   Server: Server,
@@ -51,6 +54,72 @@ function ExpiryLabel({ expiresAt }: { expiresAt: string }) {
   if (days <= 7) return <span className="text-xs text-red-500 font-medium">{days}g içinde doluyor</span>;
   if (days <= 30) return <span className="text-xs text-amber-500">{days}g içinde doluyor</span>;
   return <span className="text-xs text-muted-foreground">{days}g içinde doluyor</span>;
+}
+
+const SEVERITY_STYLES: Record<string, string> = {
+  critical: 'bg-red-500/10 text-red-500 border-red-500/30',
+  warning: 'bg-amber-500/10 text-amber-500 border-amber-500/30',
+  healthy: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30',
+};
+
+function HealthSummaryCard() {
+  const isAdmin = useAuthStore(selectIsAdmin);
+  const { data, isLoading } = useHealthReportQuery(70, 5);
+
+  if (!isAdmin) return null;
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm font-medium flex items-center gap-2">
+          <HeartPulse className="h-4 w-4 text-rose-500" />
+          Sağlık Durumu
+          {data && data.count > 0 && (
+            <Badge variant="outline" className="text-[10px] ml-auto">
+              {data.count} sorunlu
+            </Badge>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-0 space-y-2">
+        {isLoading ? (
+          Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-8 rounded" />
+          ))
+        ) : !data || data.items.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-2">
+            Tüm entity'ler sağlıklı.
+          </p>
+        ) : (
+          <>
+            {data.items.map((item) => (
+              <Link
+                key={item.item_id}
+                to={`/inventory?item=${item.item_id}`}
+                className="flex items-center justify-between gap-2 rounded px-2 py-1.5 hover:bg-accent transition-colors"
+              >
+                <span className="text-sm truncate">{item.name || item.item_id.slice(0, 8)}</span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-xs font-mono tabular-nums">{item.health_score}</span>
+                  <Badge
+                    variant="outline"
+                    className={`text-[10px] ${SEVERITY_STYLES[item.severity] ?? ''}`}
+                  >
+                    {item.severity}
+                  </Badge>
+                </div>
+              </Link>
+            ))}
+            <div className="pt-1">
+              <Link to="/admin" className="text-xs text-primary hover:underline">
+                Tüm raporu gör →
+              </Link>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function PortalHomePage() {
@@ -203,6 +272,9 @@ export default function PortalHomePage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Health summary — admin only */}
+      <HealthSummaryCard />
 
       {/* Quick links */}
       <div>

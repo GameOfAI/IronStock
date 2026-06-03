@@ -478,6 +478,7 @@ const NAV_LABELS: Record<string, string> = {
   '/admin/secret-scanning': 'Sızıntı Taraması',
   '/admin/k8s-clusters': 'K8s Kümeleri',
   '/admin/reports': 'Raporlar',
+  '/admin/portal-templates': 'Portal Şablonları',
   '/profile': 'Profil',
 };
 
@@ -806,6 +807,12 @@ export function AppShell() {
                     to="/admin/k8s-clusters"
                     icon={Layers}
                     label="K8s Kümeleri"
+                    collapsed={sidebarCollapsed && !mobileOpen}
+                  />
+                  <NavItem
+                    to="/admin/portal-templates"
+                    icon={FileText}
+                    label="Portal Şablonları"
                     collapsed={sidebarCollapsed && !mobileOpen}
                   />
                 </NavGroup>
