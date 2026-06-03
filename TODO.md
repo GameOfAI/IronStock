@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-06-03 — DP-E1~E7 tamamlandı. TÜM DP + Enhancement FAZLARI TAMAMLANDI ✅
+Son güncelleme: 2026-06-03 — DP-E1~E7 + Dependabot Group 1 + Group 2 tamamlandı. Tüm açık PR'lar kapatıldı ✅
 
 ## ✅ golangci-lint v1→v2 CI Migrasyonu (2026-06-02) — branch: fix/ux-and-dev-build
 
@@ -53,6 +53,15 @@ Son güncelleme: 2026-06-03 — DP-E1~E7 tamamlandı. TÜM DP + Enhancement FAZL
 - [x] DP-E5: Health summary widget on portal home (admin-only)
 - [x] DP-E6: Tauri client catalog page + entity detail
 - [x] DP-E7: OpenAPI spec update for all DP endpoints
+
+## ✅ Dependabot PR'ları (Group 1 + Group 2 — 2026-06-03)
+
+**Group 1 (10 PR — düşük risk):** GitHub Actions + minor/patch deps — hepsi merge edildi ✅
+
+**Group 2 (3 PR — major bağımlılıklar):**
+- [x] PR #29: golang 1.25-alpine → 1.26-alpine (Dockerfile-only)
+- [x] PR #31: @dagrejs/dagre 1→3 (`import * as dagre` fix, pipeline-canvas.tsx:34)
+- [x] PR #28: eslint 8→10 (flat config migration: eslint.config.js, typescript-eslint v8, react-hooks v5)
 
 ## 🔮 Sonraki Adımlar (Developer Portal — Gelecek)
 

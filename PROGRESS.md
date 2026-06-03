@@ -1,6 +1,6 @@
 # İlerleyiş
 
-Son güncelleme: 2026-06-03 (PR-DP15 tamamlandı — ADR-0013 + final sync — TÜM DP FAZLARI TAMAMLANDI ✅)
+Son güncelleme: 2026-06-03 (Dependabot Group 1 + Group 2 tüm PRlar merge edildi — ESLint 10 flat config migrasyon dahil)
 
 ### 2026-06-02 — golangci-lint v1→v2 CI Migrasyonu (branch: fix/ux-and-dev-build)
 
@@ -57,7 +57,23 @@ Portal'ı olgunlaştıran 7 iyileştirme PR'ı tek batch'te uygulandı:
 - **Önceki Fazlar (Faz 0–11):** 27/27 PR tamamlandı ✅
 - **Developer Portal Dönüşümü (DP Fazı):** 15/15 PR tamamlandı ✅ **TAMAMLANDI**
 - **Developer Portal Enhancement (DP-E Fazı):** 7/7 PR tamamlandı ✅ **TAMAMLANDI**
-- **Son tamamlanan:** DP-E1–E7 (catalog endpoint, admin template UI, annotation panel, kind fields, health widget, Tauri catalog, OpenAPI spec)
+- **Son tamamlanan:** DP-E1–E7 + Dependabot Group 1 (10 PR) + Group 2 (3 PR: golang 1.26, dagre v3, eslint 10)
+
+### 2026-06-03 — Dependabot PR'ları (Group 1 + Group 2)
+
+**Group 1 (düşük risk — 10 PR):** GitHub Actions güncellemeleri + minor/patch bağımlılıklar — hepsi squash-merge edildi.
+
+**Group 2 (dikkatli inceleme gerektiren — 3 PR):**
+- **PR #29** — golang 1.25-alpine → 1.26-alpine: Dockerfile-only değişiklik, `go.mod` etkilenmedi. Squash-merge edildi.
+- **PR #31** — @dagrejs/dagre 1.1.8 → 3.0.0: v3 TypeScript rewrite — default export kaldırıldı. `web/src/components/pipeline/pipeline-canvas.tsx` satır 34: `import dagre from` → `import * as dagre from`. Squash-merge edildi.
+- **PR #28** — eslint 8.57 → 10.4.0: ESLint 10 legacy eslintrc formatını kaldırdı. Tam flat config migrasyonu yapıldı:
+  - `web/.eslintrc.cjs` ve `client/.eslintrc.cjs` silindi
+  - `web/eslint.config.js` ve `client/eslint.config.js` oluşturuldu (flat config, tseslint.config())
+  - `@typescript-eslint/eslint-plugin` + `@typescript-eslint/parser` v7 → `typescript-eslint` v8 (unified package)
+  - `eslint-plugin-react-hooks` v4 → v5
+  - `@eslint/js` + `globals` paketi eklendi
+  - lint script `--ext ts,tsx` flag'i kaldırıldı (ESLint 10'da desteklenmiyor)
+  - Merge conflict (main'den gelen client/.eslintrc.cjs) çözüldü — silme kararı korundu.
 
 ## Developer Portal PR'ları (DP Fazı)
 
