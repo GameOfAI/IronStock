@@ -31,7 +31,7 @@ import {
   type OnNodeDrag,
   BackgroundVariant,
 } from '@xyflow/react';
-import dagre from '@dagrejs/dagre';
+import * as dagre from '@dagrejs/dagre';
 import { toPng, toSvg } from 'html-to-image';
 import '@xyflow/react/dist/style.css';
 
