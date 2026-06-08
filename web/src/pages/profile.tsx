@@ -44,6 +44,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import {
   totpStatusQueryKey,
+  useLogoutAllMutation,
   useTOTPDisableMutation,
   useTOTPRegenerateBackupMutation,
   useTOTPStatusQuery,
@@ -78,6 +79,7 @@ import {
   Copy,
   CheckCheck,
   Laptop,
+  LogOut,
   Trash2,
   Bell,
   Plus,
@@ -1090,6 +1092,85 @@ function SecurityKeysCard() {
   );
 }
 
+// --- Session Management Card ---
+
+function SessionManagementCard() {
+  const { toast } = useToast();
+  const logoutAll = useLogoutAllMutation();
+  const clearSession = useAuthStore((s) => s.clear);
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
+
+  function handleLogoutAll() {
+    logoutAll.mutate(undefined, {
+      onSuccess: () => {
+        toast({ title: 'Tüm oturumlar sonlandırıldı', description: 'Mevcut cihaz dahil tüm aktif oturumlarınız kapatıldı.' });
+        // Clear local session state and redirect to login
+        clearSession();
+      },
+      onError: (err: unknown) => {
+        toast({
+          title: 'Oturumlar sonlandırılamadı',
+          description: userFriendlyError(err),
+          variant: 'destructive',
+        });
+      },
+    });
+  }
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <LogOut className="h-4 w-4" />
+            Oturum Yönetimi
+          </CardTitle>
+          <CardDescription>
+            Tüm cihazlardaki aktif oturumlarınızı sonlandırın. Bu işlem mevcut oturumunuzu da kapatır.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            variant="destructive"
+            size="sm"
+            className="gap-2"
+            onClick={() => setConfirmOpen(true)}
+            disabled={logoutAll.isPending}
+          >
+            {logoutAll.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <LogOut className="h-4 w-4" />
+            )}
+            Tüm Oturumları Sonlandır
+          </Button>
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tüm Oturumları Sonlandır</AlertDialogTitle>
+            <AlertDialogDescription>
+              Bu işlem mevcut cihaz dahil tüm aktif oturumlarınızı kapatır. Devam etmek istiyor musunuz?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>İptal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleLogoutAll}
+              className="bg-red-600 text-white hover:bg-red-700"
+              disabled={logoutAll.isPending}
+            >
+              {logoutAll.isPending ? 'Kapatılıyor…' : 'Sonlandır'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
 // --- Profile Page ---
 
 export default function ProfilePage() {
@@ -1111,6 +1192,7 @@ export default function ProfilePage() {
       <TOTPManagementCard />
       <SecurityKeysCard />
       <TrustedDevicesCard />
+      <SessionManagementCard />
       <NotificationPrefsCard />
       <ExternalChannelsCard />
     </div>

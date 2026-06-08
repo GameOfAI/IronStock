@@ -1,12 +1,28 @@
 # İlerleyiş
 
-Son güncelleme: 2026-06-08 (Feat: gruba global rol atama — migration 00061, fetchUserRoles grup üyeliği, PATCH endpoint, UI)
+Son güncelleme: 2026-06-08 (UI Gap Fixes — item paylaşım sekmesi, break-glass toggle, oturum sonlandırma, favoriler sayfası, K8s binding sekmesi, şablon düzenleme, diyagram yeniden adlandırma)
 
 ## Mevcut Durum
 
 - **Tüm Fazlar Tamamlandı:** Faz 0–11 ✅
 - **Tamamlanan PR:** 27/27 + PR-CATALOG (%100 + bonus)
 - **Aktif:** PR-CATALOG tamamlandı
+
+### UI Gap Fixes — Backend-Exists-But-No-UI (2026-06-08)
+
+7 ayrı hook/endpoint vardı ama frontend UI'da hiçbiri kullanılmıyordu. Sistematik tarama sonucu:
+
+| Fix | Değişiklik |
+|-----|-----------|
+| **FIX 1: Item Paylaşım Sekmesi** | `item-detail.tsx` — `SharesTab` bileşeni: kullanıcı + grup paylaşımlarını listeler, onay kapısı toggle, paylaşım iptal butonu (`useItemSharesQuery`, `useUnshareItemMutation`, `useUnshareGroupMutation`, `useToggleApprovalRequiredMutation`) |
+| **FIX 2: Break-Glass Toggle** | `api/admin.ts` — `useSetBreakGlassMutation` eklendi. `user-actions-menu.tsx` — `ShieldAlert` ikonu + checkbox toggle (her girişinde tüm adminlere uyarı) |
+| **FIX 4: Tüm Oturumları Sonlandır** | `profile.tsx` — `SessionManagementCard` bileşeni: kırmızı buton + AlertDialog confirm + `useLogoutAllMutation` + `authStore.clear()` çağrısı |
+| **FIX 5: Favoriler Sayfası** | `pages/favorites/index.tsx` — Yeni sayfa; `useFavoritesQuery` ile liste, `useRemoveFavoriteMutation` ile kaldırma, envantere deep-link. `App.tsx` route + `app-shell.tsx` nav item (Star ikonu) |
+| **FIX 6: K8s Binding Sekmesi** | `item-detail.tsx` — `K8sBindingTab` bileşeni: mevcut bağlantıyı göster, cluster/namespace seç, `useK8sBindingQuery` + `useSetK8sBindingMutation` + `useAdminK8sClustersQuery` |
+| **FIX 7: Şablon Düzenleme** | `template-gallery.tsx` — Pencil ikonu + `useUpdateTemplateMutation` + Dialog (ad/açıklama/herkese-açık alanları) |
+| **FIX 8: Diyagram Yeniden Adlandırma** | `pipeline/diagram.tsx` — Pencil ikonu + `useUpdatePipelineDiagramMutation` + Dialog (ad + açıklama) |
+
+**Tüm değişiklikler TypeScript clean (0 hata).**
 
 ### Feat: Gruba Global Rol Atama (2026-06-08)
 

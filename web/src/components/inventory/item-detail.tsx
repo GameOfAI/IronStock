@@ -10,6 +10,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle,
   ArrowRight,
@@ -31,6 +32,8 @@ import {
   History,
   ShieldAlert,
   SendHorizonal,
+  Trash2,
+  UserMinus,
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -47,8 +50,8 @@ import { useToast } from '@/hooks/use-toast';
 import type { ExternalSourceVault, FieldDefinition, ItemType, RelationshipType, VaultFieldValue } from '@/api/types';
 import { useVaultFetchMutation, useIssueDynamicCredMutation, useRevokeDynamicCredMutation } from '@/api/vault';
 import type { DynamicCred } from '@/api/vault';
-import { useCreateAccessRequestMutation, useCancelAccessRequestMutation } from '@/api/access-requests';
-import { useItem, useRecordRotationMutation, useFieldVersionsQuery } from '@/api/items';
+import { useCreateAccessRequestMutation, useCancelAccessRequestMutation, useToggleApprovalRequiredMutation } from '@/api/access-requests';
+import { useItem, useRecordRotationMutation, useFieldVersionsQuery, useItemSharesQuery, useUnshareItemMutation, useUnshareGroupMutation } from '@/api/items';
 import { useItemHealthQuery } from '@/api/health';
 import { useSuggestMutation, useSuggestionsQuery, useAcceptSuggestionMutation, useRejectSuggestionMutation } from '@/api/ai-suggestions';
 import type { AISuggestion } from '@/api/ai-suggestions';
@@ -58,6 +61,8 @@ import {
   useFavoriteStatusQuery,
 } from '@/api/tags';
 import { useGraphQuery, useAddRelationshipMutation, useDeleteRelationshipMutation } from '@/api/graph';
+import { useK8sBindingQuery, useSetK8sBindingMutation } from '@/api/reports';
+import { useAdminK8sClustersQuery } from '@/api/admin-k8s';
 import { useLifecycleStagesQuery, useItemLifecycleStagesQuery, useSetItemLifecycleStagesMutation } from '@/api/lifecycle';
 import { useAuthStore } from '@/store/auth';
 import { fromBase64, openDEKWithKEK, decryptField } from '@/lib/crypto';
@@ -405,6 +410,8 @@ export function ItemDetail({ itemId, fieldDefinitions, itemTypes: _itemTypes }: 
             <TabsTrigger value="yasam">Yaşam Döngüsü</TabsTrigger>
             <TabsTrigger value="gecmis">Geçmiş</TabsTrigger>
             <TabsTrigger value="saglik">Sağlık</TabsTrigger>
+            <TabsTrigger value="paylasimlar">Paylaşımlar</TabsTrigger>
+            <TabsTrigger value="k8s">☸ K8s</TabsTrigger>
             <TabsTrigger value="ai-oneriler">✨ AI Önerileri</TabsTrigger>
           </TabsList>
 
@@ -746,6 +753,16 @@ export function ItemDetail({ itemId, fieldDefinitions, itemTypes: _itemTypes }: 
           {/* ── SAĞLIK ──────────────────────────────────────────────────────── */}
           <TabsContent value="saglik" className="px-0" forceMount>
             <HealthTab itemId={item.id} />
+          </TabsContent>
+
+          {/* ── PAYLAŞIMLAR ──────────────────────────────────────────────────── */}
+          <TabsContent value="paylasimlar" className="px-0" forceMount>
+            <SharesTab itemId={item.id} canWrite={item.permission === 'write'} requiresApproval={item.requires_approval ?? false} createdBy={item.created_by} />
+          </TabsContent>
+
+          {/* ── K8S BINDING ─────────────────────────────────────────────────── */}
+          <TabsContent value="k8s" className="px-0" forceMount>
+            <K8sBindingTab itemId={item.id} canWrite={item.permission === 'write'} />
           </TabsContent>
 
           {/* ── AI ÖNERİLERİ ────────────────────────────────────────────────── */}
@@ -1348,7 +1365,248 @@ function HealthTab({ itemId }: { itemId: string }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// K8s Binding Tab — bind item to a Kubernetes namespace
+// ─────────────────────────────────────────────────────────────────────────────
+
+function K8sBindingTab({ itemId, canWrite }: { itemId: string; canWrite: boolean }) {
+  const { toast } = useToast();
+  const bindingQuery = useQuery({ ...useK8sBindingQuery(itemId), enabled: Boolean(itemId) });
+  const clustersQuery = useAdminK8sClustersQuery();
+  const setBinding = useSetK8sBindingMutation();
+
+  const [clusterId, setClusterId] = useState('');
+  const [namespace, setNamespace] = useState('');
+
+  const clusters = clustersQuery.data?.clusters ?? [];
+  const existing = bindingQuery.data;
+
+  function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    if (!clusterId || !namespace.trim()) return;
+    setBinding.mutate(
+      { itemId, clusterId, namespaceName: namespace.trim() },
+      {
+        onSuccess: () => {
+          toast({ title: 'K8s bağlantısı kaydedildi' });
+          void bindingQuery.refetch();
+        },
+        onError: (err: unknown) => {
+          toast({ title: 'Kaydedilemedi', description: String(err), variant: 'destructive' });
+        },
+      },
+    );
+  }
+
+  return (
+    <div className="space-y-4 pt-2">
+      {/* Current binding */}
+      {existing && (
+        <div className="rounded-md border bg-muted/40 px-4 py-3 text-sm space-y-1">
+          <p className="font-medium text-muted-foreground">Mevcut Bağlantı</p>
+          <p>
+            <span className="font-semibold">Cluster:</span>{' '}
+            {clusters.find((c) => c.id === existing.cluster_id)?.name ?? existing.cluster_id}
+          </p>
+          <p>
+            <span className="font-semibold">Namespace:</span> {existing.namespace_name}
+          </p>
+        </div>
+      )}
+
+      {/* Bind / update form */}
+      {canWrite && (
+        <form onSubmit={handleSave} className="space-y-3">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium" htmlFor="k8s-cluster">Cluster</label>
+            {clustersQuery.isLoading ? (
+              <div className="h-9 animate-pulse rounded-md bg-muted" />
+            ) : (
+              <select
+                id="k8s-cluster"
+                value={clusterId}
+                onChange={(e) => setClusterId(e.target.value)}
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+              >
+                <option value="">— Seçin —</option>
+                {clusters.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium" htmlFor="k8s-ns">Namespace</label>
+            <input
+              id="k8s-ns"
+              type="text"
+              value={namespace}
+              onChange={(e) => setNamespace(e.target.value)}
+              placeholder="default"
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+            />
+          </div>
+          <Button
+            type="submit"
+            size="sm"
+            disabled={setBinding.isPending || !clusterId || !namespace.trim()}
+          >
+            {setBinding.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            {existing ? 'Güncelle' : 'Bağla'}
+          </Button>
+        </form>
+      )}
+
+      {!canWrite && !existing && (
+        <p className="text-sm text-muted-foreground">Bu item için K8s bağlantısı tanımlanmamış.</p>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // AI Önerileri Tab — PR-AI
+// ─────────────────────────────────────────────────────────────────────────────
+// SharesTab — view and revoke item shares (user + group), toggle approval gate
+// ─────────────────────────────────────────────────────────────────────────────
+
+function SharesTab({
+  itemId, canWrite, requiresApproval, createdBy,
+}: { itemId: string; canWrite: boolean; requiresApproval: boolean; createdBy: string }) {
+  const { toast } = useToast();
+  const me = useAuthStore((s) => s.user);
+  const { data, isLoading } = useItemSharesQuery(itemId);
+  const unshareMut = useUnshareItemMutation(itemId);
+  const unshareGroupMut = useUnshareGroupMutation(itemId);
+  const approvalMut = useToggleApprovalRequiredMutation(itemId);
+
+  const isOwnerOrAdmin = me?.id === createdBy || (me?.roles ?? []).includes('admin');
+
+  async function handleUnshare(userId: string, username: string) {
+    try {
+      await unshareMut.mutateAsync(userId);
+      toast({ title: 'Paylaşım kaldırıldı', description: username });
+    } catch (err) {
+      toast({ title: 'Paylaşım kaldırılamadı', description: userFriendlyError(err), variant: 'destructive' });
+    }
+  }
+
+  async function handleUnshareGroup(groupId: string, groupName: string) {
+    try {
+      await unshareGroupMut.mutateAsync(groupId);
+      toast({ title: 'Grup paylaşımı kaldırıldı', description: groupName });
+    } catch (err) {
+      toast({ title: 'Grup paylaşımı kaldırılamadı', description: userFriendlyError(err), variant: 'destructive' });
+    }
+  }
+
+  async function handleToggleApproval() {
+    try {
+      await approvalMut.mutateAsync({ requires_approval: !requiresApproval });
+      toast({ title: requiresApproval ? 'Onay zorunluluğu kaldırıldı' : 'Onay zorunluluğu aktif edildi' });
+    } catch (err) {
+      toast({ title: 'Güncelleme başarısız', description: userFriendlyError(err), variant: 'destructive' });
+    }
+  }
+
+  const userShares = data?.users.filter((s) => !s.revoked_at) ?? [];
+  const groupShares = data?.groups.filter((s) => !s.revoked_at) ?? [];
+
+  if (isLoading) {
+    return <div className="p-4 text-sm text-muted-foreground">Yükleniyor…</div>;
+  }
+
+  return (
+    <div className="flex flex-col gap-6 p-1">
+      {/* Approval gate toggle — owner or admin only */}
+      {isOwnerOrAdmin && (
+        <div className="flex items-center justify-between rounded-md border px-4 py-3">
+          <div>
+            <p className="text-sm font-medium">Erişim Onayı Zorunluluğu</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Aktifken, sahip dışındaki kullanıcılar gizli alanlara erişmek için onay talep etmek zorundadır.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant={requiresApproval ? 'default' : 'outline'}
+            onClick={handleToggleApproval}
+            disabled={approvalMut.isPending}
+          >
+            {requiresApproval ? 'Aktif' : 'Devre Dışı'}
+          </Button>
+        </div>
+      )}
+
+      {/* User shares */}
+      <div>
+        <h3 className="text-sm font-medium mb-2">Kullanıcı Paylaşımları</h3>
+        {userShares.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Henüz kullanıcı paylaşımı yok.</p>
+        ) : (
+          <div className="flex flex-col divide-y rounded-md border">
+            {userShares.map((s) => (
+              <div key={s.id} className="flex items-center justify-between px-3 py-2 gap-2">
+                <div className="flex flex-col min-w-0">
+                  <span className="text-sm font-mono truncate">{s.username}</span>
+                  {(s.valid_from || s.valid_until) && (
+                    <span className="text-xs text-muted-foreground">
+                      {s.valid_from ? new Date(s.valid_from).toLocaleDateString('tr-TR') : '∞'}
+                      {' — '}
+                      {s.valid_until ? new Date(s.valid_until).toLocaleDateString('tr-TR') : '∞'}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Badge variant="outline" className={s.permission === 'write' ? 'text-blue-400 border-blue-500/30' : 'text-green-400 border-green-500/30'}>
+                    {s.permission === 'write' ? 'Yazma' : 'Okuma'}
+                  </Badge>
+                  {canWrite && (
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                      onClick={() => handleUnshare(s.user_id, s.username)}
+                      aria-label={`${s.username} paylaşımını kaldır`}
+                    >
+                      <UserMinus className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Group shares */}
+      <div>
+        <h3 className="text-sm font-medium mb-2">Grup Paylaşımları</h3>
+        {groupShares.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Henüz grup paylaşımı yok.</p>
+        ) : (
+          <div className="flex flex-col divide-y rounded-md border">
+            {groupShares.map((s) => (
+              <div key={s.id} className="flex items-center justify-between px-3 py-2 gap-2">
+                <span className="text-sm truncate">{s.group_name}</span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Badge variant="outline" className={s.permission === 'write' ? 'text-blue-400 border-blue-500/30' : 'text-green-400 border-green-500/30'}>
+                    {s.permission === 'write' ? 'Yazma' : 'Okuma'}
+                  </Badge>
+                  {canWrite && (
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                      onClick={() => handleUnshareGroup(s.group_id, s.group_name)}
+                      aria-label={`${s.group_name} grup paylaşımını kaldır`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // Field values are NEVER sent to LLM (E2E encrypted — ADR-0004 §PII).
 // ─────────────────────────────────────────────────────────────────────────────
 

@@ -1,6 +1,16 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-06-08 — Feat: gruba global rol atama (migration 00061, fetchUserRoles güncellemesi, PATCH endpoint, UI).
+Son güncelleme: 2026-06-08 — UI Gap Fixes tamamlandı (item paylaşım sekmesi, break-glass toggle, oturum sonlandırma, favoriler sayfası, K8s binding, şablon düzenleme, diyagram rename).
+
+## ✅ UI Gap Fixes — Backend-Exists-But-No-UI (2026-06-08)
+
+- [x] FIX 1: Item paylaşım sekmesi (`SharesTab`) — `item-detail.tsx`
+- [x] FIX 2: Break-glass toggle — `user-actions-menu.tsx` + `useSetBreakGlassMutation`
+- [x] FIX 4: Tüm oturumları sonlandır — `profile.tsx` `SessionManagementCard`
+- [x] FIX 5: Favoriler sayfası — `pages/favorites/index.tsx` + route + nav
+- [x] FIX 6: K8s binding sekmesi — `item-detail.tsx` `K8sBindingTab`
+- [x] FIX 7: Şablon düzenleme — `template-gallery.tsx` Pencil + Dialog
+- [x] FIX 8: Diyagram yeniden adlandırma — `pipeline/diagram.tsx` Pencil + Dialog
 
 ## ✅ Post-Deploy Fixes (2026-05-25)
 
