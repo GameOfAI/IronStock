@@ -1,6 +1,6 @@
 # İlerleyiş
 
-Son güncelleme: 2026-06-08 (CI fix: go.work 1.25.7, brace-expansion override v5, TypeScript hataları)
+Son güncelleme: 2026-06-08 (CI fix 2: golangci-lint misspell/nilerr/staticcheck + test provider/mock düzeltmeleri — 179/179 test ✅)
 
 ## Mevcut Durum
 

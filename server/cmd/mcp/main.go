@@ -329,7 +329,7 @@ func (s *mcpServer) callTool(ctx context.Context, name string, args map[string]a
 			} `json:"items"`
 		}
 		if err := json.Unmarshal([]byte(body), &result); err != nil || len(result.Items) == 0 {
-			return body, nil
+			return body, nil //nolint:nilerr // best-effort: return raw body on parse failure
 		}
 		var matchID string
 		for _, it := range result.Items {

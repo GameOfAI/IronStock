@@ -122,7 +122,7 @@ func parseCatalogBrowseParams(r *http.Request) (catalogBrowseParams, error) {
 // RBAC: Graph handler ile aynı 3-kollu CTE — owned OR directly-shared OR
 // folder-accessible. Admin tüm item'ları görür.
 //
-// Performans notu: name_plain ve health_score DB'de hazır (migration 00039 ve
+// Performance notu: name_plain ve health_score DB'de hazır (migration 00039 ve
 // 00054). Ekstra decryption veya runtime hesaplama yapılmaz.
 func (h *CatalogBrowseHandlers) List(w http.ResponseWriter, r *http.Request) {
 	claims := ClaimsFromContext(r.Context())

@@ -144,7 +144,7 @@ func TestCatalogBrowseResponse_JSONShape(t *testing.T) {
 }
 
 // TestCatalogBrowseResponse_NilHealthOmitted ensures health_score null is
-// marshalled as JSON null (not omitted) — frontend checks for null explicitly.
+// marshaled as JSON null (not omitted) — frontend checks for null explicitly.
 func TestCatalogBrowseResponse_NilHealthOmitted(t *testing.T) {
 	resp := catalogBrowseResponse{
 		Total: 0,

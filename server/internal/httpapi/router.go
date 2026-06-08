@@ -95,8 +95,9 @@ func NewRouter(d Deps) http.Handler {
 	// 2. Echo request ID into response header (chi.RequestID only sets context).
 	//    Lets client / curl / browser network tab correlate with server logs.
 	r.Use(echoRequestIDHeader)
-	// 3. RealIP — trust X-Forwarded-For from the ingress (Faz 5: tighten with TrustedIPs)
-	r.Use(middleware.RealIP)
+	// 3. RealIP — trust X-Forwarded-For from ingress (Faz 5: tighten with TrustedIPs list)
+	// SA1019: RealIP is deprecated per GHSA-3fxj; replace with allowlist in Faz 5
+	r.Use(middleware.RealIP) //nolint:staticcheck
 	// 4. Request logger — emits a single line per request via slog
 	r.Use(slogRequestLogger(d.Logger))
 	// 5. Recoverer — catches panics, logs + 500 instead of crashing

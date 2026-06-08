@@ -22,6 +22,11 @@ vi.mock('@/api/admin', () => ({
     mutateAsync: vi.fn(),
     isPending: false,
   }),
+  useSetBreakGlassMutation: () => ({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
 }));
 
 function renderTable(props: Parameters<typeof UserTable>[0]) {

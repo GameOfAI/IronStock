@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-06-08 — CI kalıcı hataları düzeltildi (go.work, brace-expansion, TS tip hataları).
+Son güncelleme: 2026-06-08 — CI fix 2: golangci-lint (misspell/nilerr/staticcheck) + test mock/provider düzeltmeleri.
 
 ## ✅ Dependabot PR'ları (2026-06-08)
 

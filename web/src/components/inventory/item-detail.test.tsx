@@ -6,6 +6,9 @@ vi.mock('@/api/items', () => ({
   useItem: vi.fn(),
   useRecordRotationMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useFieldVersionsQuery: vi.fn(() => ({ data: undefined, isLoading: false })),
+  useItemSharesQuery: vi.fn(() => ({ data: undefined, isLoading: false })),
+  useUnshareItemMutation: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
+  useUnshareGroupMutation: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
 }));
 vi.mock('@/api/attachments', () => ({
   useAttachments: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
@@ -33,14 +36,34 @@ vi.mock('@/api/lifecycle', () => ({
   useItemLifecycleStagesQuery: vi.fn(() => ({ data: { stage_ids: [] }, isLoading: false })),
   useSetItemLifecycleStagesMutation: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
 }));
+vi.mock('@/api/access-requests', () => ({
+  useCreateAccessRequestMutation: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
+  useCancelAccessRequestMutation: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
+  useToggleApprovalRequiredMutation: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
+}));
+vi.mock('@/api/reports', () => ({
+  useK8sBindingQuery: vi.fn(() => ({ queryKey: [], queryFn: vi.fn() })),
+  useSetK8sBindingMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+}));
+vi.mock('@/api/admin-k8s', () => ({
+  useAdminK8sClustersQuery: vi.fn(() => ({ data: undefined, isLoading: false })),
+}));
+vi.mock('@/api/annotations', () => ({
+  useItemAnnotationsQuery: vi.fn(() => ({ data: undefined, isLoading: false })),
+}));
 
 import * as itemsApi from '@/api/items';
 import { ItemDetail } from './item-detail';
 import { sampleFieldDefinitions, sampleItemTypes, sampleItems } from './__fixtures__';
+import { EntityPageRegistryProvider } from '@/lib/entity-page-registry';
 
 function wrap(ui: React.ReactElement) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return <QueryClientProvider client={qc}>{ui}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={qc}>
+      <EntityPageRegistryProvider>{ui}</EntityPageRegistryProvider>
+    </QueryClientProvider>
+  );
 }
 
 const useItem = itemsApi.useItem as unknown as ReturnType<typeof vi.fn>;
