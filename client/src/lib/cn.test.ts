@@ -11,7 +11,7 @@ describe('cn', () => {
   });
 
   it('drops falsy values', () => {
-    expect(cn('a', false && 'b', undefined, null as unknown as string, 'c')).toBe('a c');
+    expect(cn('a', (false as boolean) && 'b', undefined, null as unknown as string, 'c')).toBe('a c');
   });
 
   it('handles object syntax', () => {

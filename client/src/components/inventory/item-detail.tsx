@@ -108,6 +108,7 @@ function buildFieldDefMap(defs: FieldDefinition[]): Map<number, FieldDefinition>
 // Main component
 // ─────────────────────────────────────────────────────────────────────────────
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function ItemDetail({ itemId, fieldDefinitions, itemTypes: _itemTypes }: ItemDetailProps) {
   const itemQuery = useItem(itemId);
   const privateKey = useAuthStore((s) => s.privateKey);

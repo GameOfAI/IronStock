@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-06-08 — CI fix 3: pre-commit go.work.sum, duplicate migration, Docker npm, client TS.
+Son güncelleme: 2026-06-08 — CI fix 4: client ESLint 3 errors, go.sum checksums, migration git rm.
 
 ## ✅ Dependabot PR'ları (2026-06-08)
 

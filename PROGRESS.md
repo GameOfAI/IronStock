@@ -1,6 +1,6 @@
 # İlerleyiş
 
-Son güncelleme: 2026-06-08 (CI fix 3: pre-commit go.work.sum restore, duplicate migration 61→65, Docker --legacy-peer-deps, client TS fixes)
+Son güncelleme: 2026-06-08 (CI fix 4: client ESLint 3 errors, server/go.sum missing checksums, migration 00061 git rm, go mod tidy resolved)
 
 ## Mevcut Durum
 
