@@ -1,6 +1,6 @@
 # İlerleyiş
 
-Son güncelleme: 2026-06-08 (CI fix 2: golangci-lint misspell/nilerr/staticcheck + test provider/mock düzeltmeleri — 179/179 test ✅)
+Son güncelleme: 2026-06-08 (CI fix 3: pre-commit go.work.sum restore, duplicate migration 61→65, Docker --legacy-peer-deps, client TS fixes)
 
 ## Mevcut Durum
 

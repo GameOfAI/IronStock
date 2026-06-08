@@ -6,8 +6,11 @@ COPY package.json ./
 COPY shared/pkg/package.json ./shared/pkg/
 COPY web/package.json ./web/
 
-# Install from workspace root so @envanter/shared symlink is created
-RUN npm install --no-audit --no-fund
+# Install from workspace root so @envanter/shared symlink is created.
+# --legacy-peer-deps: eslint-plugin-react-hooks@5.x peer dep declares only up to
+# eslint@9; we run eslint@10. Docker resolves fresh (no lockfile) so npm10 strict
+# mode would ERESOLVE without this flag.
+RUN npm install --no-audit --no-fund --legacy-peer-deps
 
 # Copy source files
 COPY shared/pkg/src/ ./shared/pkg/src/

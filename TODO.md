@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-06-08 — CI fix 2: golangci-lint (misspell/nilerr/staticcheck) + test mock/provider düzeltmeleri.
+Son güncelleme: 2026-06-08 — CI fix 3: pre-commit go.work.sum, duplicate migration, Docker npm, client TS.
 
 ## ✅ Dependabot PR'ları (2026-06-08)
 

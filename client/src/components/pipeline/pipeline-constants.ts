@@ -64,4 +64,11 @@ export const REL_LABELS: Record<RelationshipType, string> = {
   builds_to: 'build eder',
   scans_with: 'tarar',
   deploys_to: 'deploy eder',
+  // PR-DP03: Backstage camelCase aliases
+  runs_in: 'çalıştırıyor',
+  ownedBy: 'sahibi',
+  dependsOn: 'bağımlı (DP)',
+  memberOf: 'üyesi',
+  providesApi: 'API sağlar',
+  consumesApi: 'API tüketir',
 };

@@ -17,7 +17,6 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useCatalogEntityQuery } from '@/api/catalog-browser';
-import type { CatalogEntityResponse } from '@/api/catalog-browser';
 
 const KIND_ICON: Record<string, React.ElementType> = {
   Server: Server, Service: Globe, Database: Database,

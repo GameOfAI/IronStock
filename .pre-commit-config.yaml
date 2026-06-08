@@ -46,7 +46,11 @@ repos:
 
       - id: golangci-lint
         name: golangci-lint
-        entry: bash -c 'cd server && golangci-lint run ./...'
+        # golangci-lint (with goimports formatter) may add checksums to go.work.sum
+        # in the workspace root when resolving transitive deps during analysis.
+        # Those additions are benign — restore go.work.sum to avoid a spurious
+        # "files were modified by this hook" failure.
+        entry: bash -c 'cd server && golangci-lint run ./...; rc=$?; git restore ../go.work.sum 2>/dev/null || true; exit $rc'
         language: system
         types: [go]
         pass_filenames: false
