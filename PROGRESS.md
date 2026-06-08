@@ -1,6 +1,6 @@
 # İlerleyiş
 
-Son güncelleme: 2026-06-08 (CI fix 5: esbuild explicit dep for Vite 8 in client+web, Server Integration ✅, Pre-commit ✅, Server Go ✅)
+Son güncelleme: 2026-06-08 (CI fix 5: esbuild dep + RULES.md'ye CI disiplin kuralları eklendi)
 
 ## Mevcut Durum
 

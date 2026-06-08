@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-06-08 — CI fix 5: esbuild dep Vite 8, Server Integration ✅, Pre-commit ✅.
+Son güncelleme: 2026-06-08 — RULES.md CI disiplin kuralları (migration, Go versiyon, npm peer dep).
 
 ## ✅ Dependabot PR'ları (2026-06-08)
 

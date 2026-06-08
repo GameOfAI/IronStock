@@ -66,6 +66,49 @@ Proje boyunca uyulacak konvensiyonlar ve kurallar. Yeni kural çıktıkça buray
   3. `PROGRESS.md`'de faz tamamlandı entry'si.
   4. Sonraki faz task'ları TodoWrite'a yüklenir.
 
+## CI Disiplini
+
+> Bu kurallar GitHub Actions için yazılmıştır; repo şirket CI/CD'sine taşındığında
+> eşdeğer kontroller orada da uygulanmalıdır.
+
+### Migration numarası çakışması
+
+- Yeni migration eklerken `server/migrations/` içindeki **en büyük numarayı** kontrol et:
+  ```bash
+  ls server/migrations/ | sort | tail -3
+  ```
+- Paralel branch'lerde aynı numara alınabilir — merge öncesi `ls | grep "^0006[0-9]"` ile
+  tüm migration'ların numaralarının unique olduğu doğrulanır.
+- **`mv` ile dosya taşırken `git mv` kullan** — plain `mv` + `git add <yeni>` yaptığında
+  eski dosya index'te kalır ve CI'da duplicate version hatası verir.
+
+### Go versiyonu senkronizasyonu
+
+- `go.work`, `server/go.mod` ve CI workflow'undaki `go-version` **aynı minor'da** olmalı
+  (örn. `1.25.x`). Biri güncelleniyor sa diğerleri de aynı anda güncellenir.
+- `go work sync` local Go versiyonuna göre farklı checksum üretebilir.
+  CI farklı bir Go minor kullanıyorsa `go.work.sum` / `go.sum` checksum uyuşmazlığı çıkar —
+  çözüm: CI'ın Go versiyonunu local'e eşit tut veya CI ortamında `go mod tidy` çalıştır.
+
+### npm / Node — lockfile yokluğunda peer dep güvencesi
+
+- `package-lock.json` platform-specific binary içerdiğinden gitignore'da. Bu nedenle Docker
+  ve bazı CI adımları **her build'de fresh resolve** yapar.
+- Fresh resolve'da kırılmama kuralları:
+  1. **Peer dep çakışması varsa** (örn. ESLint 10 + eski plugin) root `package.json`'daki
+     `overrides` ile kısıt koy; Dockerfile/CI'a `--legacy-peer-deps` ekleme (hack'tir,
+     son çare).
+  2. **Bundler'ın opsiyonel/peer dep'leri** (Vite 8 → esbuild) explicit `devDependencies`'e
+     yazılır — "zaten gelir" sayılmaz.
+  3. Her yeni major npm paketi eklenince `npm install && npm run build` Docker
+     içinde test edilir (`docker build ./web`).
+
+### Branch'ten main'e merge sonrası CI
+
+- `main`'e merge yapıldıktan sonra CI **aynı gün** yeşillendirilir; kırık bırakılmaz.
+- Merge sonucu kırmızı CI ile gece bırakılırsa ertesi session hangi fix'in ne kırdığını
+  takip etmek zorlaşır.
+
 ## Repo Konumu
 
 - **GitHub:** `https://github.com/GameOfAI/IronStock`
