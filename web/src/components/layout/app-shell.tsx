@@ -26,6 +26,7 @@ import {
   Sun,
   Moon,
   Monitor,
+  Key,
   KeyRound,
   Menu,
   ShieldAlert,

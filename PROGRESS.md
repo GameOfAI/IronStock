@@ -1,6 +1,6 @@
 # İlerleyiş
 
-Son güncelleme: 2026-06-08 (Dependabot PR'ları: CI tracking-check muafiyeti + rebase + merge)
+Son güncelleme: 2026-06-08 (CI fix: go.work 1.25.7, brace-expansion override v5, TypeScript hataları)
 
 ## Mevcut Durum
 
@@ -41,6 +41,19 @@ Son güncelleme: 2026-06-08 (Dependabot PR'ları: CI tracking-check muafiyeti + 
 | #48 `@types/react` 18→19 | React 19 tipleri; TypeScript build CI'da doğrulandı | ✅ Safe |
 
 CI `tracking-check` job'ına Dependabot muafiyeti eklendi (`github.actor != 'dependabot[bot]'`).
+
+### CI Kalıcı Düzeltmeleri (2026-06-08)
+
+| Hata | Kök Neden | Fix |
+|------|-----------|-----|
+| `golangci-lint exit 3` | `go.work` go 1.25.0 → server/go.mod 1.25.7 mismatch | `go.work` 1.25.7'ye güncellendi |
+| `brace-expansion.expand is not a function` | `package.json` overrides `brace-expansion: ^2.0.3` ESLint 10'un `@eslint/config-array`'ini engelliyor | Override `^5.0.5`'e yükseltildi |
+| TypeScript TS6133 (`React` unused) | origin/main'in `react-jsx` transform'lu dosyaları `import * as React` gereksiz tutuyor | 3 dosyadan kaldırıldı |
+| TypeScript TS2339 (`ItemType.name`) | `ItemType` `name` field'ı yok (`label` var) | `template-selector.tsx` `t.name → t.label` |
+| TypeScript TS2339 (`clusters` not found) | `useAdminK8sClustersQuery` `select:` ile `K8sCluster[]` dönüyor | `.clusters` çağrısı kaldırıldı |
+| TypeScript TS2345 (`mutateAsync` tip hatası) | `useToggleApprovalRequiredMutation` `boolean` bekliyor, nesne geliyordu | `!requiresApproval` direkt geçildi |
+| TypeScript TS2304 (`Key` not found) | `Key` lucide import'tan eksikti | Import eklendi |
+| TypeScript TS2740 (`REL_LABELS` eksik) | `RelationshipType`'a PR-DP03 ekledi ama `REL_LABELS` map'leri güncellenmedi | `pipeline-constants.ts` ve `graph.tsx` güncellendi |
 
 ### Feat: Gruba Global Rol Atama (2026-06-08)
 

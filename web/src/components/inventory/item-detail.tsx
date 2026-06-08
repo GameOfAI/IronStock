@@ -1400,7 +1400,7 @@ function K8sBindingTab({ itemId, canWrite }: { itemId: string; canWrite: boolean
   const [clusterId, setClusterId] = useState('');
   const [namespace, setNamespace] = useState('');
 
-  const clusters = clustersQuery.data?.clusters ?? [];
+  const clusters = clustersQuery.data ?? [];
   const existing = bindingQuery.data;
 
   function handleSave(e: React.FormEvent) {
@@ -1524,7 +1524,7 @@ function SharesTab({
 
   async function handleToggleApproval() {
     try {
-      await approvalMut.mutateAsync({ requires_approval: !requiresApproval });
+      await approvalMut.mutateAsync(!requiresApproval);
       toast({ title: requiresApproval ? 'Onay zorunluluğu kaldırıldı' : 'Onay zorunluluğu aktif edildi' });
     } catch (err) {
       toast({ title: 'Güncelleme başarısız', description: userFriendlyError(err), variant: 'destructive' });

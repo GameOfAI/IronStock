@@ -1,4 +1,3 @@
-import * as React from 'react';
 import type { LifecycleStage } from '@/api/types';
 import { cn } from '@/lib/cn';
 

@@ -1,4 +1,3 @@
-import * as React from 'react';
 import type { Folder } from '@/api/types';
 
 interface KindField {

@@ -50,6 +50,13 @@ const REL_LABELS: Record<RelationshipType, string> = {
   builds_to: 'build eder (builds_to)',
   scans_with: 'tarar (scans_with)',
   deploys_to: 'deploy eder (deploys_to)',
+  // PR-DP03: Backstage camelCase aliases
+  runs_in: 'çalıştırıyor (runs_in)',
+  ownedBy: 'sahibi (ownedBy)',
+  dependsOn: 'bağımlı (dependsOn)',
+  memberOf: 'üyesi (memberOf)',
+  providesApi: 'API sağlar (providesApi)',
+  consumesApi: 'API tüketir (consumesApi)',
 };
 
 const REL_TYPES: RelationshipType[] = [

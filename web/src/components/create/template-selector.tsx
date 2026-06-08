@@ -56,10 +56,10 @@ export function TemplateSelector({ itemTypes, selectedItemTypeId, onSelect }: Te
         </div>
         <div>
           <p className={cn('font-medium text-[13px]', isSelected ? 'text-slate-100' : 'text-slate-300')}>
-            {t.kind_key ?? t.name}
+            {t.kind_key ?? t.label}
           </p>
           <p className="mt-0.5 text-[11px] text-slate-500">
-            {meta?.description ?? t.description ?? t.name}
+            {meta?.description ?? t.label}
           </p>
         </div>
       </button>

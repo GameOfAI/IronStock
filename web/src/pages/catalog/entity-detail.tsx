@@ -6,7 +6,6 @@
  * Full encrypted field access remains at /inventory?item=uuid (existing flow).
  */
 
-import * as React from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { EntityHeader } from '@/components/catalog/entity-header';

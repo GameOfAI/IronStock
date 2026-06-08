@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-06-08 — Dependabot PR'ları merge edildi (8 PR: 5 actions + uuid + tailwind-merge + @types/react).
+Son güncelleme: 2026-06-08 — CI kalıcı hataları düzeltildi (go.work, brace-expansion, TS tip hataları).
 
 ## ✅ Dependabot PR'ları (2026-06-08)
 
