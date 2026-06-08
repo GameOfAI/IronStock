@@ -1,6 +1,17 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-06-08 — UI Gap Fixes tamamlandı (item paylaşım sekmesi, break-glass toggle, oturum sonlandırma, favoriler sayfası, K8s binding, şablon düzenleme, diyagram rename).
+Son güncelleme: 2026-06-08 — Dependabot PR'ları merge edildi (8 PR: 5 actions + uuid + tailwind-merge + @types/react).
+
+## ✅ Dependabot PR'ları (2026-06-08)
+
+- [x] #42 `actions/setup-node` 4→6
+- [x] #43 `softprops/action-gh-release` 2→3
+- [x] #44 `actions/setup-go` 5→6
+- [x] #45 `actions/setup-python` 5→6
+- [x] #46 `github/codeql-action` 3→4
+- [x] #47 `uuid` 11→14
+- [x] #49 `tailwind-merge` 2→3
+- [x] #48 `@types/react` 18→19
 
 ## ✅ UI Gap Fixes — Backend-Exists-But-No-UI (2026-06-08)
 

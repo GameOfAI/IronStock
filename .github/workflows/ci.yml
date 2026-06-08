@@ -25,7 +25,8 @@ jobs:
     name: Tracking Files (PROGRESS.md + TODO.md)
     runs-on: ubuntu-latest
     # Sadece pull_request'te çalışır — direkt main push'ta uygulanamaz (hook zaten yerel yakaladı)
-    if: github.event_name == 'pull_request'
+    # Dependabot PR'ları muaf: otomatik bump'lar PROGRESS.md/TODO.md güncelleyemez
+    if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
     steps:
       - uses: actions/checkout@v6
         with:

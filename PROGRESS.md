@@ -1,6 +1,6 @@
 # İlerleyiş
 
-Son güncelleme: 2026-06-08 (UI Gap Fixes — item paylaşım sekmesi, break-glass toggle, oturum sonlandırma, favoriler sayfası, K8s binding sekmesi, şablon düzenleme, diyagram yeniden adlandırma)
+Son güncelleme: 2026-06-08 (Dependabot PR'ları: CI tracking-check muafiyeti + rebase + merge)
 
 ## Mevcut Durum
 
@@ -24,6 +24,23 @@ Son güncelleme: 2026-06-08 (UI Gap Fixes — item paylaşım sekmesi, break-gla
 | **FIX 8: Diyagram Yeniden Adlandırma** | `pipeline/diagram.tsx` — Pencil ikonu + `useUpdatePipelineDiagramMutation` + Dialog (ad + açıklama) |
 
 **Tüm değişiklikler TypeScript clean (0 hata).**
+
+### Dependabot PR'ları (2026-06-08)
+
+8 Dependabot PR'ı incelendi ve merge edildi:
+
+| PR | Değişiklik | Risk |
+|----|-----------|------|
+| #42 `actions/setup-node` 4→6 | Runner node24 | ✅ Low |
+| #43 `softprops/action-gh-release` 2→3 | Release action | ✅ Low |
+| #44 `actions/setup-go` 5→6 | Go setup | ✅ Low |
+| #45 `actions/setup-python` 5→6 | Python setup | ✅ Low |
+| #46 `github/codeql-action` 3→4 | SAST action | ✅ Low |
+| #47 `uuid` 11→14 | Node 20+ required (biz 20+ kullanıyoruz), v7 API değişmedi | ✅ Safe |
+| #49 `tailwind-merge` 2→3 | Tailwind 4 ile önerilen sürüm, yalnızca `twMerge` kullanıyoruz | ✅ Safe |
+| #48 `@types/react` 18→19 | React 19 tipleri; TypeScript build CI'da doğrulandı | ✅ Safe |
+
+CI `tracking-check` job'ına Dependabot muafiyeti eklendi (`github.actor != 'dependabot[bot]'`).
 
 ### Feat: Gruba Global Rol Atama (2026-06-08)
 
