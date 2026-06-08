@@ -5,7 +5,6 @@
  * lifecycle stages, relationships). No secret field values are displayed.
  */
 
-import * as React from 'react';
 import { Link } from 'react-router-dom';
 import {
   AlertTriangle,
