@@ -1,6 +1,6 @@
 # İlerleyiş
 
-Son güncelleme: 2026-06-08 (CI fix 4: client ESLint 3 errors, server/go.sum missing checksums, migration 00061 git rm, go mod tidy resolved)
+Son güncelleme: 2026-06-08 (CI fix 5: esbuild explicit dep for Vite 8 in client+web, Server Integration ✅, Pre-commit ✅, Server Go ✅)
 
 ## Mevcut Durum
 

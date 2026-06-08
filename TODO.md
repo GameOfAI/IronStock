@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-06-08 — CI fix 4: client ESLint 3 errors, go.sum checksums, migration git rm.
+Son güncelleme: 2026-06-08 — CI fix 5: esbuild dep Vite 8, Server Integration ✅, Pre-commit ✅.
 
 ## ✅ Dependabot PR'ları (2026-06-08)
 
