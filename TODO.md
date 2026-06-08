@@ -12,6 +12,62 @@ Son güncelleme: 2026-06-08 — UI Gap Fixes tamamlandı (item paylaşım sekmes
 - [x] FIX 7: Şablon düzenleme — `template-gallery.tsx` Pencil + Dialog
 - [x] FIX 8: Diyagram yeniden adlandırma — `pipeline/diagram.tsx` Pencil + Dialog
 
+## ✅ golangci-lint v1→v2 CI Migrasyonu (2026-06-02) — branch: fix/ux-and-dev-build
+
+- [x] `.golangci.yml` v1→v2 migrate (`golangci-lint migrate`) + standart exclusion preset'leri
+- [x] golangci-lint v1.62.2 → v2.12.2 (Go 1.25 modülünü typecheck edebiliyor)
+- [x] gosec golangci'den çıkarıldı (ayrı "Go SAST" job'u kapsıyor)
+- [x] 33 gerçek lint bulgusu kodda düzeltildi (sqlclose FP, dead-code, redis SetEx, De Morgan, receiver/param isimleri, errcheck, test SA403x)
+- [x] `ci.yml`: setup-go 1.23→1.25 (server/integration/pre-commit), golangci-action v6→v7
+- [x] Pre-commit job'a Node + web deps (eslint-web hook) eklendi
+- [x] 5 SVG pre-existing trailing-whitespace/EOF düzeltildi
+- [x] eslint-web pre-commit hook workspace-aware (`npm run lint`) yapıldı
+- [x] Integration test stale assertion düzeltildi (item_types 8→9, 00045 k8s_namespace)
+- [x] Lint 0 issue, build/vet/test ✅
+
+## ✅ QA Bug-Fix Turu (2026-06-02) — branch: fix/ux-and-dev-build
+
+- [x] Toolbar yanlış item'a Sil/Düzenle (veri kaybı riski) — activeItem temizleme + URL itemId önceliği
+- [x] Onay İstekleri + Import sayfa çökmeleri — `<Select.Item value="">` → sentinel
+- [x] Log-forwarding / K8s cluster / API token / K8s-bind oluşturma kırık — apiFetch çift-encode → `body: req`
+- [x] Docker build kırık — `golang:1.22` → `1.25` (go.mod 1.25 ister)
+- [x] WebAuthn login UX — config'siz sunucuda 501'de nazik gizleme
+- [x] DOM nesting (group detail) — `<Badge>` `<p>` içinden çıkarıldı
+- [x] CI yeşillendirme — pre-existing gofmt (server) + eslint (web/client) düzeltildi
+- [x] PROGRESS.md + TODO.md tracking güncellendi
+
+## ✅ Developer Portal Dönüşümü (Tamamlandı — 2026-06-03)
+
+- [x] PR-DP01: item_annotations tablosu + CRUD API
+- [x] PR-DP02: kind_key + EntityEnvelope (kind, owner_ref)
+- [x] PR-DP03: Relation type Backstage alias'ları
+- [x] PR-DP04: Catalog Browser sayfası (web)
+- [x] PR-DP05: Backend kind filter (search endpoint)
+- [x] PR-DP06: Entity Detail URL routing
+- [x] PR-DP07: EntityPageRegistry + Plugin Slot mimarisi
+- [x] PR-DP08: Kind-specific overview card'ları
+- [x] PR-DP09: Navigation yeniden yapılandırma
+- [x] PR-DP10: Golden Path Template Wizard (5-step)
+- [x] PR-DP11: portal_templates tablosu + API
+- [x] PR-DP12: Shared types + Tauri sync
+- [x] PR-DP13: Portal Home Dashboard
+- [x] PR-DP14: MCP server portal catalog tools
+- [x] PR-DP15: ADR-0013 + PROGRESS/TODO sync
+
+## ✅ Developer Portal Enhancement (DP-E Fazı — Tamamlandı 2026-06-03)
+
+- [x] DP-E1: Direct catalog entity endpoint (`GET /api/v1/catalog/{kind}/{name}`)
+- [x] DP-E2: Admin portal template management UI + backend `?all=true` param
+- [x] DP-E3: Annotation edit panel in item detail (EntityPageRegistry tab)
+- [x] DP-E4: Kind-specific form fields in golden path wizard
+- [x] DP-E5: Health summary widget on portal home (admin-only)
+- [x] DP-E6: Tauri client catalog page + entity detail
+- [x] DP-E7: OpenAPI spec update for all DP endpoints
+
+## 🔮 Sonraki Adımlar (Developer Portal — Gelecek)
+
+- [ ] Backstage YAML import/export (entity manifest desteği)
+
 ## ✅ Post-Deploy Fixes (2026-05-25)
 
 - [x] Tauri: set_content_protected(false) for VNC compat, window center/visible, icon.icns

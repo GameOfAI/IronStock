@@ -106,7 +106,7 @@ type Config struct {
 	RedisPassword string // ENVANTER_REDIS_PASSWORD — optional auth password
 
 	// RateLimitBackend selects the rate limiter implementation.
-	// "memory" (default) = per-pod in-memory token bucket (existing behaviour).
+	// "memory" (default) = per-pod in-memory token bucket (existing behavior).
 	// "redis"            = shared sliding-window counter via Redis (requires RedisURL).
 	// Falls back to "memory" if Redis is unavailable regardless of setting.
 	RateLimitBackend string // ENVANTER_RATE_LIMIT_BACKEND: memory|redis (default "memory")

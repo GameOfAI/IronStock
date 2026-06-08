@@ -580,42 +580,63 @@ func run() error {
 		Logger: logger,
 	}
 
+	// --- Annotation handler (PR-DP01) ---
+	annotationHandlers := &httpapi.AnnotationHandlers{
+		Service: authSvc,
+		Logger:  logger,
+	}
+
+	// --- Portal template handler (PR-DP11) ---
+	portalTemplateHandlers := &httpapi.PortalTemplateHandlers{
+		DB:     pool,
+		Logger: logger,
+	}
+
+	// --- Catalog entity handler (PR-DP-E1) ---
+	catalogEntityHandlers := &httpapi.CatalogEntityHandlers{
+		Service: authSvc,
+		Logger:  logger,
+	}
+
 	// --- HTTP layer ---
 	router := httpapi.NewRouter(httpapi.Deps{
-		Logger:        logger,
-		DB:            pool,
-		Auth:          authHandlers,
-		Folder:        folderHandlers,
-		Item:          itemHandlers,
-		Attachment:    attachmentHandlers,
-		Admin:         adminHandlers,
-		ClientCert:    clientCertHandlers, // PR-SEC3
-		SSO:           ssoHandlers,        // PR-LDAP
-		Group:         groupHandlers,
-		Tag:           tagHandlers,
-		Notification:  notificationHandlers,
-		Graph:         graphHandlers,
-		LogForwarding: logForwardingHandlers, // PR-LOG1
-		Catalog:       catalogHandlers,
-		WS:            wsHandlers,
-		ShareLink:     shareLinkHandlers,
-		Lifecycle:     lifecycleHandlers,
-		Pipeline:      pipelineHandlers,
-		Export:        exportHandlers,
-		Vault:         vaultHandlers,        // PR-VAULT
-		K8sCluster:    k8sClusterHandlers,   // PR-K8S
-		K8s:           k8sHandlers,          // PR-K8S
-		Report:        reportHandlers,       // PR-K8S
-		Template:      templateHandlers,     // PR-TPL
-		AISuggestion:  aiSuggestionHandlers, // PR-AI
-		Ansible:       ansibleHandlers,      // PR-ANSIBLE
-		APIToken:      apiTokenHandlers,     // PR-ANSIBLE
-		SCIM:          scimHandlers,         // PR-SCIM
-		Scan:          scanHandlers,         // PR-SCAN
-		SystemInfo:    systemInfoHandlers,
-		CatalogBrowse: catalogBrowseHandlers, // PR-CATALOG
-		CORSOrigins:   cfg.CORSOrigins,       // ENVANTER_CORS_ORIGINS
-		PprofEnabled:  cfg.PprofEnabled,      // PR-PROD5
+		Logger:         logger,
+		DB:             pool,
+		Auth:           authHandlers,
+		Folder:         folderHandlers,
+		Item:           itemHandlers,
+		Attachment:     attachmentHandlers,
+		Admin:          adminHandlers,
+		ClientCert:     clientCertHandlers, // PR-SEC3
+		SSO:            ssoHandlers,        // PR-LDAP
+		Group:          groupHandlers,
+		Tag:            tagHandlers,
+		Notification:   notificationHandlers,
+		Graph:          graphHandlers,
+		LogForwarding:  logForwardingHandlers, // PR-LOG1
+		Catalog:        catalogHandlers,
+		WS:             wsHandlers,
+		ShareLink:      shareLinkHandlers,
+		Lifecycle:      lifecycleHandlers,
+		Pipeline:       pipelineHandlers,
+		Export:         exportHandlers,
+		Vault:          vaultHandlers,        // PR-VAULT
+		K8sCluster:     k8sClusterHandlers,   // PR-K8S
+		K8s:            k8sHandlers,          // PR-K8S
+		Report:         reportHandlers,       // PR-K8S
+		Template:       templateHandlers,     // PR-TPL
+		AISuggestion:   aiSuggestionHandlers, // PR-AI
+		Ansible:        ansibleHandlers,      // PR-ANSIBLE
+		APIToken:       apiTokenHandlers,     // PR-ANSIBLE
+		SCIM:           scimHandlers,         // PR-SCIM
+		Scan:           scanHandlers,         // PR-SCAN
+		SystemInfo:     systemInfoHandlers,
+		CatalogBrowse:  catalogBrowseHandlers,  // PR-CATALOG
+		Annotation:     annotationHandlers,     // PR-DP01
+		PortalTemplate: portalTemplateHandlers, // PR-DP11
+		CatalogEntity:  catalogEntityHandlers,  // PR-DP-E1
+		CORSOrigins:    cfg.CORSOrigins,        // ENVANTER_CORS_ORIGINS
+		PprofEnabled:   cfg.PprofEnabled,       // PR-PROD5
 	})
 
 	if cfg.PprofEnabled {

@@ -253,6 +253,10 @@ export default function LoginPage() {
   const [waUsername, setWaUsername] = React.useState('');
   const [waDialogOpen, setWaDialogOpen] = React.useState(false);
   const [waBusy, setWaBusy] = React.useState(false);
+  // Server reports 501/not_configured when WebAuthn isn't enabled. Once we
+  // learn that, hide the security-key UI for the rest of the session instead
+  // of showing a scary error toast (browser support != server support).
+  const [waUnavailable, setWaUnavailable] = React.useState(false);
 
   const [username, setUsername] = React.useState('');
   const [password, setPassword] = React.useState('');
@@ -348,6 +352,19 @@ export default function LoginPage() {
       });
       navigate(fromPath ?? '/inventory', { replace: true });
     } catch (err) {
+      // Server doesn't have WebAuthn configured — hide the option for this
+      // session and inform the user gently instead of a destructive error.
+      if (err instanceof ApiError && (err.status === 501 || err.code === 'not_configured')) {
+        setWaUnavailable(true);
+        setWaDialogOpen(false);
+        setWaUsername('');
+        toast({
+          title: 'Güvenlik anahtarı bu sunucuda etkin değil',
+          description: 'Lütfen kullanıcı adı ve parola ile giriş yapın.',
+        });
+        setWaBusy(false);
+        return;
+      }
       const msg = userFriendlyError(err);
       if (!msg.includes('NotAllowed') && !msg.includes('abort') && !msg.includes('cancelled')) {
         toast({
@@ -602,7 +619,7 @@ export default function LoginPage() {
           )}
 
           {/* WebAuthn / Security Key section (PR-SEC4) */}
-          {isWebAuthnSupported() && (
+          {isWebAuthnSupported() && !waUnavailable && (
             <div className="mt-5">
               <div className="flex items-center gap-3">
                 <span className="h-px flex-1 bg-slate-800" />

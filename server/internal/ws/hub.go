@@ -198,7 +198,7 @@ func (h *Hub) subscribeLoop() {
 			}
 			h.localPublish(env.Event)
 		}
-		// ch closed → subscription ended (ctx cancelled or Redis error)
+		// ch closed → subscription ended (ctx canceled or Redis error)
 		_ = sub.Close()
 		if h.ctx.Err() != nil {
 			return

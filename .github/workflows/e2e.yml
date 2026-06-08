@@ -49,7 +49,7 @@ jobs:
       E2E_ADMIN_PASSWORD: E2eTestP@ss1
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # ── Pull and start the E2E stack ──────────────────────────────────────
       - name: Log in to GHCR (pull images)
@@ -105,7 +105,7 @@ jobs:
 
       # ── Upload results ─────────────────────────────────────────────────────
       - name: Upload Playwright report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: playwright-report-${{ github.run_id }}
@@ -113,7 +113,7 @@ jobs:
           retention-days: 7
 
       - name: Upload test results (traces + videos)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: test-results-${{ github.run_id }}

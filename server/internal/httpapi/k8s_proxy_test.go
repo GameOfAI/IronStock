@@ -143,7 +143,7 @@ func TestK8sProxyResponseNotStored(t *testing.T) {
 	// This is a documentation-level contract test. The actual enforcement is in
 	// the handler implementation — there are no DB writes after the K8s API call.
 	// If a future change adds persistence, the handler will need a security review.
-	t.Log("K8s proxy responses are ephemeral: fetched, serialised to HTTP, discarded — never stored in DB")
+	t.Log("K8s proxy responses are ephemeral: fetched, serialized to HTTP, discarded — never stored in DB")
 }
 
 // TestK8sProxyAuditRequired verifies that the expected audit action name is

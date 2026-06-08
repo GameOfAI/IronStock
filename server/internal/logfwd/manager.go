@@ -45,7 +45,7 @@ func (m *Manager) Publish(aev audit.PublishEvent) {
 		ActorUserID:  aev.ActorUserID,
 		ResourceType: aev.ResourceType,
 		ResourceID:   aev.ResourceID,
-		Details:      json.RawMessage(aev.Details),
+		Details:      aev.Details,
 		CreatedAt:    aev.CreatedAt,
 	}
 	m.mu.RLock()

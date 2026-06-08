@@ -51,7 +51,7 @@ func (s *AuthHandlers) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 	go s.processForgotPassword(req.Email, r.RemoteAddr, r.UserAgent())
 }
 
-func (s *AuthHandlers) processForgotPassword(email_, remoteAddr, userAgent string) {
+func (s *AuthHandlers) processForgotPassword(emailAddr, remoteAddr, userAgent string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -62,7 +62,7 @@ func (s *AuthHandlers) processForgotPassword(email_, remoteAddr, userAgent strin
 		LIMIT 1
 	`
 	var userID, username string
-	err := s.Service.DB.QueryRow(ctx, findSQL, email_).Scan(&userID, &username)
+	err := s.Service.DB.QueryRow(ctx, findSQL, emailAddr).Scan(&userID, &username)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return // Sessizce çık — enumeration koruması
@@ -133,7 +133,7 @@ func (s *AuthHandlers) processForgotPassword(email_, remoteAddr, userAgent strin
 
 	appURL := s.AppURL
 	resetURL := fmt.Sprintf("%s/reset-password?token=%s", appURL, tokenHex)
-	s.EmailClient.SendTemplateAsync(email_, "password_reset", email.TemplateData{
+	s.EmailClient.SendTemplateAsync(emailAddr, "password_reset", email.TemplateData{
 		Username:    username,
 		ResetURL:    resetURL,
 		ExpiresIn:   fmt.Sprintf("%d dakika", ttlMin),

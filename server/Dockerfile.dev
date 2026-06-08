@@ -1,5 +1,7 @@
 # Dev Dockerfile for server
-FROM golang:alpine
+# Must match server/go.mod's `go 1.25.0` — golang images set GOTOOLCHAIN=local,
+# so an older base fails `go mod download` ("requires go >= 1.25.0").
+FROM golang:1.26-alpine
 
 WORKDIR /app
 

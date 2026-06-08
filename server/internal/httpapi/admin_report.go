@@ -168,7 +168,7 @@ func (h *ReportHandlers) Generate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 5. Audit — no payload or field values.
-	h.Audit.Write(ctx, audit.Entry{
+	_ = h.Audit.Write(ctx, audit.Entry{
 		ActorUserID: claims.Subject,
 		Action:      audit.ActionAdminReportGenerated,
 		Details: map[string]any{

@@ -92,7 +92,7 @@ func (c *Client) SetEX(ctx context.Context, key string, value any, ttl time.Dura
 	if c.isOpen() {
 		return ErrCircuitOpen
 	}
-	err := c.rdb.SetEx(ctx, key, value, ttl).Err()
+	err := c.rdb.Set(ctx, key, value, ttl).Err()
 	c.observe(err)
 	return err
 }

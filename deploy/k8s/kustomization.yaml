@@ -8,7 +8,7 @@ resources:
 - namespace.yaml
 - configmap.yaml
 - postgres.yaml
-- redis.yaml     # PR-SCALE: optional Redis for multi-pod WS fan-out + rate limiter
+- redis.yaml
 - api.yaml
 - web.yaml
 - adminer.yaml
@@ -24,6 +24,6 @@ resources:
 # let the CI docker job commit the change automatically.
 images:
 - name: ghcr.io/gameofai/envanter-api
-  newTag: main-a5c1278
+  newTag: main-27a786e
 - name: ghcr.io/gameofai/envanter-web
-  newTag: main-a5c1278
+  newTag: main-27a786e

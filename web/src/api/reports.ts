@@ -82,7 +82,7 @@ export function useSetK8sBindingMutation() {
     }) =>
       apiFetch<K8sBinding>(`/api/v1/items/${itemId}/k8s/bind`, {
         method: 'POST',
-        body: JSON.stringify({ cluster_id: clusterId, namespace_name: namespaceName }),
+        body: { cluster_id: clusterId, namespace_name: namespaceName },
       }),
   });
 }

@@ -23,6 +23,7 @@ repos:
       - id: check-merge-conflict
       - id: check-case-conflict
       - id: detect-private-key
+        exclude: ^scripts/seed-mock-data\.mjs$
       - id: mixed-line-ending
         args: [--fix=lf]
 
@@ -53,14 +54,15 @@ repos:
   # TypeScript / ESLint (web)
   - repo: local
     hooks:
+      # npm workspaces: eslint binary is hoisted to the repo-root node_modules,
+      # so a fixed web/node_modules/.bin path doesn't exist. Run the same
+      # `npm run lint` the CI Web job uses (eslint . --max-warnings 0).
       - id: eslint-web
         name: ESLint (web)
-        language: node
-        entry: web/node_modules/.bin/eslint
-        types: [file]
+        language: system
+        entry: bash -c 'cd web && npm run lint'
         files: web/src/.*\.(ts|tsx)$
-        args: ['--max-warnings=0']
-        pass_filenames: true
+        pass_filenames: false
 
   # Tracking dosyaları kontrolü (PROGRESS.md + TODO.md zorunluluğu)
   # Kural: her kod commit'inde tracking dosyaları da güncellenmeli (ADR-0012)

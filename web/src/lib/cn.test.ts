@@ -7,7 +7,7 @@ describe('cn', () => {
   });
 
   it('drops falsy entries', () => {
-    expect(cn('a', false && 'b', null, undefined, 'c')).toBe('a c');
+    expect(cn('a', (false as boolean) && 'b', null, undefined, 'c')).toBe('a c');
   });
 
   it('resolves tailwind conflicts: later wins', () => {

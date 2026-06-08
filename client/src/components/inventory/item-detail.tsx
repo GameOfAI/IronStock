@@ -218,6 +218,11 @@ export function ItemDetail({ itemId, fieldDefinitions, itemTypes: _itemTypes }: 
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
+              {item.kind && (
+                <span className="shrink-0 rounded border border-slate-700 bg-slate-800/60 px-1 font-mono text-[9px] uppercase tracking-wide text-slate-400">
+                  {item.kind}
+                </span>
+              )}
               <h2 className="text-base font-semibold leading-tight truncate flex-1">{item.name}</h2>
               <button
                 type="button"

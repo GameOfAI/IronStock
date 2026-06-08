@@ -212,6 +212,12 @@ export interface ItemUpdateRequest {
   owner_wrap_nonce?: string;
 }
 
+/** PR-DP02: Backstage-style owner reference {kind, name}. */
+export interface OwnerRef {
+  kind: string;
+  name: string;
+}
+
 export interface Item {
   id: string;
   folder_id: string;
@@ -236,10 +242,96 @@ export interface Item {
   requires_approval?: boolean;
   /** PR-N3: Present when requires_approval=true and caller has no active approved request. */
   my_access_request?: AccessRequestInfo | null;
+  /** PR-DP02: Backstage entity kind (e.g. "Server", "Database"). From item_types.kind_key. */
+  kind?: string;
+  /** PR-DP02: Entity creator as Backstage-style owner reference. */
+  owner_ref?: OwnerRef;
 }
 
 export interface ItemListResponse {
   items: Item[];
+}
+
+// --- Item Annotations (PR-DP01) ---
+// Backstage metadata.annotations karşılığı: freeform key-value metadata.
+// Örnekler: "grafana/dashboard-url", "github.com/project-slug"
+
+export interface ItemAnnotation {
+  key: string;
+  value: string;
+  created_at: string; // RFC 3339
+}
+
+export interface ItemAnnotationsResponse {
+  annotations: ItemAnnotation[];
+}
+
+export interface UpsertAnnotationRequest {
+  value: string;
+}
+
+// --- Portal Templates (PR-DP11) ---
+// Golden Path scaffold blueprints for the Create wizard.
+
+/** A portal (golden path) template defining entity kind + default scaffolding. */
+export interface PortalTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  kind_key: string;
+  item_type_id?: number | null;
+  default_fields?: Record<string, unknown> | null;
+  default_annotations?: Record<string, string> | null;
+  default_lifecycle_stages?: string[] | null;
+  default_relations?: unknown[] | null;
+  is_builtin: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PortalTemplateListResponse {
+  templates: PortalTemplate[];
+}
+
+export interface CreatePortalTemplateRequest {
+  name: string;
+  description?: string;
+  kind_key: string;
+  item_type_id?: number | null;
+  default_fields?: Record<string, unknown> | null;
+  default_annotations?: Record<string, string> | null;
+  default_lifecycle_stages?: string[] | null;
+  default_relations?: unknown[] | null;
+}
+
+/** PR-DP-E2: update request — same shape as create. */
+export type UpdatePortalTemplateRequest = CreatePortalTemplateRequest;
+
+// --- Catalog Entity (PR-DP-E1) ---
+
+/** Combined entity response from GET /api/v1/catalog/{kind}/{name}. */
+export interface CatalogEntityResponse {
+  item: {
+    id: string;
+    folder_id: string;
+    name: string;
+    description?: string;
+    kind: string;
+    item_type_id: number;
+    owner_ref?: OwnerRef;
+    created_at: string;
+    updated_at: string;
+    expires_at?: string | null;
+  };
+  annotations: Record<string, string>;
+  relationships: GraphEdge[];
+  health?: {
+    item_id: string;
+    score: number;
+    severity: string;
+    breakdown: Array<{ rule: string; deduction: number; detail?: string }>;
+  };
 }
 
 /** One snapshot of a field's encrypted value (PR-N2). Server stores opaque blobs. */
@@ -406,6 +498,8 @@ export interface ItemType {
   id: number;
   key: string;
   label: string;
+  /** PR-DP02: Backstage entity kind key (e.g. "Server", "Database"). */
+  kind_key?: string | null;
   icon?: string | null;
   suggested_fields: string[];
   default_launchers: unknown[];
@@ -552,6 +646,7 @@ export interface UnreadCountResponse {
 // --- Graph / Pipeline Relationships (PR-F5a) ---
 
 export type RelationshipType =
+  // Original IronStock snake_case types.
   | 'hosted_on'
   | 'accessed_via'
   | 'part_of'
@@ -560,7 +655,24 @@ export type RelationshipType =
   | 'uses_tool'
   | 'builds_to'
   | 'scans_with'
-  | 'deploys_to';
+  | 'deploys_to'
+  | 'runs_in'
+  // PR-DP03: Backstage-native camelCase aliases.
+  | 'ownedBy'
+  | 'dependsOn'
+  | 'memberOf'
+  | 'providesApi'
+  | 'consumesApi';
+
+/** PR-DP03: Backstage-standard relation type computed from IronStock type. */
+export type BackstageRelationType =
+  | 'dependsOn'
+  | 'partOf'
+  | 'hasPart'
+  | 'ownedBy'
+  | 'memberOf'
+  | 'providesApi'
+  | 'consumesApi';
 
 /** A graph node representing an item the caller can see. Name is decrypted server-side. */
 export interface GraphNode {
@@ -577,6 +689,8 @@ export interface GraphEdge {
   target_id: string;
   type: RelationshipType;
   metadata?: Record<string, unknown>;
+  /** PR-DP03: Backstage-standard relation type computed server-side. */
+  backstage_type?: BackstageRelationType;
 }
 
 export interface GraphResponse {

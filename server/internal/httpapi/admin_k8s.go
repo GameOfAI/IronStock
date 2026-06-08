@@ -172,7 +172,7 @@ func (h *K8sClusterHandlers) CreateCluster(w http.ResponseWriter, r *http.Reques
 		h.Logger.Warn("k8s cluster credential encryption failed", slog.String("id", newID), slog.String("error", err.Error()))
 	}
 
-	h.Audit.Write(ctx, audit.Entry{
+	_ = h.Audit.Write(ctx, audit.Entry{
 		ActorUserID: claims.Subject,
 		Action:      audit.ActionAdminK8sClusterCreated,
 		Details:     map[string]any{"cluster_id": newID, "name": req.Name, "auth_mode": req.AuthMode},
@@ -237,7 +237,7 @@ func (h *K8sClusterHandlers) UpdateCluster(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	h.Audit.Write(ctx, audit.Entry{
+	_ = h.Audit.Write(ctx, audit.Entry{
 		ActorUserID: claims.Subject,
 		Action:      audit.ActionAdminK8sClusterUpdated,
 		Details:     map[string]any{"cluster_id": clusterID, "name": req.Name},
@@ -261,7 +261,7 @@ func (h *K8sClusterHandlers) DeleteCluster(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	h.Audit.Write(ctx, audit.Entry{
+	_ = h.Audit.Write(ctx, audit.Entry{
 		ActorUserID: claims.Subject,
 		Action:      audit.ActionAdminK8sClusterDeleted,
 		Details:     map[string]any{"cluster_id": clusterID},
@@ -290,7 +290,7 @@ func (h *K8sClusterHandlers) TestCluster(w http.ResponseWriter, r *http.Request)
 	}
 
 	version, err := client.GetServerVersion(ctx)
-	h.Audit.Write(ctx, audit.Entry{
+	_ = h.Audit.Write(ctx, audit.Entry{
 		ActorUserID: claims.Subject,
 		Action:      audit.ActionAdminK8sClusterTested,
 		Details:     map[string]any{"cluster_id": clusterID, "success": err == nil},

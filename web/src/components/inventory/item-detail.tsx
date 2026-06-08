@@ -74,6 +74,7 @@ import { ShareLinkDialog } from './share-link-dialog';
 import { LinkedItemsTab } from './linked-items-tab'; // PR-LINK
 import { RelativeTime } from '@/components/common/relative-time';
 import { cn } from '@/lib/cn';
+import { useEntityPageRegistry } from '@/lib/entity-page-registry';
 import { EmptyState } from '@/components/ui/empty-state';
 import {
   PIPELINE_TYPE_ICONS,
@@ -136,6 +137,7 @@ function parseVaultSource(raw: Record<string, unknown> | null | undefined): Exte
 
 export function ItemDetail({ itemId, fieldDefinitions, itemTypes: _itemTypes }: ItemDetailProps) {
   const itemQuery = useItem(itemId);
+  const { getTabsForKind } = useEntityPageRegistry();
   const privateKey = useAuthStore((s) => s.privateKey);
   const [decryption, setDecryption] = useState<DecryptionState>({ status: 'idle' });
   const { toast } = useToast();
@@ -260,6 +262,10 @@ export function ItemDetail({ itemId, fieldDefinitions, itemTypes: _itemTypes }: 
   const removeFav = useRemoveFavoriteMutation(itemId ?? '');
 
   const item = itemQuery.data;
+  const extraTabs = useMemo(
+    () => (item ? getTabsForKind(item.kind ?? '*') : []),
+    [item, getTabsForKind],
+  );
 
   // Decrypt field values when item + privateKey ready
   useEffect(() => {
@@ -413,6 +419,14 @@ export function ItemDetail({ itemId, fieldDefinitions, itemTypes: _itemTypes }: 
             <TabsTrigger value="paylasimlar">Paylaşımlar</TabsTrigger>
             <TabsTrigger value="k8s">☸ K8s</TabsTrigger>
             <TabsTrigger value="ai-oneriler">✨ AI Önerileri</TabsTrigger>
+            {extraTabs
+              .filter((t) => !t.condition || (item && t.condition(item)))
+              .map((t) => (
+                <TabsTrigger key={t.id} value={t.id}>
+                  {t.icon && <t.icon className="mr-1 h-3.5 w-3.5 inline-block" />}
+                  {t.label}
+                </TabsTrigger>
+              ))}
           </TabsList>
 
           {/* ── GENEL ────────────────────────────────────────────────────────── */}
@@ -769,6 +783,15 @@ export function ItemDetail({ itemId, fieldDefinitions, itemTypes: _itemTypes }: 
           <TabsContent value="ai-oneriler" className="px-0" forceMount>
             <AISuggestionsTab itemId={item.id} />
           </TabsContent>
+
+          {/* ── PLUGIN SLOT — extra tabs from EntityPageRegistry (PR-DP07) ── */}
+          {extraTabs
+            .filter((t) => !t.condition || t.condition(item))
+            .map((t) => (
+              <TabsContent key={t.id} value={t.id} className="px-0">
+                <t.component entity={item} />
+              </TabsContent>
+            ))}
         </Tabs>
       </div>
     </div>

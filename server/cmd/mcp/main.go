@@ -20,13 +20,16 @@
 //	}
 //
 // Tools exposed (all read-only):
-//   - inventory_search   — search items by name (fuzzy)
-//   - inventory_get_item — fetch item metadata (never secret field values)
-//   - inventory_list_folders — list folder tree
-//   - relationships_graph — graph nodes/edges for an item
-//   - k8s_status          — bound K8s cluster info for an item
-//   - audit_search        — search audit log (admin only)
-//   - health_score        — get item health score + breakdown
+//   - inventory_search        — search items by name (fuzzy)
+//   - inventory_get_item      — fetch item metadata (never secret field values)
+//   - inventory_list_folders  — list folder tree
+//   - relationships_graph     — graph nodes/edges for an item
+//   - k8s_status              — bound K8s cluster info for an item
+//   - audit_search            — search audit log (admin only)
+//   - health_score            — get item health score + breakdown
+//   - catalog_list_by_kind    — list catalog entities filtered by kind + lifecycle (portal)
+//   - catalog_get_entity      — get entity detail + relations + annotations by kind+name (portal)
+//   - portal_list_templates   — list golden path portal templates
 
 package main
 
@@ -168,7 +171,7 @@ func (s *mcpServer) handle(req rpcRequest) rpcResponse {
 	return base
 }
 
-func (s *mcpServer) toolList() []map[string]any {
+func (*mcpServer) toolList() []map[string]any {
 	return []map[string]any{
 		{
 			"name":        "inventory_search",
@@ -213,6 +216,30 @@ func (s *mcpServer) toolList() []map[string]any {
 				"actor":  map[string]any{"type": "string"},
 				"since":  map[string]any{"type": "string", "description": "RFC3339 timestamp"},
 				"limit":  map[string]any{"type": "integer", "default": 20},
+			}, nil),
+		},
+		{
+			"name":        "catalog_list_by_kind",
+			"description": "List Developer Portal catalog entities filtered by kind (e.g. Server, Database, Service, Certificate). Returns ownership, lifecycle, and kind fields — never secret field values.",
+			"inputSchema": jsonSchema(map[string]any{
+				"kind_key":        map[string]any{"type": "string", "description": "Entity kind: Server, Database, Service, Certificate, SSHKey, CloudCredential, Note, Credential"},
+				"lifecycle_stage": map[string]any{"type": "string", "description": "Optional: filter by lifecycle stage name"},
+				"limit":           map[string]any{"type": "integer", "default": 50},
+			}, []string{"kind_key"}),
+		},
+		{
+			"name":        "catalog_get_entity",
+			"description": "Get a catalog entity's detail, relations, and annotations by kind + name. Secret field values are E2E encrypted and never returned.",
+			"inputSchema": jsonSchema(map[string]any{
+				"kind_key": map[string]any{"type": "string", "description": "Entity kind (e.g. Server, Database)"},
+				"name":     map[string]any{"type": "string", "description": "Exact entity name"},
+			}, []string{"kind_key", "name"}),
+		},
+		{
+			"name":        "portal_list_templates",
+			"description": "List all active golden path portal templates available for entity scaffolding.",
+			"inputSchema": jsonSchema(map[string]any{
+				"kind_key": map[string]any{"type": "string", "description": "Optional: filter templates by kind key"},
 			}, nil),
 		},
 	}
@@ -272,6 +299,72 @@ func (s *mcpServer) callTool(ctx context.Context, name string, args map[string]a
 			params.Set("limit", fmt.Sprintf("%.0f", limit))
 		}
 		endpoint := "/api/v1/admin/audit-log"
+		if len(params) > 0 {
+			endpoint += "?" + params.Encode()
+		}
+		return s.apiGet(ctx, endpoint)
+
+	case "catalog_list_by_kind":
+		kindKey := stringArg(args, "kind_key")
+		params := url.Values{"q": {""}, "fuzzy": {"true"}, "kind": {kindKey}}
+		if limit, _ := args["limit"].(float64); limit > 0 {
+			params.Set("limit", fmt.Sprintf("%.0f", limit))
+		}
+		return s.apiGet(ctx, "/api/v1/items/search?"+params.Encode())
+
+	case "catalog_get_entity":
+		kindKey := stringArg(args, "kind_key")
+		name := stringArg(args, "name")
+		params := url.Values{"q": {name}, "kind": {kindKey}}
+		body, err := s.apiGet(ctx, "/api/v1/items/search?"+params.Encode())
+		if err != nil {
+			return "", err
+		}
+		// Parse to find exact match and fetch with annotations.
+		var result struct {
+			Items []struct {
+				ID   string `json:"id"`
+				Name string `json:"name"`
+				Kind string `json:"kind"`
+			} `json:"items"`
+		}
+		if err := json.Unmarshal([]byte(body), &result); err != nil || len(result.Items) == 0 {
+			return body, nil
+		}
+		var matchID string
+		for _, it := range result.Items {
+			if strings.EqualFold(it.Name, name) && strings.EqualFold(it.Kind, kindKey) {
+				matchID = it.ID
+				break
+			}
+		}
+		if matchID == "" {
+			matchID = result.Items[0].ID
+		}
+		// Fetch item detail + annotations + relations in parallel response.
+		detail, err := s.apiGet(ctx, "/api/v1/items/"+url.PathEscape(matchID))
+		if err != nil {
+			return "", err
+		}
+		annotations, _ := s.apiGet(ctx, "/api/v1/items/"+url.PathEscape(matchID)+"/annotations")
+		relations, _ := s.apiGet(ctx, "/api/v1/items/"+url.PathEscape(matchID)+"/relationships")
+		combined := map[string]json.RawMessage{}
+		_ = json.Unmarshal([]byte(detail), &combined)
+		if annotations != "" {
+			combined["annotations"] = json.RawMessage(annotations)
+		}
+		if relations != "" {
+			combined["relations"] = json.RawMessage(relations)
+		}
+		out, _ := json.MarshalIndent(combined, "", "  ")
+		return string(out), nil
+
+	case "portal_list_templates":
+		params := url.Values{}
+		if kindKey := stringArg(args, "kind_key"); kindKey != "" {
+			params.Set("kind_key", kindKey)
+		}
+		endpoint := "/api/v1/portal-templates"
 		if len(params) > 0 {
 			endpoint += "?" + params.Encode()
 		}

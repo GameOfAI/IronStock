@@ -409,7 +409,7 @@ function GroupDetailPanel({ group, onDelete }: { group: Group; onDelete: () => v
           {group.description && (
             <p className="text-sm text-muted-foreground">{group.description}</p>
           )}
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap mt-1">
             <Badge variant="secondary">{group.member_count} üye</Badge>
             {group.role && (
               <Badge variant="outline" className={ROLE_BADGE[group.role]}>

@@ -209,7 +209,7 @@ export function LinkedItemsTab({ itemId, fieldDefs, canWrite }: Props) {
               />
               {targetItem && (
                 <p className="text-xs text-muted-foreground">
-                  ✓ {(targetItem as any).name ?? targetItemId}
+                  ✓ {(targetItem as { name?: string }).name ?? targetItemId}
                 </p>
               )}
             </div>
@@ -223,7 +223,7 @@ export function LinkedItemsTab({ itemId, fieldDefs, canWrite }: Props) {
                     <SelectValue placeholder="Hedef alanı seçin…" />
                   </SelectTrigger>
                   <SelectContent>
-                    {(targetItem as any).fields?.map((f: any) => (
+                    {(targetItem as { fields?: Array<{ field_definition_id: number; field_label?: string }> }).fields?.map((f) => (
                       <SelectItem
                         key={f.field_definition_id}
                         value={String(f.field_definition_id)}

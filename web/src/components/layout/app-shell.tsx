@@ -14,11 +14,11 @@
  */
 
 import * as React from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
-  Archive,
+
   Folder,
-  LayoutGrid,
+
   Shield,
   ShieldCheck,
   FileText,
@@ -49,6 +49,9 @@ import {
   Eye,
   Server,
   Star,
+  BookOpen,
+  PlusCircle,
+  Wrench,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -67,7 +70,6 @@ import {
   useMarkAllReadMutation,
 } from '@/api/notifications';
 import { cn } from '@/lib/cn';
-import iconSvg from '@/assets/icon.svg';
 import { RouteErrorBoundary } from '@/components/error-boundary';
 import { APP_VERSION } from '@/version';
 import { useSystemInfoQuery } from '@/api/system-info';
@@ -509,6 +511,8 @@ function NotificationBell() {
 
 // Page title map for TopBar
 const NAV_LABELS: Record<string, string> = {
+  '/catalog': 'Catalog',
+  '/create': 'Entity Oluştur',
   '/inventory': 'Envanter',
   '/tags': 'Etiketlerim',
   '/graph': 'İlişki Haritası',
@@ -528,6 +532,7 @@ const NAV_LABELS: Record<string, string> = {
   '/admin/secret-scanning': 'Sızıntı Taraması',
   '/admin/k8s-clusters': 'K8s Kümeleri',
   '/admin/reports': 'Raporlar',
+  '/admin/portal-templates': 'Portal Şablonları',
   '/profile': 'Profil',
 };
 
@@ -601,13 +606,15 @@ export function AppShell() {
         </button>
 
         {/* Logo + branding */}
-        <div className="flex items-center gap-2">
-          <img src={iconSvg} alt="IronStock" className="h-6 w-6" />
+        <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+          <div className="grid h-6 w-6 place-items-center rounded-md bg-blue-600">
+            <Key className="h-[13px] w-[13px] text-white" />
+          </div>
           <span className="text-[14px] font-semibold tracking-tight text-slate-100">IronStock</span>
           <span className="font-mono text-[10px] text-slate-500">v{APP_VERSION}</span>
-          <span className="mx-1.5 h-3 w-px bg-slate-800" />
-          <span className="text-[13px] text-slate-400">{pageTitle}</span>
-        </div>
+        </Link>
+        <span className="mx-1.5 h-3 w-px bg-slate-800" />
+        <span className="text-[13px] text-slate-400">{pageTitle}</span>
 
         {/* Right side actions */}
         <div className="ml-auto flex items-center gap-1">
@@ -675,23 +682,23 @@ export function AppShell() {
           aria-label="Ana navigasyon"
         >
           <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2" role="navigation">
-            {/* ── Envanter Grubu ── */}
+            {/* ── Catalog ── */}
             <NavGroup
-              icon={Archive}
-              label="Envanter"
+              icon={BookOpen}
+              label="Catalog"
               collapsed={sidebarCollapsed && !mobileOpen}
-              prefixes={['/inventory', '/catalog', '/tags', '/favorites']}
+              prefixes={['/catalog', '/inventory', '/tags', '/favorites']}
             >
               <NavItem
-                to="/inventory"
-                icon={Folder}
-                label="Vault"
+                to="/catalog"
+                icon={BookOpen}
+                label="Tüm Entityler"
                 collapsed={sidebarCollapsed && !mobileOpen}
               />
               <NavItem
-                to="/catalog"
-                icon={LayoutGrid}
-                label="Katalog"
+                to="/inventory"
+                icon={Folder}
+                label="Envanter"
                 collapsed={sidebarCollapsed && !mobileOpen}
               />
               <NavItem
@@ -720,15 +727,12 @@ export function AppShell() {
               collapsed={sidebarCollapsed && !mobileOpen}
             />
 
-            {/* ── Görselleştirme ── */}
-            {!(sidebarCollapsed && !mobileOpen) && (
-              <div className="my-1.5 h-px bg-slate-800" />
-            )}
+            {/* ── Explore ── */}
             <NavGroup
               icon={Eye}
-              label="Görselleştirme"
+              label="Explore"
               collapsed={sidebarCollapsed && !mobileOpen}
-              prefixes={[]}
+              prefixes={['/graph', '/pipeline']}
             >
               <NavItem
                 to="/graph"
@@ -739,13 +743,48 @@ export function AppShell() {
               <NavItem
                 to="/pipeline"
                 icon={Network}
-                label="Pipeline Diyagramları"
+                label="Pipeline"
                 collapsed={sidebarCollapsed && !mobileOpen}
               />
               <NavItem
                 to="/pipeline/lifecycle"
                 icon={Layers}
                 label="Lifecycle Lanes"
+                collapsed={sidebarCollapsed && !mobileOpen}
+              />
+            </NavGroup>
+
+            {/* ── Create ── */}
+            <NavItem
+              to="/create"
+              icon={PlusCircle}
+              label="Create"
+              collapsed={sidebarCollapsed && !mobileOpen}
+            />
+
+            {/* ── Araçlar ── */}
+            <NavGroup
+              icon={Wrench}
+              label="Araçlar"
+              collapsed={sidebarCollapsed && !mobileOpen}
+              prefixes={['/access-requests', '/import', '/tags']}
+            >
+              <NavItem
+                to="/access-requests"
+                icon={ClipboardCheck}
+                label="Onay İstekleri"
+                collapsed={sidebarCollapsed && !mobileOpen}
+              />
+              <NavItem
+                to="/import"
+                icon={Upload}
+                label="Toplu Aktarma"
+                collapsed={sidebarCollapsed && !mobileOpen}
+              />
+              <NavItem
+                to="/tags"
+                icon={Tag}
+                label="Etiketlerim"
                 collapsed={sidebarCollapsed && !mobileOpen}
               />
             </NavGroup>
@@ -846,6 +885,12 @@ export function AppShell() {
                     to="/admin/k8s-clusters"
                     icon={Layers}
                     label="K8s Kümeleri"
+                    collapsed={sidebarCollapsed && !mobileOpen}
+                  />
+                  <NavItem
+                    to="/admin/portal-templates"
+                    icon={FileText}
+                    label="Portal Şablonları"
                     collapsed={sidebarCollapsed && !mobileOpen}
                   />
                 </NavGroup>
