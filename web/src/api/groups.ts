@@ -6,12 +6,14 @@ import type {
   Group,
   GroupListResponse,
   GroupMembersResponse,
+  GroupFolderPermissionsResponse,
   GrantFolderGroupPermissionRequest,
 } from './types';
 
 export const groupsQueryKey = ['admin', 'groups'] as const;
 export const groupQueryKey = (id: string) => ['admin', 'groups', id] as const;
 export const groupMembersQueryKey = (id: string) => ['admin', 'groups', id, 'members'] as const;
+export const groupFolderPermsQueryKey = (id: string) => ['admin', 'groups', id, 'folder-permissions'] as const;
 
 // --- Queries ---
 
@@ -36,6 +38,16 @@ export function useGroupMembersQuery(groupId: string) {
   return useQuery({
     queryKey: groupMembersQueryKey(groupId),
     queryFn: () => apiFetch<GroupMembersResponse>(`/api/v1/admin/groups/${groupId}/members`),
+    enabled: Boolean(groupId),
+    staleTime: 15_000,
+  });
+}
+
+export function useGroupFolderPermissionsQuery(groupId: string) {
+  return useQuery({
+    queryKey: groupFolderPermsQueryKey(groupId),
+    queryFn: () =>
+      apiFetch<GroupFolderPermissionsResponse>(`/api/v1/admin/groups/${groupId}/folder-permissions`),
     enabled: Boolean(groupId),
     staleTime: 15_000,
   });
@@ -86,20 +98,24 @@ export function useRemoveGroupMemberMutation(groupId: string) {
 }
 
 export function useGrantFolderGroupPermissionMutation(groupId: string) {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: GrantFolderGroupPermissionRequest) =>
       apiFetch<void>(`/api/v1/admin/groups/${groupId}/folder-permissions`, {
         method: 'POST',
         body: input,
       }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: groupFolderPermsQueryKey(groupId) }),
   });
 }
 
 export function useRevokeFolderGroupPermissionMutation(groupId: string) {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: (folderId: string) =>
       apiFetch<void>(`/api/v1/admin/groups/${groupId}/folder-permissions/${folderId}`, {
         method: 'DELETE',
       }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: groupFolderPermsQueryKey(groupId) }),
   });
 }

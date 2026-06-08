@@ -397,6 +397,7 @@ func NewRouter(d Deps) http.Handler {
 			gr.Get("/{id}/members", d.Group.ListGroupMembers)
 			gr.Post("/{id}/members", d.Group.AddGroupMember)
 			gr.Delete("/{id}/members/{user_id}", d.Group.RemoveGroupMember)
+			gr.Get("/{id}/folder-permissions", d.Group.ListFolderGroupPermissions)
 			gr.Post("/{id}/folder-permissions", d.Group.GrantFolderGroupPermission)
 			gr.Delete("/{id}/folder-permissions/{folder_id}", d.Group.RevokeFolderGroupPermission)
 		})

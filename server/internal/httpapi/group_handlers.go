@@ -351,6 +351,61 @@ func (h *GroupHandlers) RemoveGroupMember(w http.ResponseWriter, r *http.Request
 
 // --- Folder-Group Permissions ---
 
+// --- Folder-Group Permissions ---
+
+type folderGroupPermissionRow struct {
+	FolderID          string `json:"folder_id"`
+	FolderName        string `json:"folder_name"`
+	Permission        string `json:"permission"`
+	InheritToChildren bool   `json:"inherit_to_children"`
+	GrantedAt         string `json:"granted_at"`
+}
+
+// ListFolderGroupPermissions implements GET /api/v1/admin/groups/{id}/folder-permissions.
+func (h *GroupHandlers) ListFolderGroupPermissions(w http.ResponseWriter, r *http.Request) {
+	groupID := chi.URLParam(r, "id")
+	ctx := r.Context()
+
+	const sqlText = `
+		SELECT fgp.folder_id::text, f.name_enc, fgp.permission, fgp.inherit_to_children, fgp.granted_at::text
+		FROM folder_group_permissions fgp
+		JOIN folders f ON f.id = fgp.folder_id
+		WHERE fgp.group_id = $1::uuid AND fgp.revoked_at IS NULL
+		ORDER BY f.name_enc
+	`
+	rows, err := h.Service.DB.Query(ctx, sqlText, groupID)
+	if err != nil {
+		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
+			"Klasör izinleri alınamadı.", err)
+		return
+	}
+	defer rows.Close()
+
+	out := make([]folderGroupPermissionRow, 0)
+	for rows.Next() {
+		var row folderGroupPermissionRow
+		var nameEnc []byte
+		if err := rows.Scan(&row.FolderID, &nameEnc, &row.Permission, &row.InheritToChildren, &row.GrantedAt); err != nil {
+			writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
+				"İzin satırı okunamadı.", err)
+			return
+		}
+		if name, decErr := decryptFolderName(h.Service, nameEnc); decErr == nil {
+			row.FolderName = name
+		} else {
+			row.FolderName = row.FolderID // fallback: show ID if decrypt fails
+		}
+		out = append(out, row)
+	}
+	if err := rows.Err(); err != nil {
+		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
+			"İzin listesi okunamadı.", err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"permissions": out})
+}
+
 // GrantFolderGroupPermission implements POST /api/v1/admin/groups/{id}/folder-permissions.
 // Body: { folder_id, permission: "read"|"write", inherit_to_children: bool }
 func (h *GroupHandlers) GrantFolderGroupPermission(w http.ResponseWriter, r *http.Request) {

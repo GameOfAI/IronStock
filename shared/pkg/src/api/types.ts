@@ -475,6 +475,18 @@ export interface GrantFolderGroupPermissionRequest {
   inherit_to_children: boolean;
 }
 
+export interface GroupFolderPermission {
+  folder_id: string;
+  folder_name: string;
+  permission: 'read' | 'write';
+  inherit_to_children: boolean;
+  granted_at: string;
+}
+
+export interface GroupFolderPermissionsResponse {
+  permissions: GroupFolderPermission[];
+}
+
 // --- Tags + Favorites (PR-N7) ---
 
 export interface Tag {

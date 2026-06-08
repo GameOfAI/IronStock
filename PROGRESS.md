@@ -1,12 +1,29 @@
 # İlerleyiş
 
-Son güncelleme: 2026-06-08 (Container güvenlik raporu remediasyonu — vite 8, vitest 4, react-router-dom 6.30.4)
+Son güncelleme: 2026-06-08 (Bugfix: grup klasör izinleri — GET endpoint + UI panel eklendi)
 
 ## Mevcut Durum
 
 - **Tüm Fazlar Tamamlandı:** Faz 0–11 ✅
 - **Tamamlanan PR:** 27/27 + PR-CATALOG (%100 + bonus)
 - **Aktif:** PR-CATALOG tamamlandı
+
+### Bugfix: Grup Klasör İzin Atama (2026-06-08)
+
+**Sorun:** Admin panelinde gruba klasör izni atanamıyordu.
+
+**Kök neden (3 katman):**
+1. `GET /api/v1/admin/groups/{id}/folder-permissions` endpoint'i yoktu → mevcut izinler listelenemiyordu
+2. `useGroupFolderPermissionsQuery` hook tanımlı değildi
+3. `groups.tsx` sayfasında "Klasör İzinleri" paneli hiç yoktu — sadece "Üyeler" görünüyordu
+4. `useGrantFolderGroupPermissionMutation` ve `useRevokeFolderGroupPermissionMutation` hook'ları `groups.ts`'de yazılmış ama hiçbir UI bileşeni çağırmıyordu
+
+**Değişiklikler:**
+- `server/internal/httpapi/group_handlers.go` — `ListFolderGroupPermissions` handler eklendi (folder name decrypt, revoked_at IS NULL filtresi)
+- `server/internal/httpapi/router.go` — `GET /{id}/folder-permissions` route eklendi
+- `shared/pkg/src/api/types.ts` — `GroupFolderPermission` + `GroupFolderPermissionsResponse` tipleri eklendi
+- `web/src/api/groups.ts` — `useGroupFolderPermissionsQuery` hook eklendi; grant/revoke mutation'larına `onSuccess` invalidation eklendi
+- `web/src/pages/admin/groups.tsx` — `GroupFolderPermissionsPanel` bileşeni eklendi: mevcut izinleri listeler (klasör adı + okuma/yazma badge + alt klasör badge + kaldır butonu), yeni izin ekleme formu (kök klasör dropdown + okuma/yazma seçimi + alt klasörlere yay checkbox)
 
 ### Container Güvenlik Raporu Remediasyonu (2026-06-08)
 

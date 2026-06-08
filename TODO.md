@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-06-08 — Container güvenlik raporu remediasyonu tamamlandı (vite 8, vitest 4, react-router-dom 6.30.4). Bilinen risk: @xmldom/xmldom@0.7.13 (kdbxweb) — kabuledildi, PROGRESS.md'de belgelendi.
+Son güncelleme: 2026-06-08 — Bugfix: grup klasör izin atama UI + GET endpoint eklendi.
 
 ## ✅ Post-Deploy Fixes (2026-05-25)
 

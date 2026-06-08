@@ -49,13 +49,17 @@ import {
   useAddGroupMemberMutation,
   useCreateGroupMutation,
   useDeleteGroupMutation,
+  useGroupFolderPermissionsQuery,
   useGroupMembersQuery,
+  useGrantFolderGroupPermissionMutation,
   useGroupsQuery,
   useRemoveGroupMemberMutation,
+  useRevokeFolderGroupPermissionMutation,
 } from '@/api/groups';
 import { useUsers } from '@/api/admin';
+import { useRootFolders } from '@/api/folders';
 import type { Group } from '@/api/types';
-import { Plus, Trash2, UserMinus, Users } from 'lucide-react';
+import { FolderOpen, Plus, Shield, Trash2, UserMinus, Users } from 'lucide-react';
 import { useDocumentTitle } from '@/hooks/use-document-title';
 import { userFriendlyError } from '@/lib/user-error';
 
@@ -221,6 +225,137 @@ function GroupMembersPanel({ group }: { group: Group }) {
   );
 }
 
+// --- Group Folder Permissions Panel ---
+
+function GroupFolderPermissionsPanel({ group }: { group: Group }) {
+  const { toast } = useToast();
+  const { data } = useGroupFolderPermissionsQuery(group.id);
+  const { data: rootFolders } = useRootFolders();
+  const grantMut = useGrantFolderGroupPermissionMutation(group.id);
+  const revokeMut = useRevokeFolderGroupPermissionMutation(group.id);
+
+  const [selectedFolderId, setSelectedFolderId] = React.useState('');
+  const [permission, setPermission] = React.useState<'read' | 'write'>('read');
+  const [inherit, setInherit] = React.useState(true);
+
+  const permissions = data?.permissions ?? [];
+  const folders = rootFolders?.folders ?? [];
+
+  async function handleGrant() {
+    if (!selectedFolderId) return;
+    try {
+      await grantMut.mutateAsync({ folder_id: selectedFolderId, permission, inherit_to_children: inherit });
+      setSelectedFolderId('');
+      toast({ title: 'Klasör izni verildi' });
+    } catch (err) {
+      toast({ title: 'İzin verilemedi', description: userFriendlyError(err), variant: 'destructive' });
+    }
+  }
+
+  async function handleRevoke(folderId: string, folderName: string) {
+    try {
+      await revokeMut.mutateAsync(folderId);
+      toast({ title: 'İzin kaldırıldı', description: folderName });
+    } catch (err) {
+      toast({ title: 'İzin kaldırılamadı', description: userFriendlyError(err), variant: 'destructive' });
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Grant new permission */}
+      <div className="flex flex-col gap-2 rounded-md border p-3">
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Yeni İzin Ekle</p>
+        <div className="flex flex-wrap gap-2 items-end">
+          <div className="flex flex-col gap-1 flex-1 min-w-[160px]">
+            <Label className="text-xs">Klasör</Label>
+            <Select value={selectedFolderId} onValueChange={setSelectedFolderId}>
+              <SelectTrigger className="h-8 text-sm">
+                <SelectValue placeholder="Klasör seç…" />
+              </SelectTrigger>
+              <SelectContent>
+                {folders.map((f) => (
+                  <SelectItem key={f.id} value={f.id}>
+                    {f.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label className="text-xs">İzin</Label>
+            <Select value={permission} onValueChange={(v) => setPermission(v as 'read' | 'write')}>
+              <SelectTrigger className="h-8 text-sm w-28">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="read">Okuma</SelectItem>
+                <SelectItem value="write">Yazma</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-1.5 pb-0.5">
+            <input
+              type="checkbox"
+              id="inherit-check"
+              checked={inherit}
+              onChange={(e) => setInherit(e.target.checked)}
+              className="h-4 w-4 accent-primary"
+            />
+            <Label htmlFor="inherit-check" className="text-xs cursor-pointer">Alt klasörlere yay</Label>
+          </div>
+          <Button
+            size="sm"
+            className="h-8"
+            onClick={handleGrant}
+            disabled={!selectedFolderId || grantMut.isPending}
+          >
+            {grantMut.isPending ? 'Ekleniyor…' : 'Ekle'}
+          </Button>
+        </div>
+      </div>
+
+      {/* Current permissions list */}
+      {permissions.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Bu gruba henüz klasör izni verilmemiş.</p>
+      ) : (
+        <div className="flex flex-col divide-y rounded-md border">
+          {permissions.map((p) => (
+            <div key={p.folder_id} className="flex items-center justify-between px-3 py-2 gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <FolderOpen className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="text-sm truncate">{p.folder_name}</span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <Badge
+                  variant="outline"
+                  className={p.permission === 'write'
+                    ? 'text-blue-400 border-blue-500/30'
+                    : 'text-green-400 border-green-500/30'}
+                >
+                  {p.permission === 'write' ? 'Yazma' : 'Okuma'}
+                </Badge>
+                {p.inherit_to_children && (
+                  <Badge variant="secondary" className="text-xs">Alt klasörler</Badge>
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                  onClick={() => handleRevoke(p.folder_id, p.folder_name)}
+                  aria-label={`${p.folder_name} iznini kaldır`}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // --- Group Detail Panel ---
 
 function GroupDetailPanel({ group, onDelete }: { group: Group; onDelete: () => void }) {
@@ -290,6 +425,18 @@ function GroupDetailPanel({ group, onDelete }: { group: Group; onDelete: () => v
         </CardHeader>
         <CardContent>
           <GroupMembersPanel group={group} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Shield className="h-4 w-4" />
+            Klasör İzinleri
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <GroupFolderPermissionsPanel group={group} />
         </CardContent>
       </Card>
     </div>
