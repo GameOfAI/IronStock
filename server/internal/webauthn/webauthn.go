@@ -176,8 +176,8 @@ func (s *WAService) BeginRegistration(user *WAUser) (*protocol.CredentialCreatio
 	var excludeList []protocol.CredentialDescriptor
 	for _, c := range user.Credentials {
 		excludeList = append(excludeList, protocol.CredentialDescriptor{
-			Type:            protocol.PublicKeyCredentialType,
-			CredentialID:    c.ID,
+			Type:         protocol.PublicKeyCredentialType,
+			CredentialID: c.ID,
 		})
 	}
 	options, sessionData, err := s.wa.BeginRegistration(user,

@@ -22,6 +22,7 @@ import {
   clearAllTokens,
   setAccessToken as syncAccessToStorage,
   setRefreshToken as syncRefreshToStorage,
+  setPersistedSession,
 } from '@/api/token-storage';
 
 export interface SessionUser {
@@ -73,6 +74,14 @@ interface AuthState {
   clearMustSetupTOTP(): void;
   /** Update only the access token (after refresh rotation). */
   setAccessToken(token: string, refreshToken: string): void;
+  /** Restore session from persisted user info + new access token (page reload). */
+  restoreSession(input: {
+    user: SessionUser;
+    accessToken: string;
+    mustChangePassword?: boolean;
+    mustSetupTOTP?: boolean;
+    isBootstrap?: boolean;
+  }): void;
   setHydrating(value: boolean): void;
   clear(): void;
 }
@@ -92,6 +101,12 @@ export const useAuthStore = create<AuthState>()(
       setSession({ user, accessToken, refreshToken, kek, privateKey, mustChangePassword, mustSetupTOTP }) {
         syncAccessToStorage(accessToken);
         syncRefreshToStorage(refreshToken);
+        setPersistedSession({
+          user,
+          mustChangePassword: mustChangePassword ?? false,
+          mustSetupTOTP: mustSetupTOTP ?? false,
+          isBootstrap: false,
+        });
         set(
           {
             user,
@@ -111,6 +126,12 @@ export const useAuthStore = create<AuthState>()(
       setBootstrapSession({ user, accessToken, refreshToken, mustChangePassword, mustSetupTOTP }) {
         syncAccessToStorage(accessToken);
         syncRefreshToStorage(refreshToken);
+        setPersistedSession({
+          user,
+          mustChangePassword: mustChangePassword ?? false,
+          mustSetupTOTP: mustSetupTOTP ?? false,
+          isBootstrap: true,
+        });
         // Persist a per-user bootstrap key in localStorage so items created in
         // one session remain decryptable across reloads / re-logins. Without
         // this, every bootstrap login mints a fresh random key and previously
@@ -153,6 +174,39 @@ export const useAuthStore = create<AuthState>()(
           },
           false,
           'auth/setBootstrapSession',
+        );
+      },
+
+      restoreSession({ user, accessToken, mustChangePassword, mustSetupTOTP, isBootstrap }) {
+        syncAccessToStorage(accessToken);
+        // For bootstrap users, try to recover the per-user private key from localStorage.
+        let privateKey: Uint8Array | null = null;
+        if (isBootstrap) {
+          const storageKey = `envanter-bootstrap-pk:${user.id}`;
+          const stored = localStorage.getItem(storageKey);
+          if (stored && stored.length > 0) {
+            try {
+              const bin = atob(stored);
+              privateKey = new Uint8Array(bin.length);
+              for (let i = 0; i < bin.length; i++) privateKey[i] = bin.charCodeAt(i);
+            } catch {
+              // corrupt — leave null
+            }
+          }
+        }
+        set(
+          {
+            user,
+            accessToken,
+            kek: null,
+            privateKey,
+            hydrating: false,
+            isBootstrap: isBootstrap ?? false,
+            mustChangePassword: mustChangePassword ?? false,
+            mustSetupTOTP: mustSetupTOTP ?? false,
+          },
+          false,
+          'auth/restoreSession',
         );
       },
 

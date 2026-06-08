@@ -2,13 +2,10 @@
 	email burak.haslaman@gmail.com
 }
 
-# Public — only API, WebSocket, SCIM (for Tauri desktop app)
+# Public — Full app: Web UI + API + WebSocket + SCIM
+# Let's Encrypt auto-SSL via Caddy.
 haslaman.tplinkdns.com {
 	handle /api/* {
-		reverse_proxy server:8080
-	}
-
-	handle /ws {
 		reverse_proxy server:8080
 	}
 
@@ -21,11 +18,11 @@ haslaman.tplinkdns.com {
 	}
 
 	handle {
-		respond "IronStock API" 200
+		reverse_proxy web:80
 	}
 }
 
-# Local — Web UI + API (http only, no SSL)
+# Local HTTP (crypto.subtle works on localhost without HTTPS)
 :3080 {
 	handle /api/* {
 		reverse_proxy server:8080

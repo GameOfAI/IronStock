@@ -23,14 +23,14 @@ type APITokenHandlers struct {
 }
 
 type apiTokenResponse struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	Scope       string  `json:"scope"`
-	ExpiresAt   *string `json:"expires_at,omitempty"`
-	LastUsedAt  *string `json:"last_used_at,omitempty"`
-	CreatedAt   string  `json:"created_at"`
+	ID         string  `json:"id"`
+	Name       string  `json:"name"`
+	Scope      string  `json:"scope"`
+	ExpiresAt  *string `json:"expires_at,omitempty"`
+	LastUsedAt *string `json:"last_used_at,omitempty"`
+	CreatedAt  string  `json:"created_at"`
 	// PlainToken is only non-empty on initial creation response.
-	PlainToken  string  `json:"token,omitempty"`
+	PlainToken string `json:"token,omitempty"`
 }
 
 // ListAPITokens implements GET /api/v1/users/me/api-tokens.
@@ -122,11 +122,11 @@ func (h *APITokenHandlers) CreateAPIToken(w http.ResponseWriter, r *http.Request
 	}
 
 	_ = h.ItemH.Audit.Write(r.Context(), audit.Entry{
-		Action:      "api_token.created",
-		ActorUserID: claims.Subject,
+		Action:       "api_token.created",
+		ActorUserID:  claims.Subject,
 		ResourceType: "api_token",
-		ResourceID:  id,
-		Details:     map[string]any{"scope": req.Scope, "name": req.Name},
+		ResourceID:   id,
+		Details:      map[string]any{"scope": req.Scope, "name": req.Name},
 	})
 
 	writeJSON(w, http.StatusCreated, apiTokenResponse{
@@ -159,10 +159,10 @@ func (h *APITokenHandlers) DeleteAPIToken(w http.ResponseWriter, r *http.Request
 	}
 
 	_ = h.ItemH.Audit.Write(r.Context(), audit.Entry{
-		Action:      "api_token.revoked",
-		ActorUserID: claims.Subject,
+		Action:       "api_token.revoked",
+		ActorUserID:  claims.Subject,
 		ResourceType: "api_token",
-		ResourceID:  tokenID,
+		ResourceID:   tokenID,
 	})
 
 	w.WriteHeader(http.StatusNoContent)

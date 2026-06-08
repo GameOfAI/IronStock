@@ -5,12 +5,20 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 
 import { queryClient } from '@/api/query';
 import { useAuthStore } from '@/store/auth';
+import {
+  getRefreshToken,
+  getPersistedSession,
+  setAccessToken as storeAccessToken,
+  setRefreshToken as storeRefreshToken,
+  clearAllTokens,
+} from '@/api/token-storage';
 import { ThemeProvider } from '@/components/layout/theme-provider';
 import { AppShell } from '@/components/layout/app-shell';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthGate, MustChangePasswordGate, MustSetupTOTPGate, RoleGate } from '@/routes/auth-gate';
 import { WsProvider } from '@/components/ws-provider';
 import { SkipLink } from '@/components/layout/skip-link';
+import { ErrorBoundary } from '@/components/error-boundary';
 import { OnboardingTour, useOnboardingTour } from '@/components/onboarding/onboarding-tour';
 
 import LoginPage from '@/pages/login';
@@ -40,6 +48,7 @@ import ProfilePage from '@/pages/profile';
 import SharePage from '@/pages/share';
 import ImportPage from '@/pages/import';
 import AccessRequestsPage from '@/pages/access-requests';
+import CatalogPage from '@/pages/catalog';
 import NotFoundPage from '@/pages/not-found';
 
 /**
@@ -67,16 +76,64 @@ function AuthEventBridge() {
 }
 
 /**
- * Boot-time hydration. Marks the auth store as "no longer hydrating"
- * after first paint. PR-W2 will refine this: try GET /users/me/keypair
- * with the persisted refresh token to silently restore session.
+ * Boot-time hydration. Attempts to silently restore the session using
+ * the persisted refresh token + user metadata from localStorage.
+ *
+ * Flow:
+ *   1. Read refresh token + user session from localStorage.
+ *   2. If both exist, POST /auth/refresh to get a fresh access token.
+ *   3. Restore the auth store with user info + new access token.
+ *   4. KEK/privateKey remain null (derived from master password at login)
+ *      — features needing decryption will prompt for password.
+ *   5. On any failure, fall through to the login screen.
  */
 function HydrateBoot() {
+  const restoreSession = useAuthStore((s) => s.restoreSession);
   const setHydrating = useAuthStore((s) => s.setHydrating);
+
   React.useEffect(() => {
-    // PR-W2 will replace this with a real silent-refresh attempt.
-    setHydrating(false);
-  }, [setHydrating]);
+    let cancelled = false;
+
+    const refreshToken = getRefreshToken();
+    const session = getPersistedSession();
+
+    if (!refreshToken || !session) {
+      setHydrating(false);
+      return;
+    }
+
+    fetch('/api/v1/auth/refresh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    })
+      .then((res) => {
+        if (!res.ok) {
+          clearAllTokens();
+          if (!cancelled) setHydrating(false);
+          return null;
+        }
+        return res.json();
+      })
+      .then((body) => {
+        if (!body || cancelled) return;
+        storeAccessToken(body.access_token);
+        storeRefreshToken(body.refresh_token);
+        restoreSession({
+          user: session.user,
+          accessToken: body.access_token,
+          mustChangePassword: session.mustChangePassword,
+          mustSetupTOTP: session.mustSetupTOTP,
+          isBootstrap: session.isBootstrap,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setHydrating(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [restoreSession, setHydrating]);
+
   return null;
 }
 
@@ -87,6 +144,7 @@ function OnboardingTourBridge() {
 
 export default function App() {
   return (
+    <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <BrowserRouter>
@@ -127,6 +185,7 @@ export default function App() {
                   <Route element={<><OnboardingTourBridge /><AppShell /></>}>
                     <Route index element={<Navigate to="/inventory" replace />} />
                     <Route path="/inventory/*" element={<InventoryPage />} />
+                    <Route path="/catalog" element={<CatalogPage />} />
                     <Route path="/tags" element={<TagsPage />} />
                     <Route path="/graph" element={<GraphPage />} />
                     <Route path="/pipeline" element={<PipelineListPage />} />
@@ -164,5 +223,6 @@ export default function App() {
       </ThemeProvider>
       {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
     </QueryClientProvider>
+    </ErrorBoundary>
   );
 }

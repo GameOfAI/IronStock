@@ -22,7 +22,7 @@ services:
       - "80:80"
       - "443:443"
       - "443:443/udp"  # HTTP/3
-      - "3080:3080"    # Local web UI
+      - "3080:3080"    # Local web UI (HTTP — localhost only)
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

@@ -63,6 +63,8 @@ type Deps struct {
 	APIToken      *APITokenHandlers         // PR-ANSIBLE: API token management
 	SCIM          *SCIMHandlers             // PR-SCIM: SCIM 2.0 user provisioning
 	Scan          *ScanHandlers             // PR-SCAN: Secret fingerprint scanning
+	SystemInfo    *SystemInfoHandlers       // Sidebar health widget
+	CatalogBrowse *CatalogBrowseHandlers    // PR-CATALOG: Backstage-style service catalog
 	CORSOrigins   []string                  // ENVANTER_CORS_ORIGINS
 	PprofEnabled  bool                      // PR-PROD5: pprof debug endpoints
 }
@@ -125,6 +127,18 @@ func NewRouter(d Deps) http.Handler {
 	r.Get("/readyz", h.Readyz)
 	// /metrics is internal-only; restricted at the network layer (NetworkPolicy).
 	r.Get("/metrics", metrics.Handler().ServeHTTP)
+
+	// System info — authenticated, for sidebar health widget.
+	if d.SystemInfo != nil && d.Auth != nil {
+		r.With(timeoutMW, requireAuth).
+			Get("/api/v1/system/info", d.SystemInfo.GetInfo)
+	}
+
+	// PR-CATALOG: Backstage-style service catalog browse (authenticated, any role).
+	if d.CatalogBrowse != nil && d.Auth != nil {
+		r.With(timeoutMW, requireAuth).
+			Get("/api/v1/catalog/items", d.CatalogBrowse.List)
+	}
 
 	// PR-PROD5: pprof CPU+memory profiling (ENVANTER_PPROF_ENABLED=true).
 	// Admin-only — requires valid access token + admin role.

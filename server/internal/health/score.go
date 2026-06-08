@@ -90,6 +90,19 @@ func Severity(score int) string {
 	}
 }
 
+// SeverityRange returns the inclusive [min, max] score bounds for a severity label.
+// Used by catalog browse to convert a severity filter into a SQL range condition.
+func SeverityRange(sev string) (min, max int) {
+	switch sev {
+	case "healthy":
+		return 80, 100
+	case "warning":
+		return 50, 79
+	default: // "critical"
+		return 0, 49
+	}
+}
+
 // Breakdown describes which rules fired and their deductions.
 type Breakdown struct {
 	Rule      string `json:"rule"`

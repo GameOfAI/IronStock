@@ -86,11 +86,13 @@ export default function LoginPage() {
   // Ortak login akışı — hem ilk submit hem TOTP retry için kullanılır.
   async function runLogin(opts: { totp?: string }) {
     setSubstep('authenticating');
+    console.log('[Login] runLogin start', { username: username.toLowerCase(), hasTotp: !!opts.totp, baseUrl: (await import('@/api/client')).getBaseUrl() });
     const loginRes = await loginMut.mutateAsync({
       username: username.toLowerCase(),
       master_password: password,
       totp_code: opts.totp || undefined,
     });
+    console.log('[Login] login API success', { userId: loginRes.user_id, mustSetupTOTP: loginRes.must_setup_totp });
 
     setSubstep('fetching_keypair');
     const keypair = await fetchMyKeypair(loginRes.access_token);
@@ -183,6 +185,7 @@ export default function LoginPage() {
         setTotpDialogOpen(true);
         return;
       }
+      console.error('[Login] login error:', err);
       const msg =
         err instanceof ApiError
           ? err.message
@@ -211,6 +214,7 @@ export default function LoginPage() {
       // Success → dialog navigation ile zaten kapanıyor.
     } catch (err) {
       setSubstep('idle');
+      console.error('[Login] TOTP login error:', err);
       const msg =
         err instanceof ApiError
           ? err.message

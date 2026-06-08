@@ -19,7 +19,7 @@
 
 import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Server, ShieldCheck, Upload, X, Eye, EyeOff, WifiOff, MonitorOff } from 'lucide-react';
+import { Server, ShieldCheck, Upload, X, Eye, EyeOff, WifiOff, MonitorOff, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -80,7 +80,46 @@ export default function ConfigPage() {
   const [certPassword, setCertPassword] = React.useState(clientCertPassword);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
+  // Connection test state
+  const [testStatus, setTestStatus] = React.useState<'idle' | 'testing' | 'ok' | 'fail'>('idle');
+  const [testMessage, setTestMessage] = React.useState('');
+
   const hasCert = certP12Base64.length > 0;
+
+  async function handleTestConnection() {
+    const trimmed = url.trim().replace(/\/$/, '');
+    if (!trimmed || (!trimmed.startsWith('http://') && !trimmed.startsWith('https://'))) {
+      setTestStatus('fail');
+      setTestMessage('Geçerli bir URL girin.');
+      return;
+    }
+    setTestStatus('testing');
+    setTestMessage('');
+    try {
+      const res = await fetch(`${trimmed}/healthz`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(10000),
+      });
+      if (res.ok) {
+        const body = await res.json().catch(() => null) as { status?: string } | null;
+        setTestStatus('ok');
+        setTestMessage(`Bağlantı başarılı${body?.status ? ` (${body.status})` : ''}`);
+      } else {
+        setTestStatus('fail');
+        setTestMessage(`Sunucu yanıt verdi ama hata döndü: HTTP ${res.status}`);
+      }
+    } catch (err) {
+      setTestStatus('fail');
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('timeout') || msg.includes('TimeoutError')) {
+        setTestMessage('Bağlantı zaman aşımına uğradı. URL ve ağ bağlantınızı kontrol edin.');
+      } else if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
+        setTestMessage('Sunucuya ulaşılamadı. URL doğru mu?');
+      } else {
+        setTestMessage(`Bağlantı hatası: ${msg}`);
+      }
+    }
+  }
 
   // Read picked .p12 file as base64
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -141,15 +180,42 @@ export default function ConfigPage() {
             {/* ── Sunucu URL ── */}
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="server-url">Sunucu URL</Label>
-              <Input
-                id="server-url"
-                type="url"
-                placeholder="https://envanter.sirket.com"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                autoFocus
-              />
+              <div className="flex gap-2">
+                <Input
+                  id="server-url"
+                  type="url"
+                  placeholder="https://envanter.sirket.com"
+                  value={url}
+                  onChange={(e) => { setUrl(e.target.value); setTestStatus('idle'); }}
+                  autoFocus
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleTestConnection}
+                  disabled={testStatus === 'testing'}
+                  className="shrink-0"
+                >
+                  {testStatus === 'testing' ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    'Test'
+                  )}
+                </Button>
+              </div>
               {error && <p className="text-xs text-destructive">{error}</p>}
+              {testStatus === 'ok' && (
+                <p className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle2 className="h-3.5 w-3.5" /> {testMessage}
+                </p>
+              )}
+              {testStatus === 'fail' && (
+                <p className="flex items-center gap-1 text-xs text-destructive">
+                  <XCircle className="h-3.5 w-3.5" /> {testMessage}
+                </p>
+              )}
             </div>
 
             {/* ── TLS skip-verify ── */}

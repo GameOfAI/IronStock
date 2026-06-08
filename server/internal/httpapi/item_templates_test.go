@@ -54,7 +54,7 @@ func TestCreateTemplateRequiredFields(t *testing.T) {
 	}
 	cases := []req{
 		{"My Template", 1, true},
-		{"", 1, false},          // missing name
+		{"", 1, false},            // missing name
 		{"My Template", 0, false}, // missing item_type_id
 	}
 	for _, tc := range cases {

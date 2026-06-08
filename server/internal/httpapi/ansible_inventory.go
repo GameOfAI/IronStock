@@ -139,8 +139,8 @@ func (h *AnsibleInventoryHandlers) GetInventory(w http.ResponseWriter, r *http.R
 	}
 
 	// Build Ansible inventory structure.
-	meta := map[string]any{}         // hostvars
-	groups := map[string][]string{}  // group → host list
+	meta := map[string]any{}        // hostvars
+	groups := map[string][]string{} // group → host list
 	allHosts := make([]string, 0, len(hosts))
 
 	for i := range hosts {
@@ -149,8 +149,8 @@ func (h *AnsibleInventoryHandlers) GetInventory(w http.ResponseWriter, r *http.R
 
 		// hostvars: description, item_type, folder_id — no secret field values.
 		meta[hn] = map[string]any{
-			"ironstock_item_type": hosts[i].itemType,
-			"ironstock_folder_id": hosts[i].folderID,
+			"ironstock_item_type":   hosts[i].itemType,
+			"ironstock_folder_id":   hosts[i].folderID,
 			"ironstock_description": hosts[i].description,
 		}
 

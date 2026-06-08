@@ -15,6 +15,15 @@
  */
 
 const REFRESH_KEY = 'envanter.refresh_token';
+const SESSION_KEY = 'envanter.session';
+
+/** Persisted session metadata — enough to restore after page reload. */
+export interface PersistedSession {
+  user: { id: string; username: string; roles: string[] };
+  mustChangePassword?: boolean;
+  mustSetupTOTP?: boolean;
+  isBootstrap?: boolean;
+}
 
 // In-memory access token. Re-fetched after page reload via /auth/refresh.
 let accessTokenInMemory: string | null = null;
@@ -48,7 +57,30 @@ export function setRefreshToken(token: string | null): void {
   }
 }
 
+export function getPersistedSession(): PersistedSession | null {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as PersistedSession;
+  } catch {
+    return null;
+  }
+}
+
+export function setPersistedSession(session: PersistedSession | null): void {
+  try {
+    if (session === null) {
+      localStorage.removeItem(SESSION_KEY);
+    } else {
+      localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    }
+  } catch {
+    // Storage quota / private mode — silently ignore.
+  }
+}
+
 export function clearAllTokens(): void {
   setAccessToken(null);
   setRefreshToken(null);
+  setPersistedSession(null);
 }

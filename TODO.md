@@ -618,6 +618,7 @@ Faz 2 ertelemeleri (mimari cost-of-delay 0):
 - [x] `shared/pkg/package.json`, `web/package.json` → `1.0.0`
 
 **Post-v1.0.0 / Faz 6+ genel:**
+- [x] **PR-CATALOG** — Backstage-style servis kataloğu: `GET /api/v1/catalog/items` endpoint + `/catalog` web sayfası (card grid, filtreler, side panel, Envanter NavGroup). ✅ 2026-06-08
 - [ ] Distroless image (server `alpine` → `gcr.io/distroless/static-debian12`)
 - [ ] Managed DB değerlendirmesi (Cloud SQL / RDS / on-prem HA cluster)
 - [ ] nginx `readOnlyRootFilesystem: true` — emptyDir volume + custom config

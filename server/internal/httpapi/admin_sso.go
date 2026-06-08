@@ -97,11 +97,11 @@ func (h *SSOHandlers) ListSSOProviders(w http.ResponseWriter, r *http.Request) {
 
 // createSSOProviderRequest is the body for POST /api/v1/admin/sso/providers.
 type createSSOProviderRequest struct {
-	Name          string   `json:"name"`
-	ProviderType  string   `json:"provider_type"`
-	Enabled       bool     `json:"enabled"`
-	AutoProvision bool     `json:"auto_provision"`
-	DefaultRole   string   `json:"default_role"`
+	Name          string `json:"name"`
+	ProviderType  string `json:"provider_type"`
+	Enabled       bool   `json:"enabled"`
+	AutoProvision bool   `json:"auto_provision"`
+	DefaultRole   string `json:"default_role"`
 
 	// OIDC
 	DiscoveryURL string   `json:"discovery_url"`

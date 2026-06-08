@@ -4,14 +4,14 @@ mod tray;
 
 use inactivity::InactivityState;
 use std::sync::Arc;
-use tauri::Manager;
+use tauri::{Manager, RunEvent, WindowEvent};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let inactivity = Arc::new(InactivityState::new());
     let inactivity_for_thread = Arc::clone(&inactivity);
 
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(inactivity)
         .setup(move |app| {
@@ -42,6 +42,31 @@ pub fn run() {
             commands::cache_clear,
             commands::set_content_protection,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+
+    app.run(|app_handle, event| match event {
+        // macOS: Pencere kapatıldığında uygulamayı tamamen kapatma,
+        // tray ikonundan "Göster" ile yeniden açılabilsin.
+        RunEvent::WindowEvent {
+            event: WindowEvent::CloseRequested { api, .. },
+            label,
+            ..
+        } => {
+            // Pencereyi gizle, uygulamayı kapatma.
+            api.prevent_close();
+            if let Some(win) = app_handle.get_webview_window(&label) {
+                let _ = win.hide();
+            }
+        }
+        // macOS: Dock ikonuna tıklandığında pencereyi tekrar göster.
+        #[cfg(target_os = "macos")]
+        RunEvent::Reopen { .. } => {
+            if let Some(win) = app_handle.get_webview_window("main") {
+                let _ = win.show();
+                let _ = win.set_focus();
+            }
+        }
+        _ => {}
+    });
 }

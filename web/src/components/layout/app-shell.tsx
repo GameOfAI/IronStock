@@ -16,7 +16,9 @@
 import * as React from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
+  Archive,
   Folder,
+  LayoutGrid,
   Shield,
   ShieldCheck,
   FileText,
@@ -25,7 +27,6 @@ import {
   Moon,
   Monitor,
   KeyRound,
-  Key,
   Menu,
   ShieldAlert,
   UserCircle,
@@ -65,7 +66,10 @@ import {
   useMarkAllReadMutation,
 } from '@/api/notifications';
 import { cn } from '@/lib/cn';
+import iconSvg from '@/assets/icon.svg';
+import { RouteErrorBoundary } from '@/components/error-boundary';
 import { APP_VERSION } from '@/version';
+import { useSystemInfoQuery } from '@/api/system-info';
 
 // --- Theme toggle ---
 
@@ -283,29 +287,79 @@ function NavGroup({ icon: Icon, label, collapsed, prefixes = [], children }: Nav
   );
 }
 
-// --- WS Sidebar status box (bottom of sidebar) ---
+// --- System status box (bottom of sidebar) ---
 
-function WsSidebarStatus() {
+function formatUptime(seconds: number): string {
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (d > 0) return `${d}g ${h}s`;
+  if (h > 0) return `${h}s ${m}dk`;
+  return `${m}dk`;
+}
+
+function SystemStatusBox() {
   const { status } = useWsDetail();
-  const connected = status === 'connected';
-  const dotColor = connected
+  const isAdmin = useAuthStore(selectIsAdmin);
+  const { data: info } = useSystemInfoQuery();
+
+  const wsConnected = status === 'connected';
+  const wsDotColor = wsConnected
     ? 'bg-emerald-400'
     : status === 'connecting' || status === 'reconnecting'
       ? 'bg-amber-400'
       : 'bg-red-400';
-  const label = connected ? 'WS bağlı' : status === 'reconnecting' ? 'Bağlanıyor…' : 'Bağlantı yok';
+  const wsLabel = wsConnected ? 'Bağlı' : status === 'reconnecting' ? 'Bağlanıyor…' : 'Bağlantı yok';
+
+  const dbHealthy = info?.db_status === 'healthy';
+  const dbDotColor = info ? (dbHealthy ? 'bg-emerald-400' : 'bg-red-400') : 'bg-slate-600';
+
   return (
-    <div className="rounded-md border border-slate-800 bg-slate-900/60 p-2.5">
-      <div className="flex items-center gap-2 text-[11px]">
-        <span className="relative flex h-1.5 w-1.5 shrink-0 items-center justify-center">
-          {connected && (
-            <span className="absolute h-1.5 w-1.5 animate-ping rounded-full bg-emerald-400 opacity-50" />
-          )}
-          <span className={`relative h-1.5 w-1.5 rounded-full ${dotColor}`} />
-        </span>
-        <span className="font-mono uppercase tracking-wider text-emerald-400">{label}</span>
+    <div className="rounded-md border border-slate-800 bg-slate-900/60 p-2.5 space-y-1.5">
+      {/* Row 1: WS status + server version */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5 text-[11px]">
+          <span className="relative flex h-1.5 w-1.5 shrink-0 items-center justify-center">
+            {wsConnected && (
+              <span className="absolute h-1.5 w-1.5 animate-ping rounded-full bg-emerald-400 opacity-50" />
+            )}
+            <span className={`relative h-1.5 w-1.5 rounded-full ${wsDotColor}`} />
+          </span>
+          <span className={cn(
+            'font-mono uppercase tracking-wider',
+            wsConnected ? 'text-emerald-400' : 'text-slate-500',
+          )}>
+            {wsLabel}
+          </span>
+        </div>
+        {info?.server_version && (
+          <span className="font-mono text-[10px] text-slate-500">
+            v{info.server_version}
+          </span>
+        )}
       </div>
-      <div className="mt-1 font-mono text-[10px] text-slate-500">region eu-west</div>
+
+      {/* Row 2: Uptime + DB status */}
+      <div className="flex items-center justify-between font-mono text-[10px] text-slate-500">
+        <span>
+          {info ? `Uptime: ${formatUptime(info.uptime_seconds)}` : '—'}
+        </span>
+        <div className="flex items-center gap-1">
+          <span>DB</span>
+          <span className={`h-1.5 w-1.5 rounded-full ${dbDotColor}`} />
+        </div>
+      </div>
+
+      {/* Row 3: Admin-only online users */}
+      {isAdmin && info?.online_users != null && (
+        <div className="flex items-center gap-1.5 font-mono text-[10px] text-slate-500">
+          <Users2 className="h-2.5 w-2.5" />
+          <span>{info.online_users} kullanıcı online</span>
+          {info.ws_connections > 0 && info.ws_connections !== info.online_users && (
+            <span className="text-slate-600">({info.ws_connections} oturum)</span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -547,9 +601,7 @@ export function AppShell() {
 
         {/* Logo + branding */}
         <div className="flex items-center gap-2">
-          <div className="grid h-6 w-6 place-items-center rounded-md bg-blue-600">
-            <Key className="h-[13px] w-[13px] text-white" />
-          </div>
+          <img src={iconSvg} alt="IronStock" className="h-6 w-6" />
           <span className="text-[14px] font-semibold tracking-tight text-slate-100">IronStock</span>
           <span className="font-mono text-[10px] text-slate-500">v{APP_VERSION}</span>
           <span className="mx-1.5 h-3 w-px bg-slate-800" />
@@ -622,19 +674,32 @@ export function AppShell() {
           aria-label="Ana navigasyon"
         >
           <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2" role="navigation">
-            {/* ── Genel ── */}
-            <NavItem
-              to="/inventory"
-              icon={Folder}
+            {/* ── Envanter Grubu ── */}
+            <NavGroup
+              icon={Archive}
               label="Envanter"
               collapsed={sidebarCollapsed && !mobileOpen}
-            />
-            <NavItem
-              to="/tags"
-              icon={Tag}
-              label="Etiketlerim"
-              collapsed={sidebarCollapsed && !mobileOpen}
-            />
+              prefixes={['/inventory', '/catalog', '/tags']}
+            >
+              <NavItem
+                to="/inventory"
+                icon={Folder}
+                label="Vault"
+                collapsed={sidebarCollapsed && !mobileOpen}
+              />
+              <NavItem
+                to="/catalog"
+                icon={LayoutGrid}
+                label="Katalog"
+                collapsed={sidebarCollapsed && !mobileOpen}
+              />
+              <NavItem
+                to="/tags"
+                icon={Tag}
+                label="Etiketlerim"
+                collapsed={sidebarCollapsed && !mobileOpen}
+              />
+            </NavGroup>
             <NavItem
               to="/import"
               icon={Upload}
@@ -784,14 +849,16 @@ export function AppShell() {
           {/* WS status box at bottom — only when expanded */}
           {!sidebarCollapsed && (
             <div className="border-t border-slate-800 p-3">
-              <WsSidebarStatus />
+              <SystemStatusBox />
             </div>
           )}
         </aside>
 
         {/* Main content */}
-        <main id="main-content" tabIndex={-1} className="relative flex-1 overflow-hidden bg-slate-950 outline-none" role="main">
-          <Outlet />
+        <main id="main-content" tabIndex={-1} className="relative flex-1 overflow-auto bg-slate-950 outline-none" role="main">
+          <RouteErrorBoundary>
+            <Outlet />
+          </RouteErrorBoundary>
         </main>
       </div>
     </div>

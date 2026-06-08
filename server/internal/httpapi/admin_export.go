@@ -229,4 +229,3 @@ func (h *ExportHandlers) writeCSV(w http.ResponseWriter, items []exportItem, exp
 	}
 	cw.Flush()
 }
-

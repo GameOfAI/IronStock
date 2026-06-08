@@ -1,12 +1,25 @@
 # İlerleyiş
 
-Son güncelleme: 2026-05-25 (Error sanitization + security hardening + keypair route fix)
+Son güncelleme: 2026-06-08 (PR-CATALOG: Backstage-style servis kataloğu)
 
 ## Mevcut Durum
 
 - **Tüm Fazlar Tamamlandı:** Faz 0–11 ✅
-- **Tamamlanan PR:** 27/27 (%100)
-- **Kalan:** Yok — proje tamamlandı 🎉
+- **Tamamlanan PR:** 27/27 + PR-CATALOG (%100 + bonus)
+- **Aktif:** PR-CATALOG tamamlandı
+
+### PR-CATALOG: Backstage-Style Servis Kataloğu (2026-06-08)
+
+**Değişiklikler:**
+- `server/internal/httpapi/catalog_browse_handlers.go` — `GET /api/v1/catalog/items`: RBAC-filtered flat item listesi (graph handler CTE'si reuse), `name_plain` + cached `health_score` kullanır (decryption yok), tag/type/severity/q filtreleri, limit/offset pagination
+- `server/internal/health/score.go` — `SeverityRange(sev)` helper eklendi
+- `server/internal/httpapi/router.go` — `CatalogBrowse` Deps alanı + route kaydı
+- `server/cmd/api/main.go` — `CatalogBrowseHandlers` wiring
+- `web/src/api/catalog-browse.ts` — `useCatalogBrowseQuery` hook + `CatalogItem` type
+- `web/src/components/catalog/catalog-item-card.tsx` — Entity card (type icon, health badge, lifecycle pills, tag chips, expiry chip, deep-link)
+- `web/src/pages/catalog/index.tsx` — Ana sayfa: filter chips, search, card grid, side detail panel
+- `web/src/App.tsx` — `/catalog` route eklendi
+- `web/src/components/layout/app-shell.tsx` — "Envanter" NavGroup (Vault + Katalog + Etiketler)
 
 ### Tamamlanan PR'lar (kod taramasıyla doğrulandı — 2026-05-22)
 

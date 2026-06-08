@@ -20,7 +20,8 @@
 
 import * as React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Key, Loader2, ShieldCheck, LogIn, Fingerprint } from 'lucide-react';
+import { Eye, EyeOff, Loader2, ShieldCheck, LogIn, Fingerprint, AlertTriangle } from 'lucide-react';
+import iconSvg from '@/assets/icon.svg';
 import {
   Dialog,
   DialogContent,
@@ -226,6 +227,13 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+
+  // crypto.subtle is only available in secure contexts (HTTPS or localhost).
+  // Show a clear warning instead of a cryptic error after login attempt.
+  const isSecureContext = typeof globalThis.isSecureContext !== 'undefined'
+    ? globalThis.isSecureContext
+    : !!(globalThis.crypto?.subtle);
+  const needsHTTPS = !isSecureContext;
   const setSession = useAuthStore((s) => s.setSession);
   const setBootstrapSession = useAuthStore((s) => s.setBootstrapSession);
   const loginMut = useLoginMutation();
@@ -375,6 +383,7 @@ export default function LoginPage() {
         setTotpDialogOpen(true);
         return;
       }
+      console.error('[Login] login error:', err);
       toast({
         title: 'Giriş başarısız',
         description: userFriendlyError(err),
@@ -401,6 +410,7 @@ export default function LoginPage() {
       // Success → dialog closes automatically via navigation
     } catch (err) {
       setSubstep('idle');
+      console.error('[Login] TOTP login error:', err);
       toast({
         title: 'Doğrulama başarısız',
         description: userFriendlyError(err),
@@ -435,9 +445,7 @@ export default function LoginPage() {
       <div className="relative w-full max-w-sm px-4">
         {/* Logo */}
         <div className="mb-8 flex flex-col items-center gap-3">
-          <div className="grid h-12 w-12 place-items-center rounded-xl bg-blue-600 shadow-lg shadow-blue-600/30">
-            <Key className="h-[22px] w-[22px] text-white" />
-          </div>
+          <img src={iconSvg} alt="IronStock" className="h-12 w-12" />
           <div className="text-center">
             <h1 className="text-xl font-bold tracking-tight text-slate-100">IronStock</h1>
             <p className="mt-0.5 font-mono text-[11px] text-slate-500">
@@ -445,6 +453,26 @@ export default function LoginPage() {
             </p>
           </div>
         </div>
+
+        {/* HTTPS warning for non-secure contexts */}
+        {needsHTTPS && (
+          <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-amber-600/30 bg-amber-950/30 px-3 py-2.5 text-[12px] text-amber-400">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <p className="font-medium">HTTPS Gerekli</p>
+              <p className="mt-0.5 text-amber-400/80">
+                Şifreleme işlemleri güvenli bağlantı (HTTPS) gerektirir.{' '}
+                <a
+                  href={`https://haslaman.tplinkdns.com${location.pathname}`}
+                  className="underline hover:text-amber-300"
+                >
+                  HTTPS üzerinden bağlanın
+                </a>{' '}
+                veya <code className="rounded bg-amber-900/40 px-1">localhost</code> kullanın.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* LDAP dialog */}
         {activeLDAPProvider && (

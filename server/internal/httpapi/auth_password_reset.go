@@ -25,7 +25,7 @@ type forgotPasswordRequest struct {
 
 // resetPasswordRequest, POST /api/v1/auth/reset-password body.
 type resetPasswordRequest struct {
-	Token         string         `json:"token"`           // 32-byte hex token (URL'den gelen plain token)
+	Token         string         `json:"token"` // 32-byte hex token (URL'den gelen plain token)
 	NewPassword   string         `json:"new_password"`
 	PublicKey     []byte         `json:"public_key"`      // yeni E2E keypair (X25519, 32 byte)
 	PrivateKeyEnc []byte         `json:"private_key_enc"` // yeni KEK ile şifreli private key

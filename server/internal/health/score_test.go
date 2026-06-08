@@ -183,11 +183,11 @@ func TestScoreWithBreakdownCount(t *testing.T) {
 	expired := now.Add(-1 * time.Hour)
 	stale := now.Add(-100 * 24 * time.Hour)
 	meta := health.ItemMeta{
-		ID:            "abc",
-		ExpiresAt:     &expired,
-		LastRotatedAt: &stale,
-		Description:   "",
-		HasTags:       false,
+		ID:                "abc",
+		ExpiresAt:         &expired,
+		LastRotatedAt:     &stale,
+		Description:       "",
+		HasTags:           false,
 		RelationshipCount: 0,
 	}
 	score, bd := health.ScoreWithBreakdown(meta, now)

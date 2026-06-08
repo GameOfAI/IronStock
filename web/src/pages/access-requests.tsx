@@ -6,8 +6,9 @@
  */
 
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
-  Check, X, Clock, ShieldCheck, ShieldX, CircleSlash, Loader2, RefreshCw,
+  Check, X, Clock, ShieldCheck, ShieldX, CircleSlash, Loader2, RefreshCw, ArrowLeft,
 } from 'lucide-react';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import { tr } from 'date-fns/locale';
@@ -169,6 +170,7 @@ function DenyDialog({ request, onClose }: { request: AccessRequest; onClose: () 
 
 export default function AccessRequestsPage() {
   useDocumentTitle('Onay İstekleri');
+  const navigate = useNavigate();
   const isAdmin = useAuthStore(selectIsAdmin);
   const [statusFilter, setStatusFilter] = useState('');
   const [approving, setApproving] = useState<AccessRequest | null>(null);
@@ -231,9 +233,14 @@ export default function AccessRequestsPage() {
       {error ? (
         <div className="text-center py-16 space-y-3">
           <p className="text-destructive text-sm">Onay istekleri yüklenirken bir hata oluştu.</p>
-          <Button variant="outline" size="sm" onClick={() => refetch()}>
-            <RefreshCw className="mr-2 h-4 w-4" />Tekrar Dene
-          </Button>
+          <div className="flex items-center justify-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => navigate('/inventory')}>
+              <ArrowLeft className="mr-2 h-4 w-4" />Ana Sayfaya Dön
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>
+              <RefreshCw className="mr-2 h-4 w-4" />Tekrar Dene
+            </Button>
+          </div>
         </div>
       ) : isLoading ? (
         <div className="flex justify-center py-16">

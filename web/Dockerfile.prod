@@ -9,6 +9,7 @@ RUN npm install --no-audit --no-fund
 
 COPY shared/pkg/src/ ./shared/pkg/src/
 COPY web/src/ ./web/src/
+COPY web/public/ ./web/public/
 COPY web/index.html ./web/
 COPY web/tsconfig*.json ./web/
 COPY web/vite.config.ts ./web/

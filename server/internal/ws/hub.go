@@ -221,6 +221,17 @@ func (h *Hub) Stats() (totalConns int) {
 	return len(h.connections)
 }
 
+// UniqueUsers returns the number of distinct user IDs with active connections.
+func (h *Hub) UniqueUsers() int {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	seen := make(map[string]struct{}, len(h.connections))
+	for c := range h.connections {
+		seen[c.userID] = struct{}{}
+	}
+	return len(seen)
+}
+
 // Accept upgrades wraps a freshly-upgraded websocket.Conn in a Connection
 // struct. The reader + writer goroutines anchor on the hub's context, so
 // they survive past the originating HTTP request. Caller MUST then call
