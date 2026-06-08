@@ -55,6 +55,7 @@ import {
   useGroupsQuery,
   useRemoveGroupMemberMutation,
   useRevokeFolderGroupPermissionMutation,
+  useUpdateGroupRoleMutation,
 } from '@/api/groups';
 import { useUsers } from '@/api/admin';
 import { useRootFolders } from '@/api/folders';
@@ -358,9 +359,33 @@ function GroupFolderPermissionsPanel({ group }: { group: Group }) {
 
 // --- Group Detail Panel ---
 
+// Role badge colours matching roles.tsx
+const ROLE_BADGE: Record<string, string> = {
+  admin: 'bg-purple-500/15 text-purple-300 border-purple-500/30',
+  write: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
+  read: 'bg-green-500/15 text-green-300 border-green-500/30',
+};
+const ROLE_LABELS: Record<string, string> = { admin: 'Admin', write: 'Yazma', read: 'Okuma' };
+
 function GroupDetailPanel({ group, onDelete }: { group: Group; onDelete: () => void }) {
   const { toast } = useToast();
   const deleteMut = useDeleteGroupMutation();
+  const roleMut = useUpdateGroupRoleMutation(group.id);
+  const [pendingRole, setPendingRole] = React.useState<string>(group.role ?? '');
+
+  // Sync local state when selected group changes
+  React.useEffect(() => { setPendingRole(group.role ?? ''); }, [group.id, group.role]);
+
+  async function handleRoleChange(value: string) {
+    setPendingRole(value);
+    try {
+      await roleMut.mutateAsync({ role: value === '' ? null : value as 'admin' | 'write' | 'read' });
+      toast({ title: value ? `Rol atandı: ${ROLE_LABELS[value]}` : 'Rol kaldırıldı' });
+    } catch (err) {
+      setPendingRole(group.role ?? '');
+      toast({ title: 'Rol güncellenemedi', description: userFriendlyError(err), variant: 'destructive' });
+    }
+  }
 
   async function handleDelete() {
     try {
@@ -379,13 +404,43 @@ function GroupDetailPanel({ group, onDelete }: { group: Group; onDelete: () => v
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between">
-        <div>
+        <div className="flex flex-col gap-2">
           <h2 className="text-lg font-semibold">{group.name}</h2>
           {group.description && (
-            <p className="text-sm text-muted-foreground mt-0.5">{group.description}</p>
+            <p className="text-sm text-muted-foreground">{group.description}</p>
           )}
-          <p className="text-xs text-muted-foreground mt-1">
+          <div className="flex items-center gap-2 flex-wrap">
             <Badge variant="secondary">{group.member_count} üye</Badge>
+            {group.role && (
+              <Badge variant="outline" className={ROLE_BADGE[group.role]}>
+                {ROLE_LABELS[group.role]}
+              </Badge>
+            )}
+          </div>
+          {/* Role assignment inline */}
+          <div className="flex items-center gap-2 mt-1">
+            <Label className="text-xs text-muted-foreground whitespace-nowrap">Grup rolü:</Label>
+            <Select
+              value={pendingRole}
+              onValueChange={handleRoleChange}
+              disabled={roleMut.isPending}
+            >
+              <SelectTrigger className="h-7 text-xs w-36">
+                <SelectValue placeholder="Rol yok" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Rol yok</SelectItem>
+                <SelectItem value="read">Okuma</SelectItem>
+                <SelectItem value="write">Yazma</SelectItem>
+                <SelectItem value="admin">Admin</SelectItem>
+              </SelectContent>
+            </Select>
+            {roleMut.isPending && (
+              <span className="text-xs text-muted-foreground">Kaydediliyor…</span>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground max-w-xs">
+            Seçilen rol, gruptaki tüm üyelere bir sonraki token yenilemesinde uygulanır.
           </p>
         </div>
         <AlertDialog>
@@ -478,9 +533,14 @@ export default function AdminGroupsPage() {
                 }`}
               >
                 <span className="truncate">{g.name}</span>
-                <Badge variant="secondary" className="ml-2 shrink-0">
-                  {g.member_count}
-                </Badge>
+                <div className="flex items-center gap-1 ml-2 shrink-0">
+                  {g.role && (
+                    <Badge variant="outline" className={`text-xs ${ROLE_BADGE[g.role]}`}>
+                      {ROLE_LABELS[g.role]}
+                    </Badge>
+                  )}
+                  <Badge variant="secondary">{g.member_count}</Badge>
+                </div>
               </button>
             ))}
           </div>

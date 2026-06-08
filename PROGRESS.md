@@ -1,12 +1,26 @@
 # İlerleyiş
 
-Son güncelleme: 2026-06-08 (Bugfix: grup klasör izinleri — GET endpoint + UI panel eklendi)
+Son güncelleme: 2026-06-08 (Feat: gruba global rol atama — migration 00061, fetchUserRoles grup üyeliği, PATCH endpoint, UI)
 
 ## Mevcut Durum
 
 - **Tüm Fazlar Tamamlandı:** Faz 0–11 ✅
 - **Tamamlanan PR:** 27/27 + PR-CATALOG (%100 + bonus)
 - **Aktif:** PR-CATALOG tamamlandı
+
+### Feat: Gruba Global Rol Atama (2026-06-08)
+
+**Değişiklikler:**
+- `server/migrations/00061_group_roles.sql` — `groups.role TEXT CHECK ('admin'|'write'|'read')` kolonu eklendi
+- `auth_login.go` `fetchUserRoles` — UNION ALL ile grup üyeliğinden devralınan roller de JWT'ye yazılıyor; token yenilemede de aktif
+- `server/internal/audit/audit.go` — `ActionGroupRoleUpdated = "group.role_updated"` sabiti
+- `group_handlers.go` — `groupRow.role *string` DTO alanı; ListGroups/GetGroup/CreateGroup SQL güncellendi; `UpdateGroupRole` PATCH handler eklendi
+- `router.go` — `PATCH /{id}/role` route eklendi
+- `shared/pkg/src/api/types.ts` — `Group.role` alanı, `UpdateGroupRoleRequest` tipi eklendi
+- `web/src/api/groups.ts` — `useUpdateGroupRoleMutation` hook eklendi
+- `web/src/pages/admin/groups.tsx` — Grup listesinde rol badge; `GroupDetailPanel`'de inline rol seçici (Select dropdown, anlık kaydetme), grup rolü açıklama metni
+
+**Nasıl çalışır:** Gruba rol atandığında, o grubun tüm üyeleri bir sonraki token yenilemesinde (`/auth/refresh`) bu rolü JWT claim'lerinde görür. Doğrudan atanmış kullanıcı rolleriyle UNION DISTINCT uygulanır (çakışma olmaz).
 
 ### Bugfix: Grup Klasör İzin Atama (2026-06-08)
 

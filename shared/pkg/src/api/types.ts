@@ -438,6 +438,7 @@ export interface Group {
   id: string;
   name: string;
   description?: string | null;
+  role?: 'admin' | 'write' | 'read' | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -447,6 +448,10 @@ export interface Group {
 export interface GroupListResponse {
   groups: Group[];
   total: number;
+}
+
+export interface UpdateGroupRoleRequest {
+  role: 'admin' | 'write' | 'read' | null;
 }
 
 export interface GroupMember {

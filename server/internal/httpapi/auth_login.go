@@ -506,15 +506,25 @@ func fetchTOTPSecret(ctx context.Context, db auth.DBExec, userID string) ([]byte
 
 // fetchUserRoles returns the role names for a user. Empty slice = no roles.
 //
-// Uses array_agg + COALESCE so we get exactly one row back (empty array
-// when the user has no roles), letting us reuse QueryRow rather than
-// growing the auth.DBExec interface with a Query method.
+// Includes roles inherited from group memberships (groups.role IS NOT NULL).
+// Uses DISTINCT so duplicates (same role from user_roles and a group) collapse.
+// Returns exactly one row (empty array when no roles), enabling QueryRow reuse.
 func fetchUserRoles(ctx context.Context, db auth.DBExec, userID string) ([]string, error) {
 	const sqlText = `
-		SELECT COALESCE(array_agg(r.name ORDER BY r.id), '{}')
-		FROM user_roles ur
-		JOIN roles r ON r.id = ur.role_id
-		WHERE ur.user_id = $1::uuid
+		SELECT COALESCE(array_agg(DISTINCT name ORDER BY name), '{}')
+		FROM (
+			-- Direct user roles
+			SELECT r.name
+			FROM user_roles ur
+			JOIN roles r ON r.id = ur.role_id
+			WHERE ur.user_id = $1::uuid
+			UNION ALL
+			-- Roles inherited via group membership
+			SELECT g.role
+			FROM group_members gm
+			JOIN groups g ON g.id = gm.group_id
+			WHERE gm.user_id = $1::uuid AND g.role IS NOT NULL
+		) combined(name)
 	`
 	var names []string
 	err := db.QueryRow(ctx, sqlText, userID).Scan(&names)

@@ -8,6 +8,7 @@ import type {
   GroupMembersResponse,
   GroupFolderPermissionsResponse,
   GrantFolderGroupPermissionRequest,
+  UpdateGroupRoleRequest,
 } from './types';
 
 export const groupsQueryKey = ['admin', 'groups'] as const;
@@ -70,6 +71,18 @@ export function useDeleteGroupMutation() {
     mutationFn: (id: string) =>
       apiFetch<void>(`/api/v1/admin/groups/${id}`, { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: groupsQueryKey }),
+  });
+}
+
+export function useUpdateGroupRoleMutation(groupId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateGroupRoleRequest) =>
+      apiFetch<void>(`/api/v1/admin/groups/${groupId}/role`, { method: 'PATCH', body: input }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: groupsQueryKey });
+      qc.invalidateQueries({ queryKey: groupQueryKey(groupId) });
+    },
   });
 }
 

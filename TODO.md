@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-06-08 — Bugfix: grup klasör izin atama UI + GET endpoint eklendi.
+Son güncelleme: 2026-06-08 — Feat: gruba global rol atama (migration 00061, fetchUserRoles güncellemesi, PATCH endpoint, UI).
 
 ## ✅ Post-Deploy Fixes (2026-05-25)
 
