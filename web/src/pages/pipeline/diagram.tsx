@@ -14,7 +14,7 @@
 
 import * as React from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Loader2, Network, Trash2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Network, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -30,7 +30,17 @@ import {
   usePipelineDiagramQuery,
   useDiagramGraphQuery,
   useDeletePipelineDiagramMutation,
+  useUpdatePipelineDiagramMutation,
 } from '@/api/pipeline';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useLifecycleStagesQuery } from '@/api/lifecycle';
 import { PipelineCanvas } from '@/components/pipeline/pipeline-canvas';
 import { DiagramSidebar } from '@/components/pipeline/diagram-sidebar';
@@ -41,6 +51,9 @@ export default function DiagramPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const [renameOpen, setRenameOpen] = React.useState(false);
+  const [newName, setNewName] = React.useState('');
+  const [newDesc, setNewDesc] = React.useState('');
 
   const {
     data: diagramDetail,
@@ -58,6 +71,7 @@ export default function DiagramPage() {
   const lifecycleCatalog = lifecycleData?.stages ?? [];
 
   const deleteMut = useDeletePipelineDiagramMutation();
+  const updateMut = useUpdatePipelineDiagramMutation(id ?? '');
 
   const existingItemIds = React.useMemo(
     () => new Set((diagramDetail?.nodes ?? []).map((n) => n.item_id)),
@@ -130,6 +144,19 @@ export default function DiagramPage() {
           <Button
             size="icon"
             variant="ghost"
+            className="h-8 w-8 text-muted-foreground"
+            onClick={() => {
+              setNewName(diagramDetail.name);
+              setNewDesc(diagramDetail.description ?? '');
+              setRenameOpen(true);
+            }}
+            aria-label="Diyagramı yeniden adlandır"
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
             className="h-8 w-8 text-muted-foreground hover:text-destructive"
             onClick={() => setDeleteOpen(true)}
             aria-label="Diyagramı sil"
@@ -157,6 +184,53 @@ export default function DiagramPage() {
           />
         </div>
       </div>
+
+      {/* Rename dialog */}
+      <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Diyagramı Yeniden Adlandır</DialogTitle>
+          </DialogHeader>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!newName.trim()) return;
+              updateMut.mutate(
+                { name: newName.trim(), description: newDesc.trim() || undefined },
+                { onSuccess: () => setRenameOpen(false) },
+              );
+            }}
+            className="space-y-3 pt-1"
+          >
+            <div className="space-y-1.5">
+              <Label htmlFor="diagram-name">İsim</Label>
+              <Input
+                id="diagram-name"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="diagram-desc">Açıklama (isteğe bağlı)</Label>
+              <Input
+                id="diagram-desc"
+                value={newDesc}
+                onChange={(e) => setNewDesc(e.target.value)}
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setRenameOpen(false)}>
+                İptal
+              </Button>
+              <Button type="submit" disabled={updateMut.isPending || !newName.trim()}>
+                {updateMut.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Kaydet
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete confirm */}
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>

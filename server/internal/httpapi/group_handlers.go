@@ -27,6 +27,7 @@ type groupRow struct {
 	ID          string  `json:"id"`
 	Name        string  `json:"name"`
 	Description *string `json:"description,omitempty"`
+	Role        *string `json:"role,omitempty"` // global role inherited by all members
 	CreatedBy   string  `json:"created_by"`
 	CreatedAt   string  `json:"created_at"`
 	UpdatedAt   string  `json:"updated_at"`
@@ -63,6 +64,7 @@ func (h *GroupHandlers) ListGroups(w http.ResponseWriter, r *http.Request) {
 		    g.id::text,
 		    g.name,
 		    COALESCE(g.description, ''),
+		    g.role,
 		    g.created_by::text,
 		    g.created_at::text,
 		    g.updated_at::text,
@@ -85,7 +87,7 @@ func (h *GroupHandlers) ListGroups(w http.ResponseWriter, r *http.Request) {
 		var g groupRow
 		var desc string
 		if err := rows.Scan(
-			&g.ID, &g.Name, &desc, &g.CreatedBy,
+			&g.ID, &g.Name, &desc, &g.Role, &g.CreatedBy,
 			&g.CreatedAt, &g.UpdatedAt, &g.MemberCount,
 		); err != nil {
 			writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
@@ -133,9 +135,9 @@ func (h *GroupHandlers) CreateGroup(w http.ResponseWriter, r *http.Request) {
 	err := h.Service.DB.QueryRow(ctx, `
 		INSERT INTO groups (name, description, created_by)
 		VALUES ($1, NULLIF($2,''), $3::uuid)
-		RETURNING id::text, name, COALESCE(description,''), created_by::text, created_at::text, updated_at::text
+		RETURNING id::text, name, COALESCE(description,''), role, created_by::text, created_at::text, updated_at::text
 	`, req.Name, req.Description, claims.Subject,
-	).Scan(&g.ID, &g.Name, &desc, &g.CreatedBy, &g.CreatedAt, &g.UpdatedAt)
+	).Scan(&g.ID, &g.Name, &desc, &g.Role, &g.CreatedBy, &g.CreatedAt, &g.UpdatedAt)
 	if err != nil {
 		if isUniqueViolation(err) {
 			writeError(w, h.Logger, http.StatusConflict, ErrCodeConflict,
@@ -172,14 +174,14 @@ func (h *GroupHandlers) GetGroup(w http.ResponseWriter, r *http.Request) {
 	var desc string
 	err := h.Service.DB.QueryRow(ctx, `
 		SELECT
-		    g.id::text, g.name, COALESCE(g.description,''), g.created_by::text,
-		    g.created_at::text, g.updated_at::text,
+		    g.id::text, g.name, COALESCE(g.description,''), g.role,
+		    g.created_by::text, g.created_at::text, g.updated_at::text,
 		    count(gm.user_id)::int
 		FROM groups g
 		LEFT JOIN group_members gm ON gm.group_id = g.id
 		WHERE g.id = $1::uuid
 		GROUP BY g.id
-	`, id).Scan(&g.ID, &g.Name, &desc, &g.CreatedBy, &g.CreatedAt, &g.UpdatedAt, &g.MemberCount)
+	`, id).Scan(&g.ID, &g.Name, &desc, &g.Role, &g.CreatedBy, &g.CreatedAt, &g.UpdatedAt, &g.MemberCount)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, h.Logger, http.StatusNotFound, ErrCodeBadRequest,
@@ -349,7 +351,116 @@ func (h *GroupHandlers) RemoveGroupMember(w http.ResponseWriter, r *http.Request
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// UpdateGroupRole implements PATCH /api/v1/admin/groups/{id}/role.
+// Body: { "role": "admin"|"write"|"read" } — omit or null to clear.
+// The new role is inherited by all group members on their next token refresh.
+func (h *GroupHandlers) UpdateGroupRole(w http.ResponseWriter, r *http.Request) {
+	claims := ClaimsFromContext(r.Context())
+	if claims == nil {
+		writeMiddlewareUnauthorized(w, errors.New("no claims"))
+		return
+	}
+	id := chi.URLParam(r, "id")
+
+	var req struct {
+		Role *string `json:"role"` // null → clear role
+	}
+	if !decodeJSON(w, r, h.Logger, &req) {
+		return
+	}
+	if req.Role != nil && *req.Role != "admin" && *req.Role != "write" && *req.Role != "read" {
+		writeError(w, h.Logger, http.StatusBadRequest, ErrCodeBadRequest,
+			"role 'admin', 'write' veya 'read' olmalı (kaldırmak için null gönderin).",
+			errors.New("invalid role value"))
+		return
+	}
+
+	ctx := r.Context()
+	tag, err := h.Service.DB.Exec(ctx, `
+		UPDATE groups SET role = $1, updated_at = now() WHERE id = $2::uuid
+	`, req.Role, id)
+	if err != nil {
+		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
+			"Grup rolü güncellenemedi.", err)
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		writeError(w, h.Logger, http.StatusNotFound, ErrCodeBadRequest,
+			"Grup bulunamadı.", errors.New("group not found"))
+		return
+	}
+
+	roleVal := any(nil)
+	if req.Role != nil {
+		roleVal = *req.Role
+	}
+	_ = h.Audit.Write(ctx, audit.Entry{
+		ActorUserID:  claims.Subject,
+		Action:       audit.ActionGroupRoleUpdated,
+		ResourceType: audit.ResourceGroup,
+		ResourceID:   id,
+		Details:      map[string]any{"role": roleVal},
+		IPAddress:    parseIP(r.RemoteAddr),
+		UserAgent:    r.UserAgent(),
+	})
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // --- Folder-Group Permissions ---
+
+type folderGroupPermissionRow struct {
+	FolderID          string `json:"folder_id"`
+	FolderName        string `json:"folder_name"`
+	Permission        string `json:"permission"`
+	InheritToChildren bool   `json:"inherit_to_children"`
+	GrantedAt         string `json:"granted_at"`
+}
+
+// ListFolderGroupPermissions implements GET /api/v1/admin/groups/{id}/folder-permissions.
+func (h *GroupHandlers) ListFolderGroupPermissions(w http.ResponseWriter, r *http.Request) {
+	groupID := chi.URLParam(r, "id")
+	ctx := r.Context()
+
+	const sqlText = `
+		SELECT fgp.folder_id::text, f.name_enc, fgp.permission, fgp.inherit_to_children, fgp.granted_at::text
+		FROM folder_group_permissions fgp
+		JOIN folders f ON f.id = fgp.folder_id
+		WHERE fgp.group_id = $1::uuid AND fgp.revoked_at IS NULL
+		ORDER BY f.name_enc
+	`
+	rows, err := h.Service.DB.Query(ctx, sqlText, groupID)
+	if err != nil {
+		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
+			"Klasör izinleri alınamadı.", err)
+		return
+	}
+	defer rows.Close()
+
+	out := make([]folderGroupPermissionRow, 0)
+	for rows.Next() {
+		var row folderGroupPermissionRow
+		var nameEnc []byte
+		if err := rows.Scan(&row.FolderID, &nameEnc, &row.Permission, &row.InheritToChildren, &row.GrantedAt); err != nil {
+			writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
+				"İzin satırı okunamadı.", err)
+			return
+		}
+		if name, decErr := decryptFolderName(h.Service, nameEnc); decErr == nil {
+			row.FolderName = name
+		} else {
+			row.FolderName = row.FolderID // fallback: show ID if decrypt fails
+		}
+		out = append(out, row)
+	}
+	if err := rows.Err(); err != nil {
+		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
+			"İzin listesi okunamadı.", err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"permissions": out})
+}
 
 // GrantFolderGroupPermission implements POST /api/v1/admin/groups/{id}/folder-permissions.
 // Body: { folder_id, permission: "read"|"write", inherit_to_children: bool }

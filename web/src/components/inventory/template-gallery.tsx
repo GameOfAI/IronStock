@@ -9,14 +9,23 @@
  */
 
 import { useState } from 'react';
-import { BookTemplate, Plus, Trash2, Globe, Lock, Loader2, Search } from 'lucide-react';
+import { BookTemplate, Plus, Trash2, Globe, Lock, Loader2, Pencil, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   useTemplatesQuery,
   useCreateTemplateMutation,
   useDeleteTemplateMutation,
+  useUpdateTemplateMutation,
   type ItemTemplate,
   type CreateTemplateRequest,
 } from '@/api/templates';
@@ -48,6 +57,11 @@ export function TemplateGallery({
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newName, setNewName] = useState('');
   const [newIsPublic, setNewIsPublic] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<ItemTemplate | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editDesc, setEditDesc] = useState('');
+  const [editIsPublic, setEditIsPublic] = useState(false);
+  const updateMut = useUpdateTemplateMutation(editingTemplate?.id ?? '');
 
   const filtered = (templates ?? []).filter(
     (t) =>
@@ -140,23 +154,101 @@ export function TemplateGallery({
                   <Lock className="h-3.5 w-3.5 text-muted-foreground" aria-label="Özel" />
                 )}
                 {(tpl.created_by === userId) && (
-                  <button
-                    type="button"
-                    aria-label="Şablonu sil"
-                    className="opacity-0 group-hover:opacity-100 rounded p-0.5 text-destructive hover:bg-destructive/10 transition"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(tpl);
-                    }}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      aria-label="Şablonu düzenle"
+                      className="opacity-0 group-hover:opacity-100 rounded p-0.5 text-muted-foreground hover:bg-muted transition"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditName(tpl.name);
+                        setEditDesc(tpl.description ?? '');
+                        setEditIsPublic(tpl.is_public);
+                        setEditingTemplate(tpl);
+                      }}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Şablonu sil"
+                      className="opacity-0 group-hover:opacity-100 rounded p-0.5 text-destructive hover:bg-destructive/10 transition"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(tpl);
+                      }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </>
                 )}
               </div>
             </div>
           ))}
         </div>
       )}
+
+      {/* Edit template dialog */}
+      <Dialog open={editingTemplate !== null} onOpenChange={(o) => { if (!o) setEditingTemplate(null); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Şablonu Düzenle</DialogTitle>
+          </DialogHeader>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!editName.trim()) return;
+              updateMut.mutate(
+                { name: editName.trim(), description: editDesc.trim() || undefined, fields: editingTemplate?.fields ?? [], tags: editingTemplate?.tags ?? [], is_public: editIsPublic },
+                {
+                  onSuccess: () => {
+                    toast({ title: 'Şablon güncellendi' });
+                    setEditingTemplate(null);
+                  },
+                  onError: () => toast({ title: 'Şablon güncellenemedi', variant: 'destructive' }),
+                },
+              );
+            }}
+            className="space-y-3 pt-1"
+          >
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-tpl-name">İsim</Label>
+              <Input
+                id="edit-tpl-name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-tpl-desc">Açıklama</Label>
+              <Input
+                id="edit-tpl-desc"
+                value={editDesc}
+                onChange={(e) => setEditDesc(e.target.value)}
+              />
+            </div>
+            <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={editIsPublic}
+                onChange={(e) => setEditIsPublic(e.target.checked)}
+                className="h-3.5 w-3.5"
+              />
+              Herkese açık
+            </label>
+            <DialogFooter>
+              <Button type="button" variant="outline" size="sm" onClick={() => setEditingTemplate(null)}>
+                İptal
+              </Button>
+              <Button type="submit" size="sm" disabled={updateMut.isPending || !editName.trim()}>
+                {updateMut.isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
+                Kaydet
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Create new template shortcut */}
       <div className="border-t pt-2">

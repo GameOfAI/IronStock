@@ -10,7 +10,7 @@
  */
 
 import { useState } from 'react';
-import { Fingerprint, Globe, KeyRound, Loader2, MoreVertical, ShieldCheck } from 'lucide-react';
+import { Fingerprint, Globe, KeyRound, Loader2, MoreVertical, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -34,6 +34,7 @@ import {
   useGrantRoleMutation,
   useResetTOTPMutation,
   useRevokeRoleMutation,
+  useSetBreakGlassMutation,
   useUpdateTOTPRequirementMutation,
   useUpdateWebAuthnRequirementMutation,
 } from '@/api/admin';
@@ -90,6 +91,7 @@ export function UserActionsMenu({ user }: UserActionsMenuProps) {
   const updateTotpReq = useUpdateTOTPRequirementMutation(user.id);
   const updateCertReq = useUpdateClientCertRequirementMutation(user.id);
   const updateWebAuthnReq = useUpdateWebAuthnRequirementMutation(user.id);
+  const setBreakGlass = useSetBreakGlassMutation(user.id);
 
   const [ipDialogOpen, setIpDialogOpen] = useState(false);
   const ipQuery = useIPRestrictionsQuery(ipDialogOpen ? user.id : '');
@@ -321,6 +323,34 @@ export function UserActionsMenu({ user }: UserActionsMenuProps) {
           >
             <ShieldCheck className="mr-2 h-4 w-4 text-indigo-500" />
             <span>WebAuthn zorunlu</span>
+          </DropdownMenuCheckboxItem>
+          {/* PR-N4: Break-glass acil erişim toggle — etkinleştirilince tüm adminlere anlık uyarı */}
+          <DropdownMenuCheckboxItem
+            checked={user.is_break_glass}
+            disabled={setBreakGlass.isPending || isSelf}
+            onSelect={(e) => {
+              e.preventDefault();
+              const next = !user.is_break_glass;
+              setBreakGlass.mutate(next, {
+                onSuccess: () =>
+                  toast({
+                    title: next ? 'Break-glass etkinleştirildi' : 'Break-glass devre dışı bırakıldı',
+                    description: next
+                      ? `${user.username} acil erişim modunda. Her girişinde tüm adminler uyarılacak.`
+                      : `${user.username} artık normal modda.`,
+                    variant: next ? 'destructive' : 'default',
+                  }),
+                onError: (err) =>
+                  toast({
+                    title: 'Break-glass güncellenemedi',
+                    description: describeError(err),
+                    variant: 'destructive',
+                  }),
+              });
+            }}
+          >
+            <ShieldAlert className="mr-2 h-4 w-4 text-red-500" />
+            <span>Break-glass (acil)</span>
           </DropdownMenuCheckboxItem>
           <DropdownMenuSeparator />
           {/* PR-SEC5: IP kısıtlamaları */}

@@ -45,6 +45,7 @@ import LifecyclePage from '@/pages/pipeline/lifecycle';
 import AdminSetupPage from '@/pages/admin-setup';
 import ChangePasswordPage from '@/pages/change-password';
 import ProfilePage from '@/pages/profile';
+import FavoritesPage from '@/pages/favorites';
 import SharePage from '@/pages/share';
 import ImportPage from '@/pages/import';
 import AccessRequestsPage from '@/pages/access-requests';
@@ -192,6 +193,7 @@ export default function App() {
                     <Route path="/pipeline/lifecycle" element={<LifecyclePage />} />
                     <Route path="/pipeline/:id" element={<DiagramPage />} />
                     <Route path="/profile" element={<ProfilePage />} />
+                    <Route path="/favorites" element={<FavoritesPage />} />
                     <Route path="/import" element={<ImportPage />} />
                     <Route path="/access-requests" element={<AccessRequestsPage />} />
 

@@ -48,6 +48,7 @@ import {
   ChevronRight,
   Eye,
   Server,
+  Star,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -679,7 +680,7 @@ export function AppShell() {
               icon={Archive}
               label="Envanter"
               collapsed={sidebarCollapsed && !mobileOpen}
-              prefixes={['/inventory', '/catalog', '/tags']}
+              prefixes={['/inventory', '/catalog', '/tags', '/favorites']}
             >
               <NavItem
                 to="/inventory"
@@ -697,6 +698,12 @@ export function AppShell() {
                 to="/tags"
                 icon={Tag}
                 label="Etiketlerim"
+                collapsed={sidebarCollapsed && !mobileOpen}
+              />
+              <NavItem
+                to="/favorites"
+                icon={Star}
+                label="Favorilerim"
                 collapsed={sidebarCollapsed && !mobileOpen}
               />
             </NavGroup>

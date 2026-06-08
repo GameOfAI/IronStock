@@ -1,12 +1,84 @@
 # İlerleyiş
 
-Son güncelleme: 2026-06-08 (PR-CATALOG bugfix: catalog 500 error — f.name → batch decrypt)
+Son güncelleme: 2026-06-08 (UI Gap Fixes — item paylaşım sekmesi, break-glass toggle, oturum sonlandırma, favoriler sayfası, K8s binding sekmesi, şablon düzenleme, diyagram yeniden adlandırma)
 
 ## Mevcut Durum
 
 - **Tüm Fazlar Tamamlandı:** Faz 0–11 ✅
 - **Tamamlanan PR:** 27/27 + PR-CATALOG (%100 + bonus)
 - **Aktif:** PR-CATALOG tamamlandı
+
+### UI Gap Fixes — Backend-Exists-But-No-UI (2026-06-08)
+
+7 ayrı hook/endpoint vardı ama frontend UI'da hiçbiri kullanılmıyordu. Sistematik tarama sonucu:
+
+| Fix | Değişiklik |
+|-----|-----------|
+| **FIX 1: Item Paylaşım Sekmesi** | `item-detail.tsx` — `SharesTab` bileşeni: kullanıcı + grup paylaşımlarını listeler, onay kapısı toggle, paylaşım iptal butonu (`useItemSharesQuery`, `useUnshareItemMutation`, `useUnshareGroupMutation`, `useToggleApprovalRequiredMutation`) |
+| **FIX 2: Break-Glass Toggle** | `api/admin.ts` — `useSetBreakGlassMutation` eklendi. `user-actions-menu.tsx` — `ShieldAlert` ikonu + checkbox toggle (her girişinde tüm adminlere uyarı) |
+| **FIX 4: Tüm Oturumları Sonlandır** | `profile.tsx` — `SessionManagementCard` bileşeni: kırmızı buton + AlertDialog confirm + `useLogoutAllMutation` + `authStore.clear()` çağrısı |
+| **FIX 5: Favoriler Sayfası** | `pages/favorites/index.tsx` — Yeni sayfa; `useFavoritesQuery` ile liste, `useRemoveFavoriteMutation` ile kaldırma, envantere deep-link. `App.tsx` route + `app-shell.tsx` nav item (Star ikonu) |
+| **FIX 6: K8s Binding Sekmesi** | `item-detail.tsx` — `K8sBindingTab` bileşeni: mevcut bağlantıyı göster, cluster/namespace seç, `useK8sBindingQuery` + `useSetK8sBindingMutation` + `useAdminK8sClustersQuery` |
+| **FIX 7: Şablon Düzenleme** | `template-gallery.tsx` — Pencil ikonu + `useUpdateTemplateMutation` + Dialog (ad/açıklama/herkese-açık alanları) |
+| **FIX 8: Diyagram Yeniden Adlandırma** | `pipeline/diagram.tsx` — Pencil ikonu + `useUpdatePipelineDiagramMutation` + Dialog (ad + açıklama) |
+
+**Tüm değişiklikler TypeScript clean (0 hata).**
+
+### Feat: Gruba Global Rol Atama (2026-06-08)
+
+**Değişiklikler:**
+- `server/migrations/00061_group_roles.sql` — `groups.role TEXT CHECK ('admin'|'write'|'read')` kolonu eklendi
+- `auth_login.go` `fetchUserRoles` — UNION ALL ile grup üyeliğinden devralınan roller de JWT'ye yazılıyor; token yenilemede de aktif
+- `server/internal/audit/audit.go` — `ActionGroupRoleUpdated = "group.role_updated"` sabiti
+- `group_handlers.go` — `groupRow.role *string` DTO alanı; ListGroups/GetGroup/CreateGroup SQL güncellendi; `UpdateGroupRole` PATCH handler eklendi
+- `router.go` — `PATCH /{id}/role` route eklendi
+- `shared/pkg/src/api/types.ts` — `Group.role` alanı, `UpdateGroupRoleRequest` tipi eklendi
+- `web/src/api/groups.ts` — `useUpdateGroupRoleMutation` hook eklendi
+- `web/src/pages/admin/groups.tsx` — Grup listesinde rol badge; `GroupDetailPanel`'de inline rol seçici (Select dropdown, anlık kaydetme), grup rolü açıklama metni
+
+**Nasıl çalışır:** Gruba rol atandığında, o grubun tüm üyeleri bir sonraki token yenilemesinde (`/auth/refresh`) bu rolü JWT claim'lerinde görür. Doğrudan atanmış kullanıcı rolleriyle UNION DISTINCT uygulanır (çakışma olmaz).
+
+### Bugfix: Grup Klasör İzin Atama (2026-06-08)
+
+**Sorun:** Admin panelinde gruba klasör izni atanamıyordu.
+
+**Kök neden (3 katman):**
+1. `GET /api/v1/admin/groups/{id}/folder-permissions` endpoint'i yoktu → mevcut izinler listelenemiyordu
+2. `useGroupFolderPermissionsQuery` hook tanımlı değildi
+3. `groups.tsx` sayfasında "Klasör İzinleri" paneli hiç yoktu — sadece "Üyeler" görünüyordu
+4. `useGrantFolderGroupPermissionMutation` ve `useRevokeFolderGroupPermissionMutation` hook'ları `groups.ts`'de yazılmış ama hiçbir UI bileşeni çağırmıyordu
+
+**Değişiklikler:**
+- `server/internal/httpapi/group_handlers.go` — `ListFolderGroupPermissions` handler eklendi (folder name decrypt, revoked_at IS NULL filtresi)
+- `server/internal/httpapi/router.go` — `GET /{id}/folder-permissions` route eklendi
+- `shared/pkg/src/api/types.ts` — `GroupFolderPermission` + `GroupFolderPermissionsResponse` tipleri eklendi
+- `web/src/api/groups.ts` — `useGroupFolderPermissionsQuery` hook eklendi; grant/revoke mutation'larına `onSuccess` invalidation eklendi
+- `web/src/pages/admin/groups.tsx` — `GroupFolderPermissionsPanel` bileşeni eklendi: mevcut izinleri listeler (klasör adı + okuma/yazma badge + alt klasör badge + kaldır butonu), yeni izin ekleme formu (kök klasör dropdown + okuma/yazma seçimi + alt klasörlere yay checkbox)
+
+### Container Güvenlik Raporu Remediasyonu (2026-06-08)
+
+**Kaynak:** Trivy container scan `envanter-dev-web-1` — 85 bulgu, risk 100/100
+
+**Tamamlanan iyileştirmeler:**
+
+| Paket | Önceki | Sonraki | CVE/Notlar |
+|-------|--------|---------|------------|
+| `vite` | 5.3.1 | **8.0.16** | esbuild Go binary CVE'lerini düzeltir (Go stdlib) |
+| `vitest` | 2.0.0 | **4.1.8** | güvenlik + özellik güncellemesi |
+| `@vitejs/plugin-react` | 4.3.1 | **6.0.2** | vite 8 uyumluluğu |
+| `react-router-dom` | 6.30.3 | **6.30.4** | CVE-2026-40181 open redirect düzeltmesi |
+| `esbuild` (vite içinde) | 0.21.5 | **0.27.7** | Tüm Go stdlib CVE'leri düzeldi |
+| `ws`, `tar`, `glob`, `minimatch`, `brace-expansion`, `ip-address`, `diff`, `cross-spawn` | çeşitli | override | Root `package.json` `overrides` eklendi |
+
+**Kabul edilen bilinen risk — `@xmldom/xmldom@0.7.13`:**
+- kdbxweb@2.1.1 `^0.7.4` range'ine pin'li; 0.9.x ile uyumsuz
+- npm `overrides` workspace transitive dep'leri için bu durumda çalışmıyor (npm 11 workspace sınırlaması)
+- `npm audit fix --force` → kdbxweb 2.1.0'a düşürür ama eski `xmldom@0.6.0` da benzer CVE'ler içerir
+- CVE'ler XML **serileştirme** (output) hakkında; kdbxweb sadece `.kdbx` **parse** eder (okuma)
+- Saldırı vektörü: kimlik doğrulanmış kullanıcı özel hazırlanmış .kdbx dosyası yüklemeli → düşük olasılık
+- Düzeltme yolu: kdbxweb 2.2.x çıkışını izle (`@xmldom/xmldom ^0.9.x` bağımlılığıyla)
+
+**Test durumu:** 179/179 web testi geçiyor ✅
 
 ### PR-CATALOG: Backstage-Style Servis Kataloğu (2026-06-08)
 

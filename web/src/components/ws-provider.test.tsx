@@ -22,7 +22,11 @@ vi.mock('@/api/ws', () => {
     _emit: (status: string) => listeners.forEach((cb) => cb({ status, attempt: 0 })),
   };
   return {
-    WsClient: vi.fn().mockReturnValue(mockClient),
+    // vitest 4: mockReturnValue is not allowed when called with `new`.
+    // Arrow functions cannot be constructors; use regular function.
+    // Returning an object from a constructor makes `new` return that object.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    WsClient: vi.fn().mockImplementation(function(this: any) { Object.assign(this, mockClient); return mockClient; }),
     _mockClient: mockClient,
   };
 });

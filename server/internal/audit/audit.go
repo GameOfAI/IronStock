@@ -87,6 +87,7 @@ const (
 	ActionGroupDeleted       = "group.deleted"
 	ActionGroupMemberAdded   = "group.member_added"
 	ActionGroupMemberRemoved = "group.member_removed"
+	ActionGroupRoleUpdated   = "group.role_updated"
 
 	// Tags + favorites (PR-N7).
 	ActionTagCreated      = "tag.created"

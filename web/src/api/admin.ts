@@ -155,6 +155,18 @@ export function useUpdateWebAuthnRequirementMutation(userId: string) {
   });
 }
 
+export function useSetBreakGlassMutation(userId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (enabled: boolean) =>
+      apiFetch<void>(`/api/v1/admin/users/${userId}/break-glass`, {
+        method: 'POST',
+        body: { enabled },
+      }),
+    onSuccess: () => invalidateAllUserPages(queryClient),
+  });
+}
+
 // ---------- Audit log ----------
 
 /**

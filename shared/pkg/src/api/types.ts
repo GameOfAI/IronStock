@@ -438,6 +438,7 @@ export interface Group {
   id: string;
   name: string;
   description?: string | null;
+  role?: 'admin' | 'write' | 'read' | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -447,6 +448,10 @@ export interface Group {
 export interface GroupListResponse {
   groups: Group[];
   total: number;
+}
+
+export interface UpdateGroupRoleRequest {
+  role: 'admin' | 'write' | 'read' | null;
 }
 
 export interface GroupMember {
@@ -473,6 +478,18 @@ export interface GrantFolderGroupPermissionRequest {
   folder_id: string;
   permission: 'read' | 'write';
   inherit_to_children: boolean;
+}
+
+export interface GroupFolderPermission {
+  folder_id: string;
+  folder_name: string;
+  permission: 'read' | 'write';
+  inherit_to_children: boolean;
+  granted_at: string;
+}
+
+export interface GroupFolderPermissionsResponse {
+  permissions: GroupFolderPermission[];
 }
 
 // --- Tags + Favorites (PR-N7) ---
