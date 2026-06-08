@@ -386,8 +386,9 @@ func run() error {
 		Version: version,
 	}
 	catalogBrowseHandlers := &httpapi.CatalogBrowseHandlers{
-		DB:     pool,
-		Logger: logger,
+		DB:      pool,
+		AuthSvc: authSvc, // for folder name decryption
+		Logger:  logger,
 	}
 	catalogHandlers := &httpapi.CatalogHandlers{
 		Service: authSvc,

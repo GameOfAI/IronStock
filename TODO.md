@@ -1,6 +1,6 @@
 # Yapılacaklar
 
-Son güncelleme: 2026-05-25 — Error sanitization + security hardening + keypair route fix.
+Son güncelleme: 2026-06-08 — PR-CATALOG bugfix: catalog 500 hatası düzeltildi (f.name → batch decrypt).
 
 ## ✅ Post-Deploy Fixes (2026-05-25)
 

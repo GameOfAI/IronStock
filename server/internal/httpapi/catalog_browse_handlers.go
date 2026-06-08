@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 
+	"envanter.app/server/internal/auth"
 	"envanter.app/server/internal/health"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -27,8 +28,9 @@ const (
 
 // CatalogBrowseHandlers serves GET /api/v1/catalog/items.
 type CatalogBrowseHandlers struct {
-	DB     *pgxpool.Pool
-	Logger *slog.Logger
+	DB      *pgxpool.Pool
+	AuthSvc *auth.Service // for folder name decryption (folders.name_enc)
+	Logger  *slog.Logger
 }
 
 // catalogBrowseItem is a single row in the catalog list response.
@@ -235,7 +237,6 @@ func (h *CatalogBrowseHandlers) List(w http.ResponseWriter, r *http.Request) {
 			    i.id::text,
 			    i.item_type_id,
 			    i.folder_id::text,
-			    COALESCE(f.name, '') AS folder_name,
 			    COALESCE(i.name_plain, '') AS name,
 			    COALESCE(i.description, '') AS description,
 			    i.health_score,
@@ -252,7 +253,6 @@ func (h *CatalogBrowseHandlers) List(w http.ResponseWriter, r *http.Request) {
 			    EXISTS (SELECT 1 FROM user_favorites uf WHERE uf.item_id = i.id AND uf.user_id = $1::uuid) AS is_favorite,
 			    ` + permExpr + ` AS permission
 			FROM items i
-			LEFT JOIN folders f ON f.id = i.folder_id
 			WHERE (
 			    i.created_by = $1::uuid
 			    OR i.id IN (
@@ -270,7 +270,6 @@ func (h *CatalogBrowseHandlers) List(w http.ResponseWriter, r *http.Request) {
 			    i.id::text,
 			    i.item_type_id,
 			    i.folder_id::text,
-			    COALESCE(f.name, '') AS folder_name,
 			    COALESCE(i.name_plain, '') AS name,
 			    COALESCE(i.description, '') AS description,
 			    i.health_score,
@@ -287,7 +286,6 @@ func (h *CatalogBrowseHandlers) List(w http.ResponseWriter, r *http.Request) {
 			    false AS is_favorite,
 			    ` + permExpr + ` AS permission
 			FROM items i
-			LEFT JOIN folders f ON f.id = i.folder_id
 			WHERE true
 		`
 	}
@@ -312,11 +310,12 @@ func (h *CatalogBrowseHandlers) List(w http.ResponseWriter, r *http.Request) {
 		var tags []string
 		var stageIDs []int32
 
+		// NOTE: folder_name is NOT in SELECT — folders.name is encrypted.
+		// Folder names are resolved in a separate batch-decrypt pass below.
 		if err := rows.Scan(
 			&item.ID,
 			&item.ItemTypeID,
 			&item.FolderID,
-			&item.FolderName,
 			&item.Name,
 			&item.Description,
 			&rawScore,
@@ -353,6 +352,44 @@ func (h *CatalogBrowseHandlers) List(w http.ResponseWriter, r *http.Request) {
 		writeError(w, h.Logger, http.StatusInternalServerError, ErrCodeInternal,
 			"Katalog sorgusu başarısız.", err)
 		return
+	}
+
+	// --- Batch-decrypt folder names ---
+	// folders.name_enc is server-side envelope encrypted (not a secret field per
+	// ADR-0002 §1). Collect unique folder IDs, fetch name_enc in one query, then
+	// decrypt with the master cipher. Failures are soft: fallback to empty string.
+	if h.AuthSvc != nil && len(items) > 0 {
+		seen := make(map[string]struct{}, len(items))
+		folderIDs := make([]string, 0, len(items))
+		for _, it := range items {
+			if _, ok := seen[it.FolderID]; !ok {
+				seen[it.FolderID] = struct{}{}
+				folderIDs = append(folderIDs, it.FolderID)
+			}
+		}
+
+		folderNameMap := make(map[string]string, len(folderIDs))
+		fRows, fErr := h.DB.Query(ctx,
+			`SELECT id::text, name_enc FROM folders WHERE id = ANY($1::uuid[])`,
+			folderIDs)
+		if fErr == nil {
+			defer fRows.Close()
+			for fRows.Next() {
+				var fID string
+				var nameEnc []byte
+				if scanErr := fRows.Scan(&fID, &nameEnc); scanErr == nil {
+					if name, decErr := decryptFolderName(h.AuthSvc, nameEnc); decErr == nil {
+						folderNameMap[fID] = name
+					}
+				}
+			}
+		}
+
+		for i := range items {
+			if name, ok := folderNameMap[items[i].FolderID]; ok {
+				items[i].FolderName = name
+			}
+		}
 	}
 
 	// --- Count query (same filters, no limit/offset) ---

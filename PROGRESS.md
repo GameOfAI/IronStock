@@ -1,6 +1,6 @@
 # İlerleyiş
 
-Son güncelleme: 2026-06-08 (PR-CATALOG: Backstage-style servis kataloğu)
+Son güncelleme: 2026-06-08 (PR-CATALOG bugfix: catalog 500 error — f.name → batch decrypt)
 
 ## Mevcut Durum
 
@@ -10,8 +10,10 @@ Son güncelleme: 2026-06-08 (PR-CATALOG: Backstage-style servis kataloğu)
 
 ### PR-CATALOG: Backstage-Style Servis Kataloğu (2026-06-08)
 
+**Bugfix (2026-06-08):** `catalog_browse_handlers.go` — `folders` tablosunda `name` kolonu yok (server-side encrypted). `COALESCE(f.name, '')` → kaldırıldı, `LEFT JOIN folders` kaldırıldı. Yerine: `AuthSvc *auth.Service` eklendi, batch query ile `name_enc` çekilip `decryptFolderName()` ile çözülür. `main.go`'da `AuthSvc: authSvc` wiring eklendi.
+
 **Değişiklikler:**
-- `server/internal/httpapi/catalog_browse_handlers.go` — `GET /api/v1/catalog/items`: RBAC-filtered flat item listesi (graph handler CTE'si reuse), `name_plain` + cached `health_score` kullanır (decryption yok), tag/type/severity/q filtreleri, limit/offset pagination
+- `server/internal/httpapi/catalog_browse_handlers.go` — `GET /api/v1/catalog/items`: RBAC-filtered flat item listesi (graph handler CTE'si reuse), `name_plain` + cached `health_score` kullanır (decryption yok), tag/type/severity/q filtreleri, limit/offset pagination; folder name batch decryption eklendi
 - `server/internal/health/score.go` — `SeverityRange(sev)` helper eklendi
 - `server/internal/httpapi/router.go` — `CatalogBrowse` Deps alanı + route kaydı
 - `server/cmd/api/main.go` — `CatalogBrowseHandlers` wiring
