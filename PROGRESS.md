@@ -1,12 +1,37 @@
 # İlerleyiş
 
-Son güncelleme: 2026-06-08 (PR-CATALOG bugfix: catalog 500 error — f.name → batch decrypt)
+Son güncelleme: 2026-06-08 (Container güvenlik raporu remediasyonu — vite 8, vitest 4, react-router-dom 6.30.4)
 
 ## Mevcut Durum
 
 - **Tüm Fazlar Tamamlandı:** Faz 0–11 ✅
 - **Tamamlanan PR:** 27/27 + PR-CATALOG (%100 + bonus)
 - **Aktif:** PR-CATALOG tamamlandı
+
+### Container Güvenlik Raporu Remediasyonu (2026-06-08)
+
+**Kaynak:** Trivy container scan `envanter-dev-web-1` — 85 bulgu, risk 100/100
+
+**Tamamlanan iyileştirmeler:**
+
+| Paket | Önceki | Sonraki | CVE/Notlar |
+|-------|--------|---------|------------|
+| `vite` | 5.3.1 | **8.0.16** | esbuild Go binary CVE'lerini düzeltir (Go stdlib) |
+| `vitest` | 2.0.0 | **4.1.8** | güvenlik + özellik güncellemesi |
+| `@vitejs/plugin-react` | 4.3.1 | **6.0.2** | vite 8 uyumluluğu |
+| `react-router-dom` | 6.30.3 | **6.30.4** | CVE-2026-40181 open redirect düzeltmesi |
+| `esbuild` (vite içinde) | 0.21.5 | **0.27.7** | Tüm Go stdlib CVE'leri düzeldi |
+| `ws`, `tar`, `glob`, `minimatch`, `brace-expansion`, `ip-address`, `diff`, `cross-spawn` | çeşitli | override | Root `package.json` `overrides` eklendi |
+
+**Kabul edilen bilinen risk — `@xmldom/xmldom@0.7.13`:**
+- kdbxweb@2.1.1 `^0.7.4` range'ine pin'li; 0.9.x ile uyumsuz
+- npm `overrides` workspace transitive dep'leri için bu durumda çalışmıyor (npm 11 workspace sınırlaması)
+- `npm audit fix --force` → kdbxweb 2.1.0'a düşürür ama eski `xmldom@0.6.0` da benzer CVE'ler içerir
+- CVE'ler XML **serileştirme** (output) hakkında; kdbxweb sadece `.kdbx` **parse** eder (okuma)
+- Saldırı vektörü: kimlik doğrulanmış kullanıcı özel hazırlanmış .kdbx dosyası yüklemeli → düşük olasılık
+- Düzeltme yolu: kdbxweb 2.2.x çıkışını izle (`@xmldom/xmldom ^0.9.x` bağımlılığıyla)
+
+**Test durumu:** 179/179 web testi geçiyor ✅
 
 ### PR-CATALOG: Backstage-Style Servis Kataloğu (2026-06-08)
 
