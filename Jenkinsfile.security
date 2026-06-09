@@ -1,0 +1,185 @@
+// ============================================================================
+// IronStock — Security Pipeline (Trivy)  [STANDALONE / yan pipeline]
+// ----------------------------------------------------------------------------
+// Asil release pipeline'dan (Jenkinsfile) bagimsizdir. Sonra release'e stage
+// olarak entegre edilebilir. Tarama kapsami:
+//   1) Dependency + secret + misconfig  -> trivy fs (kod reposu)
+//   2) IaC / Helm / k8s manifest         -> trivy config (ironstock-k8s + deploy/k8s)
+//   3) (Opsiyonel) Container image       -> trivy image (Harbor'daki tag)
+// Ciktilar: HTML + SARIF + tablo; ARTIFACTS olarak arsivlenir.
+// ============================================================================
+pipeline {
+    agent { label 'buildserver211' }
+
+    parameters {
+        string(
+            name: 'BRANCH',
+            defaultValue: 'main',
+            description: 'Taranacak branch.'
+        )
+        choice(
+            name: 'SEVERITY',
+            choices: ['HIGH,CRITICAL', 'CRITICAL', 'MEDIUM,HIGH,CRITICAL'],
+            description: 'Raporlanacak/kirilacak severity esigi.'
+        )
+        booleanParam(
+            name: 'FAIL_ON_FINDING',
+            defaultValue: false,
+            description: 'true ise bulgu varsa build FAIL olur. Baslangicta false (sadece raporla).'
+        )
+        string(
+            name: 'IMAGE_TAG',
+            defaultValue: '',
+            description: 'Opsiyonel: Harbor image tag (orn. 0.1.42). Bos birakilirsa image scan atlanir.'
+        )
+    }
+
+    environment {
+        REGISTRY      = "${env.HARBOR_URL}"        // bilgeadam-harbor.bilgeadam.com
+        REPO_NAME     = "ironstock"
+        TRIVY_VERSION = "0.55.2"
+        TRIVY_CACHE   = "${WORKSPACE}/.trivycache"
+        SLACK_CHANNEL = "#ironstock-platform"
+        // Trivy'nin DB cekmesi gerek; offline ortamda TRIVY_DB_REPOSITORY ile ic mirror verilebilir.
+    }
+
+    options {
+        timestamps()
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        timeout(time: 45, unit: 'MINUTES')
+    }
+
+    stages {
+
+        stage('Init Trivy') {
+            steps {
+                sh '''
+                    set -e
+                    mkdir -p "${TRIVY_CACHE}" reports
+                    if ! command -v trivy >/dev/null 2>&1; then
+                        echo "trivy bulunamadi, ${TRIVY_VERSION} lokal kuruluyor..."
+                        curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+                          | sh -s -- -b "${WORKSPACE}/bin" v${TRIVY_VERSION}
+                        export PATH="${WORKSPACE}/bin:$PATH"
+                    fi
+                    trivy --version
+                '''
+            }
+        }
+
+        // ── 1) Dependency + secret + misconfig (kaynak kod) ──
+        stage('Trivy FS Scan (deps + secrets)') {
+            steps {
+                sh '''
+                    set -e
+                    export PATH="${WORKSPACE}/bin:$PATH"
+                    trivy fs . \
+                        --scanners vuln,secret,misconfig \
+                        --severity ${SEVERITY} \
+                        --cache-dir "${TRIVY_CACHE}" \
+                        --no-progress \
+                        --format table \
+                        --output reports/fs-scan.txt
+                    trivy fs . \
+                        --scanners vuln,secret,misconfig \
+                        --severity ${SEVERITY} \
+                        --cache-dir "${TRIVY_CACHE}" \
+                        --no-progress \
+                        --format sarif \
+                        --output reports/fs-scan.sarif
+                    echo "===== FS SCAN ÖZET ====="
+                    cat reports/fs-scan.txt
+                '''
+            }
+        }
+
+        // ── 2) IaC / Helm / k8s manifest ──
+        stage('Trivy Config Scan (IaC/Helm/k8s)') {
+            steps {
+                sh '''
+                    set -e
+                    export PATH="${WORKSPACE}/bin:$PATH"
+                    # Helm chart + ArgoCD manifestleri (varsa) ve raw k8s manifestleri
+                    TARGETS=""
+                    [ -d ironstock-k8s ] && TARGETS="$TARGETS ironstock-k8s"
+                    [ -d deploy/k8s ]   && TARGETS="$TARGETS deploy/k8s"
+                    [ -z "$TARGETS" ]   && TARGETS="."
+
+                    for t in $TARGETS; do
+                        echo "===== CONFIG SCAN: $t ====="
+                        trivy config "$t" \
+                            --severity ${SEVERITY} \
+                            --cache-dir "${TRIVY_CACHE}" \
+                            --no-progress \
+                            --format table \
+                            --output "reports/config-$(echo $t | tr '/' '-').txt"
+                        cat "reports/config-$(echo $t | tr '/' '-').txt"
+                    done
+                '''
+            }
+        }
+
+        // ── 3) (Opsiyonel) Container image scan ──
+        stage('Trivy Image Scan') {
+            when { expression { params.IMAGE_TAG?.trim() } }
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'harbor-credentials',
+                        usernameVariable: 'HARBOR_USER',
+                        passwordVariable: 'HARBOR_PASS'
+                    )
+                ]) {
+                    sh '''
+                        set -e
+                        export PATH="${WORKSPACE}/bin:$PATH"
+                        export TRIVY_USERNAME="${HARBOR_USER}"
+                        export TRIVY_PASSWORD="${HARBOR_PASS}"
+                        for svc in api web; do
+                            IMG="${REGISTRY}/${REPO_NAME}/${svc}:${IMAGE_TAG}"
+                            echo "===== IMAGE SCAN: $IMG ====="
+                            trivy image "$IMG" \
+                                --severity ${SEVERITY} \
+                                --cache-dir "${TRIVY_CACHE}" \
+                                --no-progress \
+                                --format table \
+                                --output "reports/image-${svc}.txt" || echo "WARN: $IMG taranamadi (henuz push edilmemis olabilir)"
+                            [ -f "reports/image-${svc}.txt" ] && cat "reports/image-${svc}.txt"
+                        done
+                    '''
+                }
+            }
+        }
+
+        // ── Gate: bulgu varsa (FAIL_ON_FINDING) build'i kir ──
+        stage('Gate') {
+            when { expression { params.FAIL_ON_FINDING } }
+            steps {
+                sh '''
+                    set -e
+                    export PATH="${WORKSPACE}/bin:$PATH"
+                    echo "FAIL_ON_FINDING=true -> ${SEVERITY} bulgularinda exit 1"
+                    trivy fs . --scanners vuln,secret,misconfig --severity ${SEVERITY} \
+                        --cache-dir "${TRIVY_CACHE}" --no-progress --exit-code 1 --quiet
+                '''
+            }
+        }
+    }
+
+    post {
+        always {
+            archiveArtifacts artifacts: 'reports/**', allowEmptyArchive: true, fingerprint: true
+            // SARIF -> Jenkins Warnings NG / GitHub code scanning entegrasyonu icin hazir.
+            // recordIssues(tools: [sarif(pattern: 'reports/*.sarif')])   // Warnings NG plugin varsa ac
+        }
+        failure {
+            script {
+                sendCICDSlackNotification(
+                    status: 'FAILURE',
+                    channel: "${SLACK_CHANNEL}",
+                    message: "IronStock Security Scan FAILED (severity: ${params.SEVERITY}) — rapor: ${env.BUILD_URL}artifact/reports/"
+                )
+            }
+        }
+    }
+}
