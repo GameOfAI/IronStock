@@ -24,6 +24,6 @@ resources:
 # let the CI docker job commit the change automatically.
 images:
 - name: ghcr.io/gameofai/envanter-api
-  newTag: main-eb9d8fe
+  newTag: main-2cb945e
 - name: ghcr.io/gameofai/envanter-web
-  newTag: main-eb9d8fe
+  newTag: main-2cb945e
