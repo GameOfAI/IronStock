@@ -39,7 +39,6 @@ pipeline {
         REPO_NAME     = "ironstock"
         TRIVY_VERSION = "0.55.2"
         TRIVY_CACHE   = "${WORKSPACE}/.trivycache"
-        SLACK_CHANNEL = "#ironstock-platform"
         // Trivy'nin DB cekmesi gerek; offline ortamda TRIVY_DB_REPOSITORY ile ic mirror verilebilir.
     }
 
@@ -173,13 +172,7 @@ pipeline {
             // recordIssues(tools: [sarif(pattern: 'reports/*.sarif')])   // Warnings NG plugin varsa ac
         }
         failure {
-            script {
-                sendCICDSlackNotification(
-                    status: 'FAILURE',
-                    channel: "${SLACK_CHANNEL}",
-                    message: "IronStock Security Scan FAILED (severity: ${params.SEVERITY}) — rapor: ${env.BUILD_URL}artifact/reports/"
-                )
-            }
+            echo "IronStock Security Scan FAILED (severity: ${params.SEVERITY}) — rapor: ${env.BUILD_URL}artifact/reports/"
         }
     }
 }

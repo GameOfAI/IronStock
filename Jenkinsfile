@@ -39,7 +39,7 @@ Diger: Sadece secilen servisi deploy et (Targeted Mode - hotfix icin)'''
         REPO_NAME         = "ironstock"
         DOCKER_BUILDKIT   = "1"
 
-        ARGOCD_SERVER     = "argocd.bilgeadam.com"
+        ARGOCD_SERVER     = "bacluster-argocd.opthemateknoloji.com"   // scheme'siz host (argocd CLI boyle ister)
         ARGOCD_PROJECT    = "ironstock"
         ARGOCD_BRANCH     = "main"
         ARGOCD_REPO_NAME  = "ironstock-k8s-repository"
@@ -48,8 +48,6 @@ Diger: Sadece secilen servisi deploy et (Targeted Mode - hotfix icin)'''
         GITHUB_CODE_REPO  = "IronStock"
         GITHUB_K8S_REPO   = "ironstock-k8s"
         K8S_REPO_DIR      = "ironstock-k8s"
-
-        SLACK_CHANNEL     = "#ironstock-platform"
     }
 
     options {
@@ -108,7 +106,8 @@ Diger: Sadece secilen servisi deploy et (Targeted Mode - hotfix icin)'''
                         env.DEPLOY_ENV = "test"
                     }
 
-                    env.ARGOCD_NAMESPACE = "ironstock-${env.DEPLOY_ENV}"
+                    // Namespace: prod -> "ironstock" (bare), digerleri -> "ironstock-<env>"
+                    env.ARGOCD_NAMESPACE = (env.DEPLOY_ENV == "prod") ? "ironstock" : "ironstock-${env.DEPLOY_ENV}"
                     env.VALUES_FILE = "values-${env.DEPLOY_ENV}.yaml"
                     env.TAG = "${params.VERSION_PREFIX}.${env.BUILD_NUMBER}"
                     env.K8S_REPO_URL = "https://github.com/${GITHUB_ORG}/${GITHUB_K8S_REPO}.git"
@@ -275,7 +274,7 @@ Diger: Sadece secilen servisi deploy et (Targeted Mode - hotfix icin)'''
             steps {
                 withCredentials([
                     usernamePassword(
-                        credentialsId: 'microservices-argocd-credentials',
+                        credentialsId: 'argocd-credentials-for-bacluster',
                         usernameVariable: 'ARGOCD_USER',
                         passwordVariable: 'ARGOCD_PASS'
                     ),
@@ -297,6 +296,7 @@ Diger: Sadece secilen servisi deploy et (Targeted Mode - hotfix icin)'''
                             echo "Creating ArgoCD project: ${ARGOCD_PROJECT}"
                             argocd proj create "$ARGOCD_PROJECT" \
                                 --description "IronStock Credential Vault" \
+                                --dest "https://kubernetes.default.svc,ironstock" \
                                 --dest "https://kubernetes.default.svc,ironstock-*" \
                                 --dest "https://kubernetes.default.svc,argocd" \
                                 --src "$K8S_REPO_URL" \
@@ -564,7 +564,7 @@ Diger: Sadece secilen servisi deploy et (Targeted Mode - hotfix icin)'''
             steps {
                 withCredentials([
                     usernamePassword(
-                        credentialsId: 'microservices-argocd-credentials',
+                        credentialsId: 'argocd-credentials-for-bacluster',
                         usernameVariable: 'ARGOCD_USER',
                         passwordVariable: 'ARGOCD_PASS'
                     )
@@ -655,10 +655,7 @@ Diger: Sadece secilen servisi deploy et (Targeted Mode - hotfix icin)'''
                 if (env.SKIP_DEPLOY == "true") {
                     echo "Degisiklik tespit edilmedi - pipeline atlandi"
                 } else {
-                    sendCICDSlackNotification(
-                        status: 'SUCCESS',
-                        channel: "${SLACK_CHANNEL}",
-                        message: """IronStock Build SUCCESS
+                    echo """IronStock Build SUCCESS
 SERVICE     : ${params.SERVICE}
 Environment : ${env.DEPLOY_ENV}
 Version     : ${env.TAG}
@@ -666,22 +663,17 @@ Services    : ${env.DEPLOY_COUNT} deployed
 Namespace   : ${env.ARGOCD_NAMESPACE}
 Build Time  : ${currentBuild.durationString.replace(' and counting', '')}
 """
-                    )
                 }
             }
         }
         failure {
             script {
-                sendCICDSlackNotification(
-                    status: 'FAILURE',
-                    channel: "${SLACK_CHANNEL}",
-                    message: """IronStock Build FAILURE
+                echo """IronStock Build FAILURE
 SERVICE     : ${params.SERVICE}
 Environment : ${env.DEPLOY_ENV}
 Stage       : ${env.STAGE_NAME}
 Build Time  : ${currentBuild.durationString.replace(' and counting', '')}
 """
-                )
             }
         }
         always {
