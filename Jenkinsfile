@@ -86,7 +86,7 @@ Diger: Sadece secilen servisi deploy et (Targeted Mode - hotfix icin)'''
                         )
                         if (checkoutStatus != 0) {
                             echo "origin/${branchParam} bulunamadi, credential ile fetch deneniyor..."
-                            withCredentials([string(credentialsId: 'github-pat', variable: 'GH_TOKEN')]) {
+                            withCredentials([string(credentialsId: 'github-pat-ironstock', variable: 'GH_TOKEN')]) {
                                 sh """
                                     git fetch 'https://x-access-token:\${GH_TOKEN}@github.com/${GITHUB_ORG}/${GITHUB_CODE_REPO}.git' '${branchParam}'
                                     git checkout -B '${branchParam}' FETCH_HEAD
@@ -253,7 +253,7 @@ Diger: Sadece secilen servisi deploy et (Targeted Mode - hotfix icin)'''
                 expression { env.SKIP_DEPLOY != "true" && env.DEPLOY_COUNT.toInteger() > 0 }
             }
             steps {
-                withCredentials([string(credentialsId: 'github-pat', variable: 'GH_TOKEN')]) {
+                withCredentials([string(credentialsId: 'github-pat-ironstock', variable: 'GH_TOKEN')]) {
                     sh '''
                         set -e
                         rm -rf ${K8S_REPO_DIR} || true
@@ -278,7 +278,7 @@ Diger: Sadece secilen servisi deploy et (Targeted Mode - hotfix icin)'''
                         usernameVariable: 'ARGOCD_USER',
                         passwordVariable: 'ARGOCD_PASS'
                     ),
-                    string(credentialsId: 'github-pat', variable: 'GH_TOKEN')
+                    string(credentialsId: 'github-pat-ironstock', variable: 'GH_TOKEN')
                 ]) {
                     script {
                         def loginTest = sh(
@@ -408,7 +408,7 @@ Diger: Sadece secilen servisi deploy et (Targeted Mode - hotfix icin)'''
                 expression { env.SKIP_DEPLOY != "true" && env.DEPLOY_COUNT.toInteger() > 0 }
             }
             steps {
-                withCredentials([string(credentialsId: 'github-pat', variable: 'GH_TOKEN')]) {
+                withCredentials([string(credentialsId: 'github-pat-ironstock', variable: 'GH_TOKEN')]) {
                     script {
                         def services = env.SERVICES_TO_DEPLOY.trim().split('\n')
 
@@ -500,7 +500,7 @@ Diger: Sadece secilen servisi deploy et (Targeted Mode - hotfix icin)'''
                 expression { env.SKIP_DEPLOY != "true" && env.DEPLOY_COUNT.toInteger() > 0 }
             }
             steps {
-                withCredentials([string(credentialsId: 'github-pat', variable: 'GH_TOKEN')]) {
+                withCredentials([string(credentialsId: 'github-pat-ironstock', variable: 'GH_TOKEN')]) {
                     script {
                         def services = env.SERVICES_TO_DEPLOY.trim().split('\n')
                         def newManifests = []
