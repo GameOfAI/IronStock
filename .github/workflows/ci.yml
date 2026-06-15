@@ -284,7 +284,7 @@ jobs:
           fi
 
       - name: Build & push API image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: ./server
           push: true
@@ -294,7 +294,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=api
 
       - name: Build & push Web image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./web/Dockerfile
